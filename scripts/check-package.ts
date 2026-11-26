@@ -16,7 +16,7 @@
 //   app of single-file components checked by vue-tsc on TypeScript 6; `angularSmoke`: a zoneless
 //   Vite + Angular app (@analogjs/vite-plugin-angular) of standalone components checked by `ngc`
 //   with strict templates on TypeScript 6; their pins the examples app's: examples/react's,
-//   examples/vue's and examples/angular's, else the adapter's own). A package published from its build output
+//   examples/vue's and examples/angular's). A package published from its build output
 //   (`publishConfig.directory`: an Angular one, which ng-packagr builds into `dist`) is packed from
 //   that directory: its packed `exports` are the repo's relative to it, each target a file of the
 //   tarball.
@@ -27,7 +27,6 @@
 // packed from the repo, as without the option.
 import { execFileSync, spawn } from "node:child_process";
 import {
-    existsSync,
     mkdirSync,
     mkdtempSync,
     readdirSync,
@@ -282,10 +281,14 @@ export interface AdapterCheck {
     ) => Promise<void>;
 }
 
-/** The version the adapter `packages/<dir>` pins for `name` (a dependency or a dev dependency). */
-function adapterVersion(dir: string, name: string): string {
+/**
+ * The version the smoke app of `framework` installs of `name`: the examples app's
+ * (`examples/<framework>`, which pins what an app of that framework installs, the Vite plugin of
+ * its components included). Every adapter has its examples app, so a pin missing from it fails.
+ */
+function smokeVersion(framework: Framework, name: string): string {
     const manifest = JSON.parse(
-        readFileSync(join(root, "packages", dir, "package.json"), "utf8"),
+        readFileSync(join(root, "examples", framework, "package.json"), "utf8"),
     ) as {
         dependencies?: Record<string, string>;
         devDependencies?: Record<string, string>;
@@ -293,29 +296,9 @@ function adapterVersion(dir: string, name: string): string {
     const version =
         manifest.dependencies?.[name] ?? manifest.devDependencies?.[name];
     if (version === undefined) {
-        throw new Error(`packages/${dir} does not depend on ${name}`);
+        throw new Error(`examples/${framework} does not depend on ${name}`);
     }
     return version;
-}
-
-/**
- * The version the smoke app of `framework` installs of `name`: the examples app's
- * (`examples/<framework>`, which pins what an app of that framework installs: React's and Vue's
- * exist, with the Vite plugin of single-file components), else the adapter's own (the same pins:
- * AGENTS.md D22), for a framework whose examples app is not written yet.
- */
-function smokeVersion(framework: Framework, dir: string, name: string): string {
-    const examples = join(root, "examples", framework, "package.json");
-    if (existsSync(examples)) {
-        const manifest = JSON.parse(readFileSync(examples, "utf8")) as {
-            dependencies?: Record<string, string>;
-            devDependencies?: Record<string, string>;
-        };
-        const version =
-            manifest.dependencies?.[name] ?? manifest.devDependencies?.[name];
-        if (version !== undefined) return version;
-    }
-    return adapterVersion(dir, name);
 }
 
 // Everything from the React package, the core included: a React app installs that one only. A
@@ -468,7 +451,7 @@ if (container) {
  * (examples/react's); Vite compiles the JSX itself.
  */
 function writeReactSmokeApp(dir: string, core: string, react: string): void {
-    const version = (name: string) => smokeVersion("react", "react", name);
+    const version = (name: string) => smokeVersion("react", name);
     const manifest = {
         name: "calendar-smoke",
         private: true,
@@ -786,7 +769,7 @@ const VUE_SMOKE_SHIM = `declare module "*.vue" {
  * declarations checked too (no skipLibCheck).
  */
 function writeVueSmokeApp(dir: string, core: string, vue: string): void {
-    const version = (name: string) => smokeVersion("vue", "vue", name);
+    const version = (name: string) => smokeVersion("vue", name);
     const manifest = {
         name: "calendar-smoke-vue",
         private: true,
@@ -1068,14 +1051,14 @@ bootstrapApplication(App, {
 /**
  * A scratch Vite + Angular app in `dir` (@analogjs/vite-plugin-angular) that depends on the Angular
  * tarball only (the core tarball comes as its dependency), on the Angular tools and TypeScript 6.0
- * (examples/angular's pins, else packages/angular's).
+ * (examples/angular's pins).
  */
 function writeAngularSmokeApp(
     dir: string,
     core: string,
     angular: string,
 ): void {
-    const version = (name: string) => smokeVersion("angular", "angular", name);
+    const version = (name: string) => smokeVersion("angular", name);
     const manifest = {
         name: "calendar-smoke-angular",
         private: true,
