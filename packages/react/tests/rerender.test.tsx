@@ -56,6 +56,27 @@ function Month(props: { tag: number; count: (id: string) => void }) {
     );
 }
 
+/** A month whose rows show a mark: a `useCallback`'d function that reads it. */
+function MarkedMonth(props: {
+    tag: number;
+    mark: string;
+    count: (id: string) => void;
+}) {
+    const { mark, count } = props;
+    const row = React.useCallback(
+        (week: DayGridWeek) => {
+            count(week.id);
+            return <Calendar.Week week={week} data-mark={mark} />;
+        },
+        [mark, count],
+    );
+    return (
+        <Calendar.DayGrid data-tag={props.tag}>
+            <Calendar.Weeks>{row}</Calendar.Weeks>
+        </Calendar.DayGrid>
+    );
+}
+
 describe("re-rendering what changed", () => {
     it("re-renders the week rows an event moves between, not the others", () => {
         const model = modelOf(
@@ -216,5 +237,95 @@ describe("re-rendering what changed", () => {
         });
         expect(columns.changed(before)).toEqual(["2026-11-26"]);
         expect(slots.changed(slotsBefore)).toEqual([]);
+    });
+
+    it("calls a new children function again for every column, slot row, header and list day", () => {
+        const week = modelOf([timed("t", "09:00", "10:00")], {
+            view: { type: "week", anchorDate: "2026-11-26" },
+        });
+        const calls = counter();
+        const grid = (tag: number): React.ReactElement => (
+            <Calendar.Root model={week}>
+                <Calendar.TimeGrid data-tag={tag}>
+                    <Calendar.ColumnHeaders>
+                        {(date) => {
+                            calls.count(`header ${date}`);
+                            return <Calendar.ColumnHeader date={date} />;
+                        }}
+                    </Calendar.ColumnHeaders>
+                    <Calendar.SlotRows>
+                        {(slot) => {
+                            calls.count(`slot ${slot.time}`);
+                            return <Calendar.SlotRow slot={slot} />;
+                        }}
+                    </Calendar.SlotRows>
+                    <Calendar.Columns>
+                        {(column) => {
+                            calls.count(`column ${column.date}`);
+                            return <Calendar.Column column={column} />;
+                        }}
+                    </Calendar.Columns>
+                </Calendar.TimeGrid>
+            </Calendar.Root>
+        );
+        const { rerender, unmount } = render(grid(1));
+        const before = calls.snapshot();
+        rerender(grid(2));
+        const changed = calls.changed(before);
+        expect(changed.filter((key) => key.startsWith("header"))).toHaveLength(
+            7,
+        );
+        expect(changed.filter((key) => key.startsWith("column"))).toHaveLength(
+            7,
+        );
+        expect(changed.filter((key) => key.startsWith("slot"))).toHaveLength(
+            48,
+        );
+        unmount();
+
+        const list = modelOf([timed("t", "09:00", "10:00")], {
+            view: { type: "list", anchorDate: "2026-11-26" },
+        });
+        const days = counter();
+        const agenda = (tag: number): React.ReactElement => (
+            <Calendar.Root model={list}>
+                <Calendar.List data-tag={tag}>
+                    <Calendar.ListDays>
+                        {(day) => {
+                            days.count(day.date);
+                            return (
+                                <Calendar.ListDay day={day}>
+                                    {() => null}
+                                </Calendar.ListDay>
+                            );
+                        }}
+                    </Calendar.ListDays>
+                </Calendar.List>
+            </Calendar.Root>
+        );
+        const second = render(agenda(1));
+        const listBefore = days.snapshot();
+        expect(listBefore.size).toBeGreaterThan(0);
+        second.rerender(agenda(2));
+        expect(days.changed(listBefore)).toHaveLength(listBefore.size);
+    });
+
+    it("keeps a useCallback'd function until what it reads changes", () => {
+        const model = modelOf([allDay("a", "2026-11-03", "2026-11-04")], {
+            view: { type: "month", anchorDate: "2026-11-26" },
+        });
+        const weeks = counter();
+        const app = (tag: number, mark: string): React.ReactElement => (
+            <Calendar.Root model={model}>
+                <MarkedMonth tag={tag} mark={mark} count={weeks.count} />
+            </Calendar.Root>
+        );
+        const { rerender } = render(app(1, "x"));
+        let before = weeks.snapshot();
+        rerender(app(2, "x"));
+        expect(weeks.changed(before)).toEqual([]);
+        before = weeks.snapshot();
+        rerender(app(3, "y"));
+        expect(weeks.changed(before)).toHaveLength(6);
     });
 });
