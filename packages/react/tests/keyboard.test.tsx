@@ -2,6 +2,7 @@
 // slots and into the all-day row, Enter into a cell's events and Escape back, and a keyboard grab
 // that moves an event (one `event.move`, `onEventDrop`).
 import { act, render } from "@testing-library/react";
+import * as React from "react";
 import { describe, expect, it, vi } from "vitest";
 import { Calendar } from "../src";
 import { dragAndDrop } from "../src/drag-and-drop";
@@ -115,5 +116,24 @@ describe("the keyboard in a month", () => {
         key("PageDown");
         expect(model.state.view.anchorDate.startsWith("2027-01")).toBe(true);
         expect(focused()).toBe("day 2027-01-03");
+    });
+});
+
+describe("StrictMode", () => {
+    it("runs on the engine of the second mount: keys and registrations work", () => {
+        const model = modelOf([], {
+            view: { type: "month", anchorDate: "2026-11-26" },
+        });
+        const { container } = render(
+            <React.StrictMode>
+                <Calendar.Root model={model}>
+                    <MonthGrid />
+                </Calendar.Root>
+            </React.StrictMode>,
+        );
+        act(() => tabStop(container).focus());
+        key("ArrowRight");
+        expect(focused()).toBe("day 2026-11-27");
+        expect(tabStop(container)).toBe(document.activeElement);
     });
 });
