@@ -153,6 +153,63 @@ export function useFetchMissing(model: Model) {
 
 </Framework>
 
+<Framework name="angular">
+
+```ts title="inject-fetch-missing.ts"
+import { afterNextRender, DestroyRef, inject } from "@angular/core";
+import type {
+    AnyTypes,
+    CalendarEventJson,
+    CalendarModel,
+} from "@fragiola/calendar-angular";
+
+// `features` is the array above: [eventSources()]
+type Model = CalendarModel<AnyTypes, typeof features>;
+
+async function fetchEvents(
+    sourceId: string,
+    range: { start: string; end: string },
+    signal: AbortSignal,
+): Promise<CalendarEventJson[]> {
+    const query = new URLSearchParams({ from: range.start, to: range.end });
+    const response = await fetch(`/api/sources/${sourceId}/events?${query}`, { signal });
+    if (!response.ok) throw new Error(response.statusText);
+    return response.json();
+}
+
+/** Call it in a component's constructor: it fetches in the browser only, once rendered. */
+export function injectFetchMissing(model: Model) {
+    const controller = new AbortController();
+    let stop = () => {};
+    const fetchMissing = () => {
+        for (const { sourceId, range } of model.get("ranges-to-fetch", {})) {
+            model.run("event-sources.set-loading", { sourceId, range, loading: true });
+            fetchEvents(sourceId, range, controller.signal).then(
+                (events) =>
+                    model.run("event-sources.receive", { sourceId, range, events }),
+                () =>
+                    // failed or aborted: it is asked for again on the next change
+                    model.run("event-sources.set-loading", {
+                        sourceId,
+                        range,
+                        loading: false,
+                    }),
+            );
+        }
+    };
+    afterNextRender(() => {
+        fetchMissing();
+        stop = model.subscribe(fetchMissing);
+    });
+    inject(DestroyRef).onDestroy(() => {
+        stop();
+        controller.abort();
+    });
+}
+```
+
+</Framework>
+
 `ranges-to-fetch` gives, per source, the days of the view that are neither fetched nor loading
 (`{ sourceId, range }`, dates with an exclusive end); a `range` payload asks about other days
 than the view's (a month ahead, for a prefetch). Marking a range loading takes it out of the next
@@ -212,6 +269,19 @@ const stop = model.subscribe(() => {
     loading.value = model.is("event-source-loading", {});
 });
 onScopeDispose(stop);
+```
+
+</Framework>
+
+<Framework name="angular">
+
+```ts
+import { DestroyRef, inject, signal } from "@angular/core";
+
+// in the component's constructor
+const loading = signal(model.is("event-source-loading", {}));
+const stop = model.subscribe(() => loading.set(model.is("event-source-loading", {})));
+inject(DestroyRef).onDestroy(stop);
 ```
 
 </Framework>

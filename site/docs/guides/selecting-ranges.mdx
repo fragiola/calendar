@@ -122,6 +122,66 @@ const model = createCalendarModel<Types, typeof features>(
 
 </Framework>
 
+<Framework name="angular">
+
+```ts title="selectable-week.ts"
+import { Component } from "@angular/core";
+import { CALENDAR, createCalendarModel } from "@fragiola/calendar-angular";
+import {
+    CalendarSelectionDirective,
+    selection,
+} from "@fragiola/calendar-angular/selection";
+
+const features = [selection()] as const;
+
+@Component({
+    selector: "app-selectable-week",
+    imports: [CALENDAR, CalendarSelectionDirective],
+    template: `
+        <div [calendarRoot]="model">
+            <div calendarTimeGrid aria-label="Week">
+                <div calendarAllDayRow>
+                    <ng-template calendarDays let-day>
+                        <div [calendarDay]="day"></div>
+                    </ng-template>
+                    <div *calendarSelection class="selection"></div>
+                </div>
+                <div calendarScroller>
+                    <div class="body">
+                        <!-- the slot rows, as in a week -->
+                        <div calendarColumns class="columns">
+                            <ng-template calendarColumnsItem let-column>
+                                <div [calendarColumn]="column">
+                                    <div calendarColumnEvents>
+                                        <ng-template calendarColumnEventsItem let-segment>
+                                            <div [calendarTimeEvent]="segment"></div>
+                                        </ng-template>
+                                    </div>
+                                    <div *calendarSelection class="selection"></div>
+                                </div>
+                            </ng-template>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `,
+})
+export class SelectableWeek {
+    readonly model = createCalendarModel<Types, typeof features>(
+        {
+            version: 1,
+            events: [],
+            calendars: [],
+            view: { type: "week", anchorDate: "2026-11-26" },
+        },
+        { features },
+    );
+}
+```
+
+</Framework>
+
 In a column, `Selection` is positioned like a timed event (its `top` and `height`); in a row, it
 sits over its days like a segment. Its state says whether the range is still being selected
 (`pending`), so a drag can look lighter than a confirmed range:
@@ -152,6 +212,16 @@ The `#render` slot gives the state:
 
 </Framework>
 
+<Framework name="angular">
+
+The structural directive hands the state to its template:
+
+```html
+<div *calendarSelection="let selection" class="selection" [class.pending]="selection.pending"></div>
+```
+
+</Framework>
+
 ```css
 .selection {
     background: color-mix(in srgb, Highlight 25%, transparent);
@@ -178,7 +248,7 @@ assistive technology: the cells' state and your own announcement say what is sel
 ## Turning a range into an event
 
 A confirmed range is the engine's `select` event, which the root reports as `onSelect` (in Vue,
-`@select`). The listener is typed only when the feature is installed:
+`@select`; in Angular, `(rangeSelect)` with the `calendarSelection` directive on the root). The listener is typed only when the feature is installed:
 
 <Framework name="react">
 
@@ -293,6 +363,67 @@ function save() {
 
 </Framework>
 
+<Framework name="angular">
+
+```ts title="select-to-create.ts"
+import { Component, signal } from "@angular/core";
+import {
+    CALENDAR,
+    type CalendarEngineEventOf,
+    createCalendarModel,
+} from "@fragiola/calendar-angular";
+import {
+    CalendarSelectionRootDirective,
+    selection,
+} from "@fragiola/calendar-angular/selection";
+
+const features = [selection()] as const;
+type Range = CalendarEngineEventOf<"select">["range"];
+
+@Component({
+    selector: "app-select-to-create",
+    imports: [CALENDAR, CalendarSelectionRootDirective],
+    template: `
+        <div [calendarRoot]="model" calendarSelection (rangeSelect)="range.set($event.range)">
+            <!-- the week's parts, and an editor open while range() is set -->
+        </div>
+    `,
+})
+export class SelectToCreate {
+    readonly model = createCalendarModel<Types, typeof features>(
+        {
+            version: 1,
+            events: [],
+            calendars: [],
+            view: { type: "week", anchorDate: "2026-11-26" },
+        },
+        { features },
+    );
+    readonly range = signal<Range | null>(null);
+    readonly title = signal("");
+
+    close() {
+        this.range.set(null);
+        this.title.set("");
+        this.model.run("selection.clear", {});
+    }
+
+    save() {
+        const range = this.range();
+        if (!range) return;
+        this.model.run("event.add", {
+            title: this.title().trim() || "New event",
+            start: range.start,
+            end: range.end,
+            allDay: range.allDay,
+        });
+        this.close();
+    }
+}
+```
+
+</Framework>
+
 The range is `{ start, end, allDay }`: dates (`YYYY-MM-DD`, end exclusive) when `allDay`, RFC
 3339 date-times in the display zone otherwise, exactly what `event.add` takes. The editor is
 yours (the example uses Fragiola UI's `Dialog`); clearing the selection when it closes removes
@@ -300,13 +431,14 @@ the highlight.
 
 Typing in the editor need not render the grid's rows again: in React, declare children functions
 that read only their arguments outside the component; in Vue, a template's slots that read only
-their scope already are stable. See [Performance](/docs/guides/performance).
+their scope already are stable; in Angular, a template renders again only for the layout objects
+that changed. See [Performance](/docs/guides/performance).
 
 ## Reading and setting the range from code
 
 The selection is model state (not part of the document): `model.get("selected-range")` reads
 it, `selection.set` sets one and `selection.clear` clears it, and `useSelection()` follows the
-selected range, and the one being selected (in Vue, a computed).
+selected range, and the one being selected (in Vue, a computed; `injectSelection()` in Angular, a signal).
 
 ```ts
 model.run("selection.set", {

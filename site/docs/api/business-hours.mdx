@@ -108,6 +108,55 @@ const model = createCalendarModel(
 
 </Framework>
 
+<Framework name="angular">
+
+```ts title="office-week.ts"
+import { Component } from "@angular/core";
+import { CALENDAR, createCalendarModel } from "@fragiola/calendar-angular";
+import {
+    CalendarBusinessHoursDirective,
+    constraints,
+} from "@fragiola/calendar-angular/constraints";
+
+const FEATURES = [constraints()] as const;
+
+@Component({
+    selector: "app-office-week",
+    imports: [CALENDAR, CalendarBusinessHoursDirective],
+    template: `
+        <div [calendarRoot]="model">
+            <div calendarTimeGrid aria-label="Week">
+                <div calendarColumns>
+                    <ng-template calendarColumnsItem let-column>
+                        <div [calendarColumn]="column">
+                            <div *calendarBusinessHours class="business-hours"></div>
+                        </div>
+                    </ng-template>
+                </div>
+            </div>
+        </div>
+    `,
+})
+export class OfficeWeek {
+    readonly model = createCalendarModel(
+        {
+            version: 1,
+            events: [],
+            calendars: [],
+            settings: {
+                businessHours: [
+                    { daysOfWeek: [1, 2, 3, 4, 5], startTime: "09:00", endTime: "17:00" },
+                ],
+            },
+            view: { type: "week", anchorDate: "2026-11-26" },
+        },
+        { features: FEATURES },
+    );
+}
+```
+
+</Framework>
+
 Each weekday's column shows a block from 09:00 to 17:00; the weekend shows none. A real grid also
 renders its slot rows (see [Calendar.TimeGrid](/docs/api/time-grid)). `useBusinessHours` (on the
 [hooks page](/docs/api/hooks)) gives the ranges themselves.
@@ -127,6 +176,9 @@ renders its slot rows (see [Calendar.TimeGrid](/docs/api/time-grid)). `useBusine
 
 In Vue: the same props (in kebab-case in a template), and slots in place of `children`; see
 [Vue primitives](/docs/api/vue).
+
+In Angular: a directive on your element, the props as its inputs, templates in place of
+`children`; see [Angular primitives](/docs/api/angular).
 
 `BusinessHoursProps` takes the [common props](/docs/api/root#common-props) and any `div`
 attribute, and:

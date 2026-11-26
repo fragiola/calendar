@@ -168,11 +168,103 @@ function moved(event: CalendarEngineEventOf<"drop">) {
 
 </Framework>
 
+<Framework name="angular">
+
+```ts title="title.ts"
+import { Component } from "@angular/core";
+import { injectCalendarTitle } from "@fragiola/calendar-angular";
+
+@Component({ selector: "app-title", template: "<h2>{{ text() }}</h2>" })
+export class Title {
+    private readonly parts = injectCalendarTitle();
+    text() {
+        return this.parts().map((part) => part.value).join("");
+    }
+}
+```
+
+```ts title="team-week.ts"
+import { Component } from "@angular/core";
+import {
+    CALENDAR,
+    type CalendarEngineEventOf,
+    type CalendarEventJson,
+    createCalendarModel,
+} from "@fragiola/calendar-angular";
+import {
+    CalendarDragAndDropRootDirective,
+    dragAndDrop,
+} from "@fragiola/calendar-angular/drag-and-drop";
+import { Title } from "./title";
+
+type Types = { events: { meeting: { room: string } }; calendar: undefined };
+
+const features = [dragAndDrop()] as const;
+
+const events: CalendarEventJson<Types>[] = [
+    {
+        id: "standup",
+        title: "Standup",
+        start: "2026-11-26T09:00:00-03:00",
+        end: "2026-11-26T09:15:00-03:00",
+        allDay: false,
+        kind: "meeting",
+        data: { room: "Blue" },
+    },
+];
+
+@Component({
+    selector: "app-team-week",
+    imports: [CALENDAR, CalendarDragAndDropRootDirective, Title],
+    template: `
+        <div
+            [calendarRoot]="model"
+            #calendar="calendarRoot"
+            calendarDragAndDrop
+            aria-label="Team calendar"
+            class="cal"
+            [class.dragging]="calendar.state().gestureActive"
+            (eventClick)="opened($event)"
+            (eventDrop)="moved($event)"
+        >
+            <app-title />
+            <button calendarPrevious>Previous</button>
+            <button calendarToday>Today</button>
+            <button calendarNext>Next</button>
+            <!-- a [calendarTimeGrid], a [calendarDayGrid] or a [calendarList] -->
+        </div>
+    `,
+})
+export class TeamWeek {
+    // the model types the root (what React passes as type arguments)
+    readonly model = createCalendarModel<Types, typeof features>(
+        {
+            version: 1,
+            events,
+            settings: { timeZone: "America/Sao_Paulo", locale: "en-US" },
+            view: { type: "week", anchorDate: "2026-11-26" },
+        },
+        { features },
+    );
+
+    opened(event: CalendarEngineEventOf<"event-click">) {
+        console.log("open", event.eventId);
+    }
+
+    moved(event: CalendarEngineEventOf<"drop">) {
+        console.log("moved to", event.start);
+    }
+}
+```
+
+</Framework>
+
 The root's type arguments are the registry and the features (`RootProps<T, F>`): with them, a
 feature's callback such as `onEventDrop` is typed, and without its feature it is a type error. A
 `model` carries its own, so `<Calendar.Root model={model}>` needs none. A Vue template passes no
 type argument: `typedCalendar<Types, typeof features>()` gives the namespace typed by both, and
-`@event-drop` without its feature is a `vue-tsc` error ([Vue primitives](/docs/api/vue)).
+`@event-drop` without its feature is a `vue-tsc` error ([Vue primitives](/docs/api/vue)). An
+Angular root is typed by the model it is given ([Angular primitives](/docs/api/angular)).
 
 ## Props
 
@@ -182,6 +274,11 @@ the engine props and the event props below, and every `div` attribute.
 In Vue, the same props in kebab-case, `v-model:events`, `v-model:view` and `v-model:date` for the
 controlled ones, and listeners for the callbacks (`@events-change`, `@event-click`, …): see
 [Vue primitives](/docs/api/vue).
+
+In Angular, the same props as inputs of `[calendarRoot]` (the model its own input),
+`[(events)]`, `[(view)]` and `[(date)]` for the controlled ones, and outputs for the callbacks
+(`(eventsChange)`, `(eventClick)`, …; a feature's from its directive on the root): see
+[Angular primitives](/docs/api/angular).
 
 | prop | type | default | description |
 | --- | --- | --- | --- |
@@ -274,6 +371,15 @@ is a callback ref).
         </section>
     </template>
 </Calendar.Day>
+```
+
+</Framework>
+
+<Framework name="angular">
+
+```html
+<!-- the element you write is the part: a section -->
+<section [calendarDay]="day" #cell="calendarDay" [attr.aria-current]="cell.state()?.day?.today ? 'date' : null"></section>
 ```
 
 </Framework>

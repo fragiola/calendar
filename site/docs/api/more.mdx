@@ -108,8 +108,51 @@ const openDay = ref<string | null>(null);
 
 </Framework>
 
+<Framework name="angular">
+
+```ts title="busy-month.ts"
+import { Component, signal } from "@angular/core";
+import { CALENDAR } from "@fragiola/calendar-angular";
+// your popover: the day's events from model.get("list"), a close button
+import { DayPopover } from "./day-popover";
+
+@Component({
+    selector: "app-busy-month",
+    imports: [CALENDAR, DayPopover],
+    template: `
+        <div calendarRoot [settings]="{ dayMaxEvents: 2 }" (moreClick)="openDay.set($event.date)">
+            <div calendarDayGrid aria-label="Month">
+                <ng-template calendarWeeks let-week>
+                    <div [calendarWeek]="week">
+                        <ng-template calendarDays let-day>
+                            <div [calendarDay]="day">
+                                <div calendarDayEvents>
+                                    <ng-template calendarDayEventsItem let-segment>
+                                        <div [calendarSegment]="segment"></div>
+                                    </ng-template>
+                                </div>
+                                <button *calendarMore="let more" class="more">+{{ more.hiddenCount }} more</button>
+                                @if (openDay() === day.date) {
+                                    <app-day-popover [date]="day.date" (closed)="openDay.set(null)" />
+                                }
+                            </div>
+                        </ng-template>
+                    </div>
+                </ng-template>
+            </div>
+        </div>
+    `,
+})
+export class BusyMonth {
+    readonly openDay = signal<string | null>(null);
+}
+```
+
+</Framework>
+
 The rows' function closes over `openDay`, so it is called again when the open day changes (React's
-contract); in Vue, the slot reads the `openDay` ref, and Vue renders the rows again when it changes. The [more events guide](/docs/guides/more-events) builds the popover with Fragiola UI.
+contract); in Vue, the slot reads the `openDay` ref, and Vue renders the rows again when it changes; in
+Angular, the days' template reads the `openDay()` signal, checked with the template it is in. The [more events guide](/docs/guides/more-events) builds the popover with Fragiola UI.
 
 <Example id="more-events" />
 
@@ -120,6 +163,9 @@ attribute.
 
 In Vue: the same props (in kebab-case in a template), and slots in place of `children`; see
 [Vue primitives](/docs/api/vue).
+
+In Angular: a directive on your element, the props as its inputs, templates in place of
+`children`; see [Angular primitives](/docs/api/angular).
 
 | prop | type | description |
 | --- | --- | --- |

@@ -121,6 +121,35 @@ const event = computed(() => model.get("event-by", { id: props.eventId }));
 
 </Framework>
 
+<Framework name="angular">
+
+In a component, pass the registry to the injection function, which cannot infer it through
+injection; the root takes it from the model it is given:
+
+```ts title="room.ts"
+import { Component, computed, input } from "@angular/core";
+import { injectCalendar } from "@fragiola/calendar-angular";
+import type { Types } from "./types";
+
+@Component({
+    selector: "app-room",
+    template: `
+        @if (event(); as event) {
+            @if (event.kind === "meeting") { <span>{{ event.data?.room }}</span> }
+        }
+    `,
+})
+export class Room {
+    readonly eventId = input.required<string>();
+    private readonly model = injectCalendar<Types>().model;
+    protected readonly event = computed(() =>
+        this.model().get("event-by", { id: this.eventId() }),
+    );
+}
+```
+
+</Framework>
+
 ## Data is JSON
 
 The document is JSON: `data` holds JSON values (strings, numbers, booleans, arrays, objects,

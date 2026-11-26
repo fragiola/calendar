@@ -71,6 +71,33 @@ const parts = useDayHeader(() => props.date);
 
 </Framework>
 
+<Framework name="angular">
+
+```ts title="day-header.ts"
+import { Component, input } from "@angular/core";
+import { injectDayHeader } from "@fragiola/calendar-angular";
+
+// the weekday and the day in a time grid, the weekday in a month, in the calendar's locale
+@Component({ selector: "[appDayHeader]", template: "{{ text() }}" })
+export class DayHeader {
+    readonly appDayHeader = input.required<string>();
+    private readonly parts = injectDayHeader(() => this.appDayHeader());
+    text() {
+        return this.parts().map((part) => part.value).join("");
+    }
+}
+```
+
+```html
+<div calendarColumnHeaders class="headers">
+    <ng-template calendarColumnHeadersItem let-date>
+        <div [calendarColumnHeader]="date" [appDayHeader]="date" class="header"></div>
+    </ng-template>
+</div>
+```
+
+</Framework>
+
 ## Props
 
 `ColumnHeadersProps`; it also takes the [common props](/docs/api/root#common-props) and every `div`
@@ -78,6 +105,9 @@ attribute.
 
 In Vue: the same props (in kebab-case in a template), and slots in place of `children`; see
 [Vue primitives](/docs/api/vue).
+
+In Angular: a directive on your element, the props as its inputs, templates in place of
+`children`; see [Angular primitives](/docs/api/angular).
 
 | prop | type | description |
 | --- | --- | --- |

@@ -64,6 +64,34 @@ const model = createCalendarModel<Types>({
 
 </Framework>
 
+<Framework name="angular">
+
+```ts title="arabic-week.ts"
+import { Component } from "@angular/core";
+import { CALENDAR, createCalendarModel } from "@fragiola/calendar-angular";
+
+@Component({
+    selector: "app-arabic-week",
+    imports: [CALENDAR],
+    template: `
+        <div [calendarRoot]="model" dir="rtl" lang="ar">
+            <!-- the time grid, as in a left-to-right week -->
+        </div>
+    `,
+})
+export class ArabicWeek {
+    readonly model = createCalendarModel<Types>({
+        version: 1,
+        events: [],
+        calendars: [],
+        settings: { locale: "ar", firstDayOfWeek: 6 },
+        view: { type: "week", anchorDate: "2026-11-26" },
+    });
+}
+```
+
+</Framework>
+
 `engine.get("direction")` answers `"ltr"` or `"rtl"`, the way the keys and the hit-testing read
 it. The dates come as `Intl` parts in `ar`, so the headers read in Arabic without any formatting
 code of yours.

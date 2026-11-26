@@ -71,6 +71,34 @@ import HourText from "./hour-text.vue";
 
 </Framework>
 
+<Framework name="angular">
+
+```ts title="hour-text.ts"
+import { Component, input } from "@angular/core";
+import { injectSlotLabel } from "@fragiola/calendar-angular";
+
+@Component({ selector: "app-hour-text", template: "<span>{{ text() }}</span>" })
+export class HourText {
+    readonly time = input.required<string>();
+    // Intl parts in the calendar's locale: "9 AM", "09"
+    private readonly parts = injectSlotLabel(() => this.time(), { hour: "numeric" });
+    text() {
+        return this.parts().map((part) => part.value).join("");
+    }
+}
+```
+
+```html title="label.html"
+<!-- imports: [CALENDAR, HourText] -->
+<div calendarSlotLabel #label="calendarSlotLabel" class="slot-label">
+    @if (label.state()?.time?.endsWith(":00")) {
+        <app-hour-text [time]="label.state()!.time" />
+    }
+</div>
+```
+
+</Framework>
+
 It shows the hour on the full hours and nothing on the other slots. See
 [`useSlotLabel`](/docs/api/hooks).
 
@@ -86,6 +114,9 @@ It shows the hour on the full hours and nothing on the other slots. See
 
 In Vue: the same props (in kebab-case in a template), and slots in place of `children`; see
 [Vue primitives](/docs/api/vue).
+
+In Angular: a directive on your element, the props as its inputs, templates in place of
+`children`; see [Angular primitives](/docs/api/angular).
 
 `SlotLabelProps` takes the [common props](/docs/api/root#common-props) and any `div` attribute,
 and:

@@ -604,6 +604,139 @@ describe("the Vue reference", () => {
     });
 });
 
+describe("the Angular reference", () => {
+    const ANGULAR = join(ROOT, "packages/angular");
+    const publicApi = read(join(ANGULAR, "src/public-api.ts"));
+    const mdx = page("angular");
+    const calendar = read(join(ANGULAR, "src/lib/calendar.ts"));
+    /** `readonly name = input(…)`, `output(…)`, `model(…)` members of a directive's source. */
+    const members = (source: string, kind: "input" | "output") =>
+        [
+            ...source.matchAll(
+                new RegExp(`readonly (\\w+)(?:: [^=]+)? = ${kind}\\b`, "g"),
+            ),
+        ].map((match) => match[1] ?? "");
+
+    it("re-exports the core from its main entry", () => {
+        expect(publicApi).toMatch(/^export \* from "@fragiola\/calendar";$/m);
+    });
+
+    it("mentions every named export of the main entry on api/angular.mdx", () => {
+        const names = namedExports(publicApi).map((entry) => entry.name);
+        expect(names.length).toBeGreaterThan(90);
+        expect(names.filter((name) => !mentions(mdx, name))).toEqual([]);
+    });
+
+    it("mentions every export of the Angular feature entries on api/angular.mdx", () => {
+        for (const [entry] of FEATURE_ENTRIES) {
+            const source = read(join(ANGULAR, entry, "public-api.ts"));
+            expect(source, entry).toMatch(
+                new RegExp(
+                    `^export \\* from "@fragiola/calendar/${entry}";$`,
+                    "m",
+                ),
+            );
+            const names = namedExports(source).map((entry) => entry.name);
+            expect(
+                names.filter((name) => !mentions(mdx, name)),
+                `@fragiola/calendar-angular/${entry}`,
+            ).toEqual([]);
+            expect(mdx, entry).toContain(`@fragiola/calendar-angular/${entry}`);
+        }
+    });
+
+    it("lists every directive of CALENDAR in its table, one per React part (and its item templates)", () => {
+        const directives = [
+            ...calendar.matchAll(/^ {4}(Calendar\w+Directive),$/gm),
+        ].map((match) => match[1] ?? "");
+        expect(directives.length).toBeGreaterThan(30);
+        for (const name of directives) {
+            expect(mdx, name).toMatch(new RegExp(`^\\| \`${name}\` \\|`, "m"));
+        }
+        // every React part has its directive, `Calendar<Part>Directive`
+        for (const { name } of partExports) {
+            expect(directives, `Calendar.${name}`).toContain(
+                `Calendar${name}Directive`,
+            );
+        }
+        const features = FEATURE_ENTRIES.flatMap(([entry]) =>
+            [
+                ...read(join(ANGULAR, entry, "public-api.ts")).matchAll(
+                    /\b(Calendar\w+Directive)\b/g,
+                ),
+            ].map((match) => match[1] ?? ""),
+        );
+        expect(new Set(features).size).toBeGreaterThan(6);
+        for (const name of features) {
+            expect(mdx, name).toMatch(new RegExp(`^\\| \`${name}\` \\|`, "m"));
+        }
+    });
+
+    it("lists every input and output of the root, and every feature directive's output", () => {
+        const root = read(
+            join(ANGULAR, "src/lib/directives/root.directive.ts"),
+        );
+        const inputs = members(root, "input");
+        const outputs = members(root, "output");
+        expect(inputs).toContain("weekNumberColumn");
+        expect(outputs).toContain("eventClick");
+        const row = mdx
+            .split("\n")
+            .find((line) => line.startsWith("| `CalendarRootDirective` |"));
+        for (const name of [...inputs, ...outputs]) {
+            expect(row, name).toContain(`\`${name}\``);
+        }
+        for (const [file, output] of [
+            ["selection/directives/selection-root.directive.ts", "rangeSelect"],
+            [
+                "drag-and-drop/directives/drag-and-drop-root.directive.ts",
+                "eventDrop",
+            ],
+            [
+                "external-drop/directives/external-drop-root.directive.ts",
+                "externalDrop",
+            ],
+        ] as const) {
+            expect(members(read(join(ANGULAR, file)), "output")).toEqual([
+                output,
+            ]);
+            expect(mdx, output).toContain(`output \`${output}\``);
+        }
+    });
+
+    it("is linked from every part's page", () => {
+        for (const { module } of partExports) {
+            const slug = MODULE_PAGES[module] ?? "";
+            expect(page(slug), `api/${slug}.mdx`).toContain(
+                "](/docs/api/angular)",
+            );
+        }
+        for (const [, , , slug] of FEATURE_PARTS) {
+            expect(page(slug), `api/${slug}.mdx`).toContain(
+                "](/docs/api/angular)",
+            );
+        }
+    });
+
+    it("gives every React snippet of a page its Vue and its Angular variants, in that order", () => {
+        const offenders: string[] = [];
+        for (const [path, mdx] of readPages(DOCS_DIR)) {
+            const order = [...mdx.matchAll(/^<Framework name="(\w+)">$/gm)].map(
+                (match) => match[1] ?? "",
+            );
+            for (let at = 0; at < order.length; at += 3) {
+                if (order.slice(at, at + 3).join(",") !== "react,vue,angular") {
+                    offenders.push(
+                        `${path}: ${order.slice(at, at + 3).join(",")}`,
+                    );
+                    break;
+                }
+            }
+        }
+        expect(offenders).toEqual([]);
+    });
+});
+
 describe("the concept pages", () => {
     it("list every part name on the state attributes page", () => {
         const mdx = docsPage("concepts/state-attributes");
@@ -659,11 +792,11 @@ describe("the concept pages", () => {
 
     it("import framework-neutral snippets from the core, never from one framework's package", () => {
         // a code block outside <Framework> is read by every framework's reader: one that names a
-        // framework package names both (an adapter type, as styling-tailwind's), else it imports
-        // the core; api/vue is the Vue page
+        // framework package names every one (an adapter type, as styling-tailwind's), else it
+        // imports the core; api/vue and api/angular are their framework's pages
         const offenders: string[] = [];
         for (const [path, mdx] of readPages(DOCS_DIR)) {
-            if (path === "api/vue") continue;
+            if (path === "api/vue" || path === "api/angular") continue;
             const neutral = mdx.replace(
                 /^<Framework[\s\S]*?^<\/Framework>/gm,
                 "",
@@ -672,9 +805,12 @@ describe("the concept pages", () => {
                 /^```[^\n]*\n([\s\S]*?)^```/gm,
             )) {
                 const code = block[1] ?? "";
-                const react = code.includes("@fragiola/calendar-react");
-                const vue = code.includes("@fragiola/calendar-vue");
-                if (react !== vue) {
+                const named = [
+                    "@fragiola/calendar-react",
+                    "@fragiola/calendar-vue",
+                    "@fragiola/calendar-angular",
+                ].filter((adapter) => code.includes(adapter));
+                if (named.length !== 0 && named.length !== 3) {
                     offenders.push(`${path}: ${code.split("\n")[0]}`);
                 }
             }

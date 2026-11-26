@@ -77,6 +77,21 @@ function slotClass(state: SlotState) {
 
 </Framework>
 
+<Framework name="angular">
+
+```html title="cell.html"
+<div
+    [calendarSlot]="date"
+    #cell="calendarSlot"
+    [attr.aria-label]="date + ' ' + time"
+    class="slot"
+    [class.slot-selected]="cell.state()?.selected"
+    [class.slot-closed]="!cell.state()?.businessHours"
+></div>
+```
+
+</Framework>
+
 The cell's state (`SlotState`, on the [hooks page](/docs/api/hooks)) styles it; or style
 `[data-selected]` and `[data-business-hours]` in CSS. `useSlot` gives the same props for an
 element of your own.
@@ -94,6 +109,9 @@ element of your own.
 
 In Vue: the same props (in kebab-case in a template), and slots in place of `children`; see
 [Vue primitives](/docs/api/vue).
+
+In Angular: a directive on your element, the props as its inputs, templates in place of
+`children`; see [Angular primitives](/docs/api/angular).
 
 `SlotProps` takes the [common props](/docs/api/root#common-props) and any `div` attribute, and:
 

@@ -79,6 +79,37 @@ function change(event: Event) {
 
 </Framework>
 
+<Framework name="angular">
+
+```ts title="zone-switcher.ts"
+import { Component } from "@angular/core";
+import { injectCalendar } from "@fragiola/calendar-angular";
+
+const ZONES = ["America/New_York", "Europe/London", "Asia/Tokyo"] as const;
+
+@Component({
+    selector: "app-zone-switcher",
+    template: `
+        <select aria-label="Time zone" [value]="model().state.settings.timeZone" (change)="change($event)">
+            @for (zone of zones; track zone) {
+                <option [value]="zone">{{ zone }}</option>
+            }
+        </select>
+    `,
+})
+export class ZoneSwitcher {
+    protected readonly zones = ZONES;
+    protected readonly model = injectCalendar().model;
+
+    protected change(event: Event) {
+        const timeZone = (event.target as HTMLSelectElement).value;
+        this.model().run("settings.set", { settings: { timeZone } });
+    }
+}
+```
+
+</Framework>
+
 The time grid's axis is the display zone's wall clock: a 23-hour or a 25-hour day keeps the same
 slots, and each event sits at its wall-clock times. A zone name the engine does not know is
 refused (`invalid_payload`), never guessed.

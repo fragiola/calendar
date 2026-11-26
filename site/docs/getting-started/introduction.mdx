@@ -3,8 +3,9 @@ title: Introduction
 description: What the event calendar package gives you (views, interaction, dates, time zones and accessibility) and what stays yours.
 ---
 
-Fragiola Calendar (`@fragiola/calendar-react`, `@fragiola/calendar-vue`) is a **headless**,
-accessible event calendar for React 19 and Vue 3.5: team planners, booking screens, schedules,
+Fragiola Calendar (`@fragiola/calendar-react`, `@fragiola/calendar-vue`,
+`@fragiola/calendar-angular`) is a **headless**, accessible event calendar for React 19, Vue 3.5
+and Angular 22: team planners, booking screens, schedules,
 agendas. It ships the behaviour of an event calendar and its accessibility as composable
 primitives over a framework-free core (`@fragiola/calendar`), which each framework's package
 re-exports, so an app installs one package.
@@ -37,8 +38,8 @@ re-exports, so an app installs one package.
 The package ships **no CSS, no icons, no text, no rendered menus and no popovers**:
 
 - every visible word: an event's title is model data you render, and dates and times are
-  `Intl` parts you join (`useCalendarTitle`, `useDayHeader`, `useSlotLabel`, hooks in React and
-  composables in Vue);
+  `Intl` parts you join (`useCalendarTitle`, `useDayHeader`, `useSlotLabel`, hooks in React,
+  composables in Vue and injection functions in Angular);
 - every accessible name: the library sets no `aria-label`;
 - every pixel: the parts expose their state as `data-*` attributes and ARIA
   ([State attributes](/docs/concepts/state-attributes)), and place events with structural style
@@ -51,7 +52,7 @@ The package ships **no CSS, no icons, no text, no rendered menus and no popovers
 ## Where to go next
 
 <Cards>
-<Card title="Installation" href="/docs/getting-started/installation" description="One package for React 19 or Vue 3.5, and the feature entries." />
+<Card title="Installation" href="/docs/getting-started/installation" description="One package for React 19, Vue 3.5 or Angular 22, and the feature entries." />
 <Card title="Your first calendar" href="/docs/getting-started/first-calendar" description="A typed week view, from the document to the events on screen." />
-<Card title="Composition" href="/docs/concepts/composition" description="Children functions or scoped slots per row, day and event: you own the markup." />
+<Card title="Composition" href="/docs/concepts/composition" description="Children functions, scoped slots or templates per row, day and event: you own the markup." />
 </Cards>

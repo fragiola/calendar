@@ -93,8 +93,24 @@ import { BusinessHours } from "@fragiola/calendar-vue/constraints";
 
 </Framework>
 
+<Framework name="angular">
+
+```html
+<!-- imports: [CALENDAR, CalendarBusinessHoursDirective] (from @fragiola/calendar-angular/constraints) -->
+<div [calendarColumn]="column" class="column">
+    <div *calendarBusinessHours class="business-hours"></div>
+    <div calendarColumnEvents>
+        <ng-template calendarColumnEventsItem let-segment>
+            <div [calendarTimeEvent]="segment"></div>
+        </ng-template>
+    </div>
+</div>
+```
+
+</Framework>
+
 Put it before the events so they paint above it. It is hidden from assistive technology.
-`useBusinessHours(date)` gives a day's ranges (their instants and fractions; in Vue, a computed) for anything else
+`useBusinessHours(date)` gives a day's ranges (their instants and fractions; in Vue, a computed; `injectBusinessHours` in Angular, a signal) for anything else
 you draw, and `model.get("business-hours-in", { range })` the same for any days.
 
 ## Where events may go

@@ -76,6 +76,41 @@ const title = computed(
 
 </Framework>
 
+<Framework name="angular">
+
+```ts title="list-item.ts"
+import { Component, computed } from "@angular/core";
+import { injectCalendar, injectListEvent } from "@fragiola/calendar-angular";
+
+// on the event's element: <div [calendarListEvent]="item" appListItem>
+@Component({
+    selector: "[appListItem]",
+    host: { "[class]": "'event event-' + (event.state()?.calendarId ?? 'none')" },
+    template: `
+        <span class="event-time">{{ event.state()?.allDay ? "All day" : occurrence()?.start }}</span>
+        <span class="event-title">{{ title() }}</span>
+    `,
+})
+export class ListItem {
+    protected readonly event = injectListEvent();
+    private readonly model = injectCalendar().model;
+    protected readonly occurrence = computed(() => {
+        const state = this.event.state();
+        return state && this.model().get("occurrence-by", { id: state.occurrenceId });
+    });
+    // a renamed occurrence of a recurring event has its own title
+    protected readonly title = computed(() => {
+        const state = this.event.state();
+        return (
+            this.occurrence()?.title ??
+            (state && this.model().get("event-by", { id: state.eventId })?.title)
+        );
+    });
+}
+```
+
+</Framework>
+
 The state (`ListEventState`, on the [hooks page](/docs/api/hooks), with the item and the
 `EventState` flags) styles it; `useListEvent` gives the same props for an element of your own.
 
@@ -92,6 +127,9 @@ The state (`ListEventState`, on the [hooks page](/docs/api/hooks), with the item
 
 In Vue: the same props (in kebab-case in a template), and slots in place of `children`; see
 [Vue primitives](/docs/api/vue).
+
+In Angular: a directive on your element, the props as its inputs, templates in place of
+`children`; see [Angular primitives](/docs/api/angular).
 
 `ListEventProps` takes the [common props](/docs/api/root#common-props) and any `div` attribute,
 and:

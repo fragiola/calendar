@@ -63,6 +63,20 @@ defineProps<{ day: DayCell }>();
 
 </Framework>
 
+<Framework name="angular">
+
+```html title="month-day.html"
+<div [calendarDay]="day" class="day">
+    <div calendarDayEvents class="day-events">
+        <ng-template calendarDayEventsItem let-segment>
+            <div [calendarSegment]="segment" class="chip"></div>
+        </ng-template>
+    </div>
+</div>
+```
+
+</Framework>
+
 ```css
 .month {
     --calendar-lane-size: 1.375rem;
@@ -77,6 +91,9 @@ attribute.
 
 In Vue: the same props (in kebab-case in a template), and slots in place of `children`; see
 [Vue primitives](/docs/api/vue).
+
+In Angular: a directive on your element, the props as its inputs, templates in place of
+`children`; see [Angular primitives](/docs/api/angular).
 
 | prop | type | description |
 | --- | --- | --- |

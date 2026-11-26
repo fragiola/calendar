@@ -74,6 +74,28 @@ import { DragPreview } from "@fragiola/calendar-vue/drag-and-drop";
 
 </Framework>
 
+<Framework name="angular">
+
+```html title="previewed.html"
+<!-- imports: [CALENDAR, CalendarDragPreviewDirective] (from @fragiola/calendar-angular/drag-and-drop) -->
+<div calendarColumns>
+    <ng-template calendarColumnsItem let-column>
+        <div [calendarColumn]="column">
+            <div calendarColumnEvents>
+                <ng-template calendarColumnEventsItem let-segment>
+                    <div [calendarTimeEvent]="segment"></div>
+                </ng-template>
+            </div>
+            <div *calendarDragPreview="let drag" class="preview">
+                {{ drag.preview.allDay ? "All day" : drag.preview.start }}
+            </div>
+        </div>
+    </ng-template>
+</div>
+```
+
+</Framework>
+
 Render one in every column and in the rows (the all-day row, a month's weeks): each shows the
 preview's part in its own place. `useDragPreview` (on the [hooks page](/docs/api/hooks)) gives the
 preview itself.
@@ -92,6 +114,9 @@ preview itself.
 
 In Vue: the same props (in kebab-case in a template), and slots in place of `children`; see
 [Vue primitives](/docs/api/vue).
+
+In Angular: a directive on your element, the props as its inputs, templates in place of
+`children`; see [Angular primitives](/docs/api/angular).
 
 `DragPreviewProps` takes the [common props](/docs/api/root#common-props) and any `div`
 attribute, and:

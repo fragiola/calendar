@@ -125,7 +125,7 @@ describe("the frameworks of project.json", () => {
     it("validate as an export with several frameworks, each embed checked on its own", async () => {
         const out = temp("site-export-");
         const base = "/calendar";
-        const frameworks: Framework[] = ["react", "vue"];
+        const frameworks: Framework[] = ["react", "vue", "angular"];
         const project = { ...readProject(), frameworks };
         const manifests = await buildManifests(frameworks, appOf(fakeVueApp()));
         cpSync(DOCS_DIR, join(out, "docs"), { recursive: true });

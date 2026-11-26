@@ -72,6 +72,25 @@ defineProps<{ day: ListDay }>();
 
 </Framework>
 
+<Framework name="angular">
+
+```html title="day.html"
+<!-- inside <ng-template calendarListDays let-day> -->
+<h3 [id]="'day-' + day.date">{{ day.date }}</h3>
+<div
+    [calendarListDay]="day"
+    [attr.aria-labelledby]="'day-' + day.date"
+    class="events"
+    [class.events-today]="day.today"
+>
+    <ng-template calendarListDayItem let-item>
+        <div [calendarListEvent]="item">{{ item.allDay ? "All day" : "" }} {{ item.eventId }}</div>
+    </ng-template>
+</div>
+```
+
+</Framework>
+
 ## Attributes
 
 | attribute | value |
@@ -84,6 +103,9 @@ defineProps<{ day: ListDay }>();
 
 In Vue: the same props (in kebab-case in a template), and slots in place of `children`; see
 [Vue primitives](/docs/api/vue).
+
+In Angular: a directive on your element, the props as its inputs, templates in place of
+`children`; see [Angular primitives](/docs/api/angular).
 
 `ListDayProps` takes the [common props](/docs/api/root#common-props) and any `div` attribute, and:
 

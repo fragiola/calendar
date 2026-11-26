@@ -64,6 +64,18 @@ The markup reads them, so switching a theme is switching an attribute on an ance
 
 </Framework>
 
+<Framework name="angular">
+
+```html
+<div [calendarRoot]="model" class="font-(family-name:--cal-font) [--calendar-lane-size:var(--cal-lane-size)]">
+    <ng-template calendarSlotRows let-slot>
+        <div [calendarSlotRow]="slot" class="flex h-(--cal-slot-height)"></div>
+    </ng-template>
+</div>
+```
+
+</Framework>
+
 Note the hand-over on the root: the theme's lane height becomes the package's
 `--calendar-lane-size`, which the day-grid segments read ([Layout](/docs/concepts/layout)).
 

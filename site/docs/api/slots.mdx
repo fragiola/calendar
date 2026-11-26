@@ -68,10 +68,26 @@ defineProps<{ slot: TimeSlot }>();
 
 </Framework>
 
+<Framework name="angular">
+
+```html title="slot-row.html"
+<div [calendarSlotRow]="slot">
+    <div calendarSlotLabel>{{ slot.time }}</div>
+    <ng-template calendarSlots let-column>
+        <div [calendarSlot]="column.date" class="slot" [class.slot-weekend]="column.weekend"></div>
+    </ng-template>
+</div>
+```
+
+</Framework>
+
 ## Props
 
 In Vue: the same props (in kebab-case in a template), and slots in place of `children`; see
 [Vue primitives](/docs/api/vue).
+
+In Angular: a directive on your element, the props as its inputs, templates in place of
+`children`; see [Angular primitives](/docs/api/angular).
 
 `SlotsProps`:
 

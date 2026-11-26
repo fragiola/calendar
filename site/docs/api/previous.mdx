@@ -50,6 +50,17 @@ import { ChevronLeft } from "@lucide/vue";
 
 </Framework>
 
+<Framework name="angular">
+
+```html
+<!-- inside [calendarRoot]; imports: [CALENDAR, LucideChevronLeft] (from @lucide/angular) -->
+<button calendarPrevious aria-label="Previous month" class="icon-button">
+    <svg lucideChevronLeft aria-hidden="true"></svg>
+</button>
+```
+
+</Framework>
+
 An icon-only button needs its accessible name: the library sets none, so `aria-label` (or text)
 is yours. A right-to-left calendar flips the icon in your CSS, not the command.
 
@@ -60,6 +71,9 @@ attribute.
 
 In Vue: the same props (in kebab-case in a template), and slots in place of `children`; see
 [Vue primitives](/docs/api/vue).
+
+In Angular: a directive on your element, the props as its inputs, templates in place of
+`children`; see [Angular primitives](/docs/api/angular).
 
 | prop | type | description |
 | --- | --- | --- |

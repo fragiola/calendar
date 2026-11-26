@@ -26,7 +26,7 @@ moves its columns.
 
 ## Formatting as data
 
-Three hooks (composables in Vue) give the text of the calendar as parts, in the calendar's locale, so you choose the
+Three hooks (composables in Vue, injection functions in Angular) give the text of the calendar as parts, in the calendar's locale, so you choose the
 markup and the separators:
 
 | hook or composable | gives |
@@ -35,7 +35,8 @@ markup and the separators:
 | `useDayHeader(date, format?)` | a day's header: the weekday in a month, the weekday and day in a time grid |
 | `useSlotLabel(time, format?)` | a slot's time (`HH:mm`), such as 9 AM or 09:00 |
 
-Each takes optional `Intl.DateTimeFormat` options (in Vue, each argument may also be a ref or a getter, and the result is a `ComputedRef`). Joining the parts' values is enough for most
+Each takes optional `Intl.DateTimeFormat` options (in Vue, each argument may also be a ref or a getter, and the result is a `ComputedRef`; in
+Angular, a signal or a getter, and the result is a signal). Joining the parts' values is enough for most
 headers:
 
 <Framework name="react">
@@ -94,6 +95,38 @@ const parts = useDayHeader(() => props.date, { weekday: "short" });
 
 </Framework>
 
+<Framework name="angular">
+
+```ts title="title.ts"
+import { Component } from "@angular/core";
+import { injectCalendarTitle } from "@fragiola/calendar-angular";
+
+@Component({ selector: "app-title", template: "<h2>{{ text() }}</h2>" })
+export class Title {
+    private readonly parts = injectCalendarTitle();
+    protected text() {
+        return this.parts().map((part) => part.value).join("");
+    }
+}
+```
+
+```ts title="weekday.ts"
+import { Component, input } from "@angular/core";
+import { injectDayHeader } from "@fragiola/calendar-angular";
+
+// <div [calendarColumnHeader]="date" [appWeekday]="date"></div>
+@Component({ selector: "[appWeekday]", template: "{{ text() }}" })
+export class Weekday {
+    readonly appWeekday = input.required<string>();
+    private readonly parts = injectDayHeader(() => this.appWeekday(), { weekday: "short" });
+    protected text() {
+        return this.parts().map((part) => part.value).join("");
+    }
+}
+```
+
+</Framework>
+
 In `ja-JP`, the same components show `2026年11月` and `木`; in `de-DE`, `November 2026` and `Do`.
 
 ## Week numbers
@@ -102,7 +135,7 @@ In `ja-JP`, the same components show `2026年11月` and `木`; in `de-DE`, `Nove
 or `"iso"` (ISO 8601: weeks start on Monday, week 1 holds the year's first Thursday). A row's week
 number is its middle day's. `Calendar.WeekNumber` is a row header that gives the number in its
 state; tell the root its rows render one (`<Calendar.Root weekNumberColumn>`, `week-number-column` in
-Vue), so the grid counts that column:
+Vue, `weekNumberColumn` on `[calendarRoot]` in Angular), so the grid counts that column:
 
 <Framework name="react">
 
@@ -126,6 +159,18 @@ Vue), so the grid counts that column:
     </Calendar.WeekNumber>
     <Calendar.Days v-slot="{ day }"><Calendar.Day :day="day" /></Calendar.Days>
 </Calendar.Week>
+```
+
+</Framework>
+
+<Framework name="angular">
+
+```html
+<!-- and `weekNumberColumn` on the root, so the grid counts the column -->
+<div [calendarWeek]="week">
+    <div calendarWeekNumber class="week-number">{{ week.weekNumber }}</div>
+    <ng-template calendarDays let-day><div [calendarDay]="day"></div></ng-template>
+</div>
 ```
 
 </Framework>

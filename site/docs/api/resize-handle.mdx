@@ -62,6 +62,19 @@ defineProps<{ segment: TimeSegment }>();
 
 </Framework>
 
+<Framework name="angular">
+
+```html title="resizable-event.html"
+<!-- imports: [CALENDAR, CalendarResizeHandleDirective] (from @fragiola/calendar-angular/resize) -->
+<div [calendarTimeEvent]="segment" class="event">
+    <div *calendarResizeHandle="'start'" class="handle handle-top"></div>
+    <span class="event-title">{{ segment.eventId }}</span>
+    <div *calendarResizeHandle="'end'" class="handle handle-bottom"></div>
+</div>
+```
+
+</Framework>
+
 ```css
 .handle {
     position: absolute;
@@ -92,6 +105,9 @@ See [Resizing events](/docs/guides/resizing).
 
 In Vue: the same props (in kebab-case in a template), and slots in place of `children`; see
 [Vue primitives](/docs/api/vue).
+
+In Angular: a directive on your element, the props as its inputs, templates in place of
+`children`; see [Angular primitives](/docs/api/angular).
 
 `ResizeHandleProps` takes the [common props](/docs/api/root#common-props) and any `div`
 attribute, and:

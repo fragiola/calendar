@@ -58,6 +58,16 @@ model cannot run it.
 
 </Framework>
 
+<Framework name="angular">
+
+```html
+<button calendarViewButton="month">Month</button>
+<button calendarViewButton="week">Week</button>
+<button calendarViewButton="days" [days]="3">3 days</button>
+```
+
+</Framework>
+
 ## The visible range and the current range
 
 `model.get("visible-range")` is every day the view shows; `model.get("current-range")` is the
@@ -93,6 +103,25 @@ const view = useCalendarView();
 <template>
     <p>{{ view.type }}: {{ view.visibleRange.start }} to {{ view.visibleRange.end }} (exclusive)</p>
 </template>
+```
+
+</Framework>
+
+<Framework name="angular">
+
+```ts title="range-note.ts"
+import { Component } from "@angular/core";
+import { injectCalendarView } from "@fragiola/calendar-angular";
+
+@Component({
+    selector: "app-range-note",
+    template: `
+        <p>{{ view().type }}: {{ view().visibleRange.start }} to {{ view().visibleRange.end }} (exclusive)</p>
+    `,
+})
+export class RangeNote {
+    protected readonly view = injectCalendarView();
+}
 ```
 
 </Framework>
@@ -151,6 +180,18 @@ const date = ref("2026-11-26");
         <!-- … -->
     </Calendar.Root>
 </template>
+```
+
+</Framework>
+
+<Framework name="angular">
+
+`[(view)]` and `[(date)]` bind them (`(viewChangeDetails)` hears the view with its `days` too);
+`defaultView` and `defaultDate` start it.
+
+```ts
+readonly date = signal("2026-11-26");
+// <div calendarRoot [defaultEvents]="events" defaultView="week" [(date)]="date">…</div>
 ```
 
 </Framework>

@@ -4,7 +4,7 @@ description: Drive the events, the settings, the view and the date from your app
 ---
 
 `Calendar.Root` works three ways: it creates a model from its `default…` props and keeps it
-(uncontrolled), it follows props you keep in your app's state (controlled: React state, a Vue `ref`), or it shows a model you
+(uncontrolled), it follows props you keep in your app's state (controlled: React state, a Vue `ref`, an Angular signal), or it shows a model you
 created (`model`). Whichever you choose, the model holds the calendar and every change is a
 command; the controlled props are commands the root sends for you. Where the state lives is yours.
 
@@ -61,6 +61,25 @@ const Calendar = typedCalendar<Types, typeof features>();
 
 </Framework>
 
+<Framework name="angular">
+
+```html
+<!-- features = [dragAndDrop()] as const, a field of the component -->
+<div
+    calendarRoot
+    [defaultEvents]="events"
+    [defaultCalendars]="calendars"
+    defaultView="week"
+    defaultDate="2026-11-26"
+    [settings]="{ timeZone: 'Europe/Lisbon', locale: 'pt-PT' }"
+    [features]="features"
+>
+    <!-- the week's parts -->
+</div>
+```
+
+</Framework>
+
 A drop, a command from a button or from an assistant changes that model, and the calendar shows
 it. `useCalendar()` gives any component inside the root the model and the engine.
 
@@ -68,7 +87,7 @@ it. `useCalendar()` gives any component inside the root the model and the engine
 
 `events` keeps the events in your state. A new list replaces the model's events
 (`event.set-all`, so give every event its `id`), and `onEventsChange` (in Vue, `update:events`,
-so `v-model:events`) hears every other change, a drop included, with the model's events:
+so `v-model:events`; in Angular, `(eventsChange)`, so `[(events)]`) hears every other change, a drop included, with the model's events:
 
 <Framework name="react">
 
@@ -132,6 +151,39 @@ The model's state is frozen data, which Vue never proxies: the `ref` holds the m
 
 </Framework>
 
+<Framework name="angular">
+
+```ts title="planner.ts"
+import { Component, input, linkedSignal } from "@angular/core";
+import {
+    CALENDAR,
+    type CalendarEventJson,
+    type CalendarEventOf,
+} from "@fragiola/calendar-angular";
+import { dragAndDrop } from "@fragiola/calendar-angular/drag-and-drop";
+
+@Component({
+    selector: "app-planner",
+    imports: [CALENDAR],
+    template: `
+        <div calendarRoot [(events)]="events" defaultView="week" [features]="features">
+            <!-- the week's parts -->
+        </div>
+    `,
+})
+export class Planner {
+    readonly initial = input.required<CalendarEventJson<Types>[]>();
+    readonly features = [dragAndDrop()] as const;
+    readonly events = linkedSignal<readonly (CalendarEventJson<Types> | CalendarEventOf<Types>)[]>(
+        () => this.initial(),
+    );
+}
+```
+
+The model's state is frozen data: the signal holds the model's own list.
+
+</Framework>
+
 The list the root reports is the model's own, so handing it back runs nothing. The props are
 sent, not enforced: a change you do not echo stays in the model (the reply is yours).
 To refuse a change, refuse the command (edit flags, a middleware): see
@@ -142,8 +194,9 @@ To refuse a change, refuse the command (edit flags, a middleware): see
 - `settings` applies a changed value with `settings.set` (the changed object as a whole patch).
   A model the root creates starts with them.
 - `view` (with `days` for a `days` view) runs `view.set`; `onViewChange` (`@view-change`) hears
-  `{ type, days }`, and in Vue `v-model:view` binds the type.
-- `date` runs `view.go-to`; `onDateChange` (`@date-change`, `v-model:date` in Vue) hears the
+  `{ type, days }`, and in Vue `v-model:view` binds the type (in Angular, `[(view)]`, and
+  `(viewChangeDetails)` hears `{ type, days }`).
+- `date` runs `view.go-to`; `onDateChange` (`@date-change`, `v-model:date` in Vue, `[(date)]` in Angular) hears the
   view's anchor date (`YYYY-MM-DD`) after Previous, Next, Today, a keyboard page or a
   `view.go-to` from anywhere.
 
@@ -188,6 +241,29 @@ const date = ref("2026-11-26");
         <!-- a date picker beside it can set date -->
     </Calendar.Root>
 </template>
+```
+
+</Framework>
+
+<Framework name="angular">
+
+```ts title="routed-calendar.ts"
+import { Component, signal } from "@angular/core";
+import { CALENDAR, type ViewType } from "@fragiola/calendar-angular";
+
+@Component({
+    selector: "app-routed-calendar",
+    imports: [CALENDAR],
+    template: `
+        <div calendarRoot [(view)]="view" [(date)]="date" [defaultEvents]="[]">
+            <!-- a date picker beside it can set date -->
+        </div>
+    `,
+})
+export class RoutedCalendar {
+    readonly view = signal<ViewType>("month");
+    readonly date = signal("2026-11-26");
+}
 ```
 
 </Framework>
@@ -254,10 +330,40 @@ model.use((ctx, next) => {
 
 </Framework>
 
+<Framework name="angular">
+
+```ts title="own-model.ts"
+import { Component } from "@angular/core";
+import { CALENDAR, createCalendarModel } from "@fragiola/calendar-angular";
+
+@Component({
+    selector: "app-own-model",
+    imports: [CALENDAR],
+    template: `<div [calendarRoot]="model"><!-- the parts --></div>`,
+})
+export class OwnModel {
+    readonly model = createCalendarModel<Types>({
+        version: 1,
+        events: [],
+        calendars: [],
+        view: { type: "week", anchorDate: "2026-11-26" },
+    });
+
+    constructor() {
+        this.model.use((ctx, next) => {
+            console.log(ctx.command, ctx.payload);
+            return next();
+        });
+    }
+}
+```
+
+</Framework>
+
 A model has its own features, clock and id generator: the root's `features`, `now` and
 `createId` are for the model it creates. A new model identity creates a new engine (in Vue, it
-remounts the root). Controlled props given with a `model` bring it to them on the client before
-the first paint (React's first layout effect, `onMounted` in Vue), so a server render shows the
+remounts the root; in Angular, the root makes another one). Controlled props given with a `model` bring it to them on the client before
+the first paint (React's first layout effect, `onMounted` in Vue, the first render in Angular), so a server render shows the
 model's state as it is: give a model that already matches.
 
 ## Reaching the calendar from outside the root
@@ -319,6 +425,38 @@ const calendar = useCalendarRef();
 
 `calendar.value` is `{ model, engine }` while the root is mounted and `null` otherwise. It is
 reactive but not a Vue ref: a template reads `calendar.value`, as a script does.
+
+</Framework>
+
+<Framework name="angular">
+
+```ts title="with-external-toolbar.ts"
+import { Component } from "@angular/core";
+import { CALENDAR, injectCalendarRef } from "@fragiola/calendar-angular";
+
+@Component({
+    selector: "app-with-external-toolbar",
+    imports: [CALENDAR],
+    template: `
+        <button
+            type="button"
+            [disabled]="!calendar.current"
+            (click)="calendar.current?.model.run('view.today', {})"
+        >
+            Today
+        </button>
+        <div calendarRoot [calendarRef]="calendar" [defaultEvents]="[]">
+            <!-- the parts -->
+        </div>
+    `,
+})
+export class WithExternalToolbar {
+    readonly calendar = injectCalendarRef();
+}
+```
+
+`calendar.current` is `{ model, engine }` while the root lives and `null` otherwise; it is a
+signal's value, so the template follows it.
 
 </Framework>
 
