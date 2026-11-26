@@ -3,12 +3,12 @@ import type * as React from "react";
 import { useCalendarContext } from "../context";
 import {
     previewSegmentsIn,
+    previewStyle,
     useCalendarValue,
     useFeature,
     usePart,
     useWhere,
 } from "../hooks/internal";
-import { timeSegmentStyle } from "../hooks/use-time-event";
 import { type DivPrimitiveProps, useRenderElement } from "../utils/use-render";
 
 export interface SelectionState {
@@ -26,7 +26,8 @@ export interface SelectionProps extends DivPrimitiveProps<SelectionState> {
 /**
  * The highlight of the range selected (or being selected) with `selection()`, laid out as an
  * event: in a `Calendar.Column` it is positioned as a timed event; in a `Calendar.Week` or
- * `Calendar.AllDayRow` it renders the row's segment, placed from its state. Hidden from assistive
+ * `Calendar.AllDayRow` it renders the row's segment, over its days (the row is its containing block; `--calendar-row-inset` is the row's
+ * space before its first day: a week number, a label). Hidden from assistive
  * technology (the days and slots carry `data-selected`).
  */
 export function Selection(props: SelectionProps) {
@@ -57,7 +58,7 @@ function SelectionElements(props: SelectionProps) {
                     {...props}
                     segment={segment}
                     pending={pending}
-                    timed={where.column !== undefined}
+                    where={where}
                 />
             ))}
         </>
@@ -68,10 +69,10 @@ function SelectionElement(
     props: SelectionProps & {
         segment: TimeSegment | Segment;
         pending: boolean;
-        timed: boolean;
+        where: ReturnType<typeof useWhere>;
     },
 ) {
-    const { segment, pending, timed, children, ...rest } = props;
+    const { segment, pending, where, children, ...rest } = props;
     const context = useCalendarContext("Selection");
     const part = usePart(context, "selection", {}, false);
     const state: SelectionState = { segment, pending };
@@ -83,6 +84,6 @@ function SelectionElement(
             children:
                 typeof children === "function" ? children(state) : children,
         },
-        style: timed ? timeSegmentStyle(segment as TimeSegment) : undefined,
+        style: previewStyle(segment, where),
     });
 }

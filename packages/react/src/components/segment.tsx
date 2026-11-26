@@ -14,13 +14,14 @@ export interface SegmentProps extends DivPrimitiveProps<SegmentState> {
 
 /**
  * An occurrence's part in a day-grid row (`role="listitem"`, `data-event-id`, …): focusable,
- * draggable with `dragAndDrop()`. It sets no geometry: place it from `state.segment`
- * (`startColumn`, `span`, `lane`) in `className` / `style` functions.
+ * draggable with `dragAndDrop()`. It places itself from the layout (structural style): in its
+ * lane (`--calendar-lane-size` high, default `1.5rem`) and over its `span` days (each day's event
+ * area, plus `--calendar-day-gap` between two), on logical properties.
  */
 export function Segment(props: SegmentProps) {
     const { segment, children, ...rest } = props;
     const { state, props: own } = useSegment(segment);
-    const { ref, props: elementProps } = splitRef(own);
+    const { ref, style, props: elementProps } = splitRef(own);
     const { week } = useRequired(
         WeekContext,
         "Segment",
@@ -39,6 +40,7 @@ export function Segment(props: SegmentProps) {
             children:
                 typeof children === "function" ? children(state) : children,
         },
+        style,
     });
     return (
         <EventContext.Provider value={value}>{element}</EventContext.Provider>

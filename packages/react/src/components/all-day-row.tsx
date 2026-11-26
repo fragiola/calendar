@@ -47,6 +47,8 @@ function AllDayRowElement(props: AllDayRowProps & { week: DayGridWeek }) {
                     children
                 ),
         },
+        // the containing block of its decorations (`Selection`, `DragPreview`)
+        style: { position: "relative" },
     });
     return <WeekContext.Provider value={value}>{element}</WeekContext.Provider>;
 }

@@ -37,6 +37,8 @@ export function Week(props: WeekProps) {
                     children
                 ),
         },
+        // the containing block of its decorations (`Selection`, `DragPreview`)
+        style: { position: "relative" },
     });
     return <WeekContext.Provider value={value}>{element}</WeekContext.Provider>;
 }

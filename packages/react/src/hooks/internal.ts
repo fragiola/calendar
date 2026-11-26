@@ -17,6 +17,7 @@ import {
     ColumnContext,
     WeekContext,
 } from "../context";
+import { timeSegmentStyle } from "./use-time-event";
 
 /** @internal `useLayoutEffect` in a browser, nothing on the server (where it would warn) */
 export const useIsomorphicLayoutEffect =
@@ -256,6 +257,42 @@ export function useWhere(): {
     const column = React.useContext(ColumnContext)?.column;
     const week = React.useContext(WeekContext)?.week;
     return { column, week: column ? undefined : week };
+}
+
+/** The row's space before its first day (a week number, a label): the app's `--calendar-row-inset`. */
+const ROW_INSET = "var(--calendar-row-inset, 0px)";
+
+/**
+ * @internal the structural style of a decoration over a day-grid row (a selection, a drag
+ * preview), the row its containing block: over its `span` days from `startColumn`, the full height
+ * of the row, after the row's `--calendar-row-inset`, on logical properties
+ */
+export function rowSegmentStyle(
+    segment: Segment,
+    days: number,
+): React.CSSProperties {
+    const width = `(100% - ${ROW_INSET})`;
+    return {
+        position: "absolute",
+        insetBlock: 0,
+        insetInlineStart: `calc(${ROW_INSET} + ${width} * ${segment.startColumn / days})`,
+        inlineSize: `calc(${width} * ${segment.span / days})`,
+    };
+}
+
+/** @internal the structural style of a preview's segment where it is (a column, a row) */
+export function previewStyle(
+    segment: TimeSegment | Segment,
+    where: {
+        column: TimeGridColumn | undefined;
+        week: DayGridWeek | undefined;
+    },
+): React.CSSProperties | undefined {
+    if (where.column) return timeSegmentStyle(segment as TimeSegment);
+    if (where.week) {
+        return rowSegmentStyle(segment as Segment, where.week.days.length);
+    }
+    return undefined;
 }
 
 /** @internal a preview's segments in a column (time grid) or a row (day grid) */

@@ -5,8 +5,12 @@ import type {
 } from "@fragiola/calendar";
 import type * as React from "react";
 import { useCalendarContext } from "../context";
-import { previewSegmentsIn, usePart, useWhere } from "../hooks/internal";
-import { timeSegmentStyle } from "../hooks/use-time-event";
+import {
+    previewSegmentsIn,
+    previewStyle,
+    usePart,
+    useWhere,
+} from "../hooks/internal";
 import { type DivPrimitiveProps, useRenderElement } from "../utils/use-render";
 import { useDragPreview } from "./use-drag-preview";
 
@@ -25,7 +29,8 @@ export interface DragPreviewProps extends DivPrimitiveProps<DragPreviewState> {
 /**
  * Where a drag (`dragAndDrop()`, `externalDrop()`) or a resize (`resize()`) would put the
  * occurrence, laid out as the event: in a `Calendar.Column` it is positioned as a timed event; in
- * a `Calendar.Week` or `Calendar.AllDayRow` it renders the row's segment, placed from its state.
+ * a `Calendar.Week` or `Calendar.AllDayRow` it renders the row's segment, over its days (the row is its containing block; `--calendar-row-inset` is the row's
+ * space before its first day: a week number, a label).
  * Rendered only while there is a target; hidden from assistive technology (`onAnnounce` tells).
  */
 export function DragPreview(props: DragPreviewProps) {
@@ -42,7 +47,7 @@ export function DragPreview(props: DragPreviewProps) {
                     {...props}
                     preview={preview}
                     segment={segment}
-                    timed={where.column !== undefined}
+                    where={where}
                 />
             ))}
         </>
@@ -53,10 +58,10 @@ function DragPreviewElement(
     props: DragPreviewProps & {
         preview: Preview;
         segment: TimeSegment | Segment;
-        timed: boolean;
+        where: ReturnType<typeof useWhere>;
     },
 ) {
-    const { preview, segment, timed, children, ...rest } = props;
+    const { preview, segment, where, children, ...rest } = props;
     const context = useCalendarContext("DragPreview");
     const part = usePart(context, "drag-preview", {}, false);
     const state: DragPreviewState = { preview, segment };
@@ -68,6 +73,6 @@ function DragPreviewElement(
             children:
                 typeof children === "function" ? children(state) : children,
         },
-        style: timed ? timeSegmentStyle(segment as TimeSegment) : undefined,
+        style: previewStyle(segment, where),
     });
 }
