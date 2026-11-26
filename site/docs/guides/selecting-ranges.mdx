@@ -1,0 +1,190 @@
+---
+title: Selecting ranges
+description: Let people select days or a span of time with the pointer or Shift and the arrows, then turn the range into an event with your own editor.
+---
+
+The `selection()` feature selects **ranges**, not events: a span of days on a day grid or the
+all-day row, or a span of time in a time grid's columns. The engine runs the gesture (a press and
+a drag, a touch's long press, Shift and the arrows), the model keeps the selected range as view
+state, and `Selection` draws its highlight laid out as an event. What a range becomes (a new
+event, a booking, a search) and the editor that asks for it are yours.
+
+<Example id="select-to-create" />
+
+## Installing the feature
+
+The feature comes from its own entry, so a calendar that never selects never loads its code.
+Install it on the model (or on the root that creates it), and put a `Selection` where the
+highlight shows: in each time-grid `Calendar.Column`, and in a `Calendar.Week` or the
+`Calendar.AllDayRow`.
+
+```tsx
+import { Calendar, createCalendarModel } from "@fragiola/calendar-react";
+import { Selection, selection } from "@fragiola/calendar-react/selection";
+import { useState } from "react";
+
+const features = [selection()] as const;
+
+export function SelectableWeek() {
+    const [model] = useState(() =>
+        createCalendarModel(
+            {
+                version: 1,
+                events: [],
+                calendars: [],
+                view: { type: "week", anchorDate: "2026-11-26" },
+            },
+            { features },
+        ),
+    );
+    return (
+        <Calendar.Root model={model}>
+            <Calendar.TimeGrid aria-label="Week">
+                <Calendar.AllDayRow>
+                    <Calendar.Days>
+                        {(day) => <Calendar.Day day={day} />}
+                    </Calendar.Days>
+                    <Selection className="selection" />
+                </Calendar.AllDayRow>
+                <Calendar.Scroller>
+                    <div className="body">
+                        {/* the slot rows, as in a week */}
+                        <Calendar.Columns className="columns">
+                            {(column) => (
+                                <Calendar.Column column={column}>
+                                    <Calendar.ColumnEvents>
+                                        {(segment) => (
+                                            <Calendar.TimeEvent segment={segment} />
+                                        )}
+                                    </Calendar.ColumnEvents>
+                                    <Selection className="selection" />
+                                </Calendar.Column>
+                            )}
+                        </Calendar.Columns>
+                    </div>
+                </Calendar.Scroller>
+            </Calendar.TimeGrid>
+        </Calendar.Root>
+    );
+}
+```
+
+In a column, `Selection` is positioned like a timed event (its `top` and `height`); in a row, it
+sits over its days like a segment. Its state says whether the range is still being selected
+(`pending`), and `className` takes a function of it, so a drag can look lighter than a confirmed
+range:
+
+```tsx
+<Selection
+    className={(state) => (state.pending ? "selection pending" : "selection")}
+/>
+```
+
+```css
+.selection {
+    background: color-mix(in srgb, Highlight 25%, transparent);
+    border-radius: 4px;
+}
+.selection.pending {
+    opacity: 0.6;
+}
+```
+
+The days and slots inside the range carry `data-selected` too. The highlight is hidden from
+assistive technology: the cells' state and your own announcement say what is selected.
+
+## Selecting by pointer, touch and keyboard
+
+- **Mouse and pen:** press on a day or a slot and drag. A click selects its day or slot (a click is
+  also the engine's `date-click`). `selection({ selectMinDistance: 4 })` makes a press move 4
+  pixels before it selects, so a click selects nothing.
+- **Touch:** a long press (`longPressDelay`, 500 ms, an option of the root) starts the selection;
+  a touch that moves first scrolls the page.
+- **Keyboard:** from the focused day or slot, Shift and the arrows extend the range, and Enter
+  confirms it. Escape cancels.
+
+## Turning a range into an event
+
+A confirmed range is the engine's `select` event, which the root reports as `onSelect`. The
+callback is typed only when the feature is installed:
+
+```tsx
+import {
+    Calendar,
+    type CalendarEngineEventOf,
+    createCalendarModel,
+} from "@fragiola/calendar-react";
+import { selection } from "@fragiola/calendar-react/selection";
+import { useState } from "react";
+
+const features = [selection()] as const;
+type Range = CalendarEngineEventOf<"select">["range"];
+
+export function SelectToCreate() {
+    const [model] = useState(() =>
+        createCalendarModel(
+            {
+                version: 1,
+                events: [],
+                calendars: [],
+                view: { type: "week", anchorDate: "2026-11-26" },
+            },
+            { features },
+        ),
+    );
+    const [range, setRange] = useState<Range | null>(null);
+    const [title, setTitle] = useState("");
+    const close = () => {
+        setRange(null);
+        setTitle("");
+        model.run("selection.clear", {});
+    };
+    const save = () => {
+        if (!range) return;
+        model.run("event.add", {
+            title: title.trim() || "New event",
+            start: range.start,
+            end: range.end,
+            allDay: range.allDay,
+        });
+        close();
+    };
+    return (
+        <Calendar.Root
+            model={model}
+            onSelect={(event: CalendarEngineEventOf<"select">) =>
+                setRange(event.range)
+            }
+        >
+            {/* the week's parts, and an editor open while range is set */}
+        </Calendar.Root>
+    );
+}
+```
+
+The range is `{ start, end, allDay }`: dates (`YYYY-MM-DD`, end exclusive) when `allDay`, RFC
+3339 date-times in the display zone otherwise, exactly what `event.add` takes. The editor is
+yours (the example uses Fragiola UI's `Dialog`); clearing the selection when it closes removes
+the highlight.
+
+A component whose children functions read only their arguments can declare them outside the
+component: typing in the editor then re-renders no row of the grid. See
+[Performance](/docs/guides/performance).
+
+## Reading and setting the range from code
+
+The selection is model state (not part of the document): `model.get("selected-range")` reads
+it, `selection.set` sets one and `selection.clear` clears it, and `useSelection()` re-renders a
+component when the selected range, or the one being selected, changes.
+
+```ts
+model.run("selection.set", {
+    start: "2026-11-26T14:00:00-05:00",
+    end: "2026-11-26T15:30:00-05:00",
+    allDay: false,
+});
+```
+
+`selection.set` is refused outside `validRange`, and with `constraints()` by `selectConstraint`
+([Constraints and business hours](/docs/guides/constraints-and-business-hours)). A refused range
+shows no highlight while it is being dragged.

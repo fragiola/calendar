@@ -1,0 +1,231 @@
+---
+title: Month view
+description: Assemble a month from the day grid's parts, place multi-day events in lanes, number the weeks and decide how many events a day shows.
+---
+
+A month is a **day grid**: rows of weeks, each a row of days, and each event's part in a row is a
+**segment** that spans its days. The core lays it all out (`model.get("day-grid")`): which weeks
+the view shows, which lane each segment takes, which days are today, outside the month, a weekend
+or in the past. The package renders the grid's roles, its keyboard and its geometry. What a day
+looks like, what an event shows and every word on screen are yours.
+
+<Example id="month" />
+
+## The parts of a month
+
+`Calendar.DayGrid` is the grid (`role="grid"`). Inside it, `Calendar.Weeks` calls your function
+once per row, `Calendar.Week` is the row, and `Calendar.Day` a day (`role="gridcell"`, the roving
+focus). A day's events go in `Calendar.DayEvents` (a list), one `Calendar.Segment` each.
+
+```tsx
+import {
+    Calendar,
+    createCalendarModel,
+    type Segment,
+    useCalendar,
+    useCalendarTitle,
+    useDayHeader,
+} from "@fragiola/calendar-react";
+import { useState } from "react";
+
+const text = (parts: readonly { value: string }[]) =>
+    parts.map((part) => part.value).join("");
+
+export function MonthCalendar() {
+    const [model] = useState(() =>
+        createCalendarModel({
+            version: 1,
+            events: [
+                {
+                    id: "offsite",
+                    title: "Team offsite",
+                    start: "2026-11-24",
+                    end: "2026-11-27",
+                    allDay: true,
+                },
+            ],
+            calendars: [],
+            settings: { locale: "en-US" },
+            view: { type: "month", anchorDate: "2026-11-26" },
+        }),
+    );
+    return (
+        <Calendar.Root model={model} className="month">
+            <Toolbar />
+            <Calendar.DayGrid aria-label="Month" className="grid">
+                <Calendar.ColumnHeaders className="weekdays">
+                    {(date) => <Weekday date={date} />}
+                </Calendar.ColumnHeaders>
+                <Calendar.Weeks>
+                    {(week) => (
+                        <Calendar.Week week={week} className="week">
+                            {(day) => (
+                                <Calendar.Day day={day} className="day">
+                                    <span aria-hidden>
+                                        {Number(day.date.slice(8))}
+                                    </span>
+                                    <Calendar.DayEvents className="events">
+                                        {(segment) => (
+                                            <EventSegment segment={segment} />
+                                        )}
+                                    </Calendar.DayEvents>
+                                </Calendar.Day>
+                            )}
+                        </Calendar.Week>
+                    )}
+                </Calendar.Weeks>
+            </Calendar.DayGrid>
+        </Calendar.Root>
+    );
+}
+
+function Toolbar() {
+    const title = useCalendarTitle(); // the month, as Intl parts
+    return (
+        <div className="toolbar">
+            <h2>{text(title)}</h2>
+            <Calendar.Today>Today</Calendar.Today>
+            <Calendar.Previous aria-label="Previous month">‹</Calendar.Previous>
+            <Calendar.Next aria-label="Next month">›</Calendar.Next>
+        </div>
+    );
+}
+
+function Weekday({ date }: { date: string }) {
+    const parts = useDayHeader(date, { weekday: "short" });
+    return (
+        <Calendar.ColumnHeader date={date} className="weekday">
+            {text(parts)}
+        </Calendar.ColumnHeader>
+    );
+}
+
+function EventSegment({ segment }: { segment: Segment }) {
+    const { model } = useCalendar();
+    const title = model.get("event-by", { id: segment.eventId })?.title;
+    return (
+        <Calendar.Segment segment={segment} className="segment">
+            {title}
+        </Calendar.Segment>
+    );
+}
+```
+
+The month's title, the weekday names and the day numbers are data you format: the hooks give
+`Intl.DateTimeFormat` parts in the calendar's locale, and you join them (or style each part).
+`Calendar.Previous`, `Calendar.Next` and `Calendar.Today` run `view.previous`, `view.next` and
+`view.today`, and carry `data-disabled` when the model cannot run them (outside `validRange`).
+
+`Calendar.Week` takes a function of each day, as above, or elements: put a
+`Calendar.WeekNumber` (a row header) before `Calendar.Days` when the row has more than its days.
+
+```tsx
+<Calendar.Week week={week} className="week">
+    <Calendar.WeekNumber className="week-number">
+        {({ weekNumber }) => weekNumber}
+    </Calendar.WeekNumber>
+    <Calendar.Days>
+        {(day) => <Calendar.Day day={day} className="day" />}
+    </Calendar.Days>
+</Calendar.Week>
+```
+
+The numbers follow the `weekNumbers` setting (`"locale"` or `"iso"`): see
+[Locales and week numbers](/docs/guides/locales-and-week-numbers).
+
+## Styling a day from its state
+
+Every day carries its state as attributes, so plain CSS (or Tailwind variants) styles it:
+`data-today`, `data-outside` (a day of the previous or next month), `data-weekend`, `data-past`,
+`data-disabled` (outside `validRange`), `data-focused` and, with `selection()`, `data-selected`.
+
+```css
+.day[data-outside] {
+    color: GrayText;
+}
+.day[data-today] > span {
+    border-radius: 999px;
+    background: Highlight;
+    color: HighlightText;
+}
+.day:focus-visible {
+    outline: 2px solid Highlight;
+    outline-offset: -2px;
+}
+```
+
+The row and the grid are yours to lay out too: a week is usually a seven-column CSS grid (or a
+flex row), and the grid a column of rows that share the height. A month shows six weeks by
+default (`fixedWeekCount: true`), so its height does not jump between months; set
+`fixedWeekCount: false` to show only the weeks the month touches.
+
+## Events that span days
+
+A segment is an event's part in one row. The core packs the row's segments into **lanes** (by
+start, then longer first, then `eventOrder`), and `Calendar.Segment` places itself from its
+layout: `position: absolute` in its first day's `Calendar.DayEvents`, at its lane, across its days.
+It reads three custom properties you set on any ancestor:
+
+| property | default | what it is |
+| --- | --- | --- |
+| `--calendar-lane-size` | `1.5rem` | the height of one lane |
+| `--calendar-day-gap` | `0px` | the space between two days' event areas, which a multi-day segment spans |
+| `--calendar-row-inset` | `0px` | the row's space before its first day (a week number), for the row's decorations |
+
+```css
+.month {
+    --calendar-lane-size: 1.5rem;
+    --calendar-day-gap: 0.5rem; /* the days' padding on both sides */
+}
+.segment[data-continues-before] {
+    border-start-start-radius: 0;
+    border-end-start-radius: 0;
+}
+.segment[data-continues-after] {
+    border-start-end-radius: 0;
+    border-end-end-radius: 0;
+}
+```
+
+An event that goes on in the previous or next row carries `data-continues-before` or
+`data-continues-after`: draw a square end, an arrow, or nothing. All-day ends are exclusive (an
+event on the 24th only ends on the 25th), and a timed event that crosses midnight shows on both
+days, unless it ends before `nextDayThreshold`.
+
+<Example id="all-day-and-multi-day" />
+
+`Calendar.DayEvents` holds the row's lanes (its `min-block-size`), so every day of a row lines its
+segments up. See [Layout](/docs/concepts/layout) for the whole geometry.
+
+## How many events a day shows
+
+`dayMaxEvents` decides it:
+
+- `null` (the default): every event, and the rows grow;
+- a number: that many lanes, and each day's `hiddenCount` says how many did not fit;
+- `"auto"`: as many as fit the room the day leaves its events, which the engine measures. Give
+  `Calendar.DayEvents` the day's remaining height (a flex child that grows) and the rows a fixed
+  share of the grid.
+
+A day with hidden events renders `Calendar.More`, the "+N more" button. What it opens is yours:
+[More events and "+N more"](/docs/guides/more-events).
+
+## Opening a day from the month
+
+A press on a day is the engine's `date-click` (`onDateClick`), and a press on an event its
+`event-click` (`onEventClick`). The month example opens a day's agenda from its "+N more":
+
+```tsx
+<Calendar.Root
+    model={model}
+    onMoreClick={({ date }) => {
+        model.run("view.set", { type: "day" });
+        model.run("view.go-to", { date });
+    }}
+>
+    {/* the month, or the day as a list */}
+</Calendar.Root>
+```
+
+`useCalendarView()` re-renders a component when the view changes, so one component can choose
+between `Calendar.DayGrid` and another view's parts.

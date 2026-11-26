@@ -1,0 +1,217 @@
+---
+title: Drag and drop
+description: Move events across days, times and views by pointer, touch and keyboard, preview where they land, and refuse a target with edit rules or middleware.
+---
+
+The `dragAndDrop()` feature moves events: to another day, another time, between the all-day row
+and the time grid, from one week of a month to another. The engine runs the gesture on Pointer
+Events, asks the model about every target it passes, previews the moved event as view state, and
+runs **one** `event.move` on the drop. The look of the dragged event and of its preview, and the
+words an announcement becomes, are yours.
+
+<Example id="drag-and-resize" />
+
+## Installing the feature
+
+```tsx
+import { Calendar, createCalendarModel } from "@fragiola/calendar-react";
+import { DragPreview, dragAndDrop } from "@fragiola/calendar-react/drag-and-drop";
+import { useState } from "react";
+
+const features = [dragAndDrop()] as const;
+
+export function DraggableWeek() {
+    const [model] = useState(() =>
+        createCalendarModel(
+            {
+                version: 1,
+                events: [],
+                calendars: [],
+                view: { type: "week", anchorDate: "2026-11-26" },
+            },
+            { features },
+        ),
+    );
+    return (
+        <Calendar.Root model={model}>
+            <Calendar.TimeGrid aria-label="Week">
+                <Calendar.AllDayRow>
+                    <Calendar.Days>
+                        {(day) => (
+                            <Calendar.Day day={day}>
+                                <Calendar.DayEvents>
+                                    {(segment) => <Calendar.Segment segment={segment} />}
+                                </Calendar.DayEvents>
+                            </Calendar.Day>
+                        )}
+                    </Calendar.Days>
+                    <DragPreview className="preview" />
+                </Calendar.AllDayRow>
+                <Calendar.Scroller>
+                    <div className="body">
+                        {/* the slot rows */}
+                        <Calendar.Columns className="columns">
+                            {(column) => (
+                                <Calendar.Column column={column}>
+                                    <Calendar.ColumnEvents>
+                                        {(segment) => (
+                                            <Calendar.TimeEvent segment={segment} />
+                                        )}
+                                    </Calendar.ColumnEvents>
+                                    <DragPreview className="preview" />
+                                </Calendar.Column>
+                            )}
+                        </Calendar.Columns>
+                    </div>
+                </Calendar.Scroller>
+            </Calendar.TimeGrid>
+        </Calendar.Root>
+    );
+}
+```
+
+Every event is draggable once the feature is installed (`touch-action: none` is set on it, so a
+touch can drag). `DragPreview` goes wherever the event could land: each `Calendar.Column`, and
+each `Calendar.Week` or the `Calendar.AllDayRow`. It renders only while there is a target, laid
+out as the event would be there.
+
+## Showing where it lands
+
+`DragPreview` takes elements or a function of its state: `preview` (the occurrence's new times,
+`start`, `end`, `allDay`, and the gesture's `kind` and `keyboard`) and `segment` (its part here).
+
+```tsx
+<DragPreview className="preview">
+    {({ preview }) => (
+        <span>
+            {new Intl.DateTimeFormat("en-US", {
+                hour: "numeric",
+                minute: "2-digit",
+            }).format(Date.parse(preview.start))}
+        </span>
+    )}
+</DragPreview>
+```
+
+While it is dragged, the event itself carries `data-dragging` (dim it), and a keyboard grab
+carries `data-grabbed`:
+
+```css
+[data-calendar-part="time-event"][data-dragging] {
+    opacity: 0.4;
+}
+[data-grabbed] {
+    outline: 2px dashed Highlight;
+}
+.preview {
+    border: 2px dashed Highlight;
+    border-radius: 4px;
+}
+```
+
+## The gestures
+
+- **Mouse and pen:** a drag starts after the pointer moves 5 pixels (`dragThreshold`, an option
+  of the root); a press that never moves is a click (`onEventClick`).
+- **Touch:** a long press (`longPressDelay`, 500 ms) starts the drag, unless the event already has
+  the focus; a touch that moves first scrolls the page.
+- **Keyboard:** Space on a focused event grabs it; the arrows move it by a day (Up and Down by a
+  week in a month, by `snapDuration` in a time grid); Enter drops it, Escape cancels.
+
+Escape, a lost pointer capture or a `pointercancel` end a pointer drag with nothing changed.
+Near the scroller's edges the time grid scrolls by itself (`autoScroll`, an option of the root).
+Each step of a keyboard move is announced as data (`onAnnounce`): see
+[Keyboard](/docs/guides/keyboard) for the live region.
+
+## Hearing the drop
+
+A drop runs one command, and the root reports it as `onEventDrop` with the event's new times:
+
+```tsx
+import { Calendar, type CalendarEngineEventOf } from "@fragiola/calendar-react";
+
+<Calendar.Root
+    model={model}
+    onEventDrop={(event: CalendarEngineEventOf<"drop">) => {
+        // kind: "move" (or "resize" with resize()), keyboard: whether Enter dropped it
+        console.log(event.kind, event.eventId, event.start, event.end, event.allDay);
+    }}
+>
+    {/* the grid */}
+</Calendar.Root>;
+```
+
+To save it, listen to the model instead (`model.subscribe`, or `onEventsChange`): it hears the
+drop and every other change the same way.
+
+## Between the all-day row and the time grid
+
+A move between the two keeps the rules a calendar user expects:
+
+- a timed event dropped on the all-day row becomes all-day for `defaultAllDayDuration` days
+  (default 1), unless `allDayMaintainDuration` keeps its length;
+- an all-day event dropped in the time grid starts at the drop's slot for
+  `defaultTimedDuration` minutes (default 60);
+- moving by whole days keeps the event's wall clock in its zone across a daylight saving change
+  (09:00 stays 09:00); a move by time is exact.
+
+## Refusing a target
+
+Edit rules live in the commands, so the drag asks the model (`model.check`) at every target: a
+refused one shows no preview, and a drop there runs nothing.
+
+- **Flags:** an event, its calendar or the settings say what may change. `editable: false` on a
+  calendar makes its events read-only; `startEditable: false` on an event keeps it in place. The
+  most specific flag wins: the event's, then its calendar's, then the settings'.
+- **Middleware:** an app rule is a middleware around every command, a drag's dry runs included.
+
+```ts
+import { createCalendarModel, veto } from "@fragiola/calendar-react";
+import { dragAndDrop } from "@fragiola/calendar-react/drag-and-drop";
+
+const features = [dragAndDrop()] as const;
+
+const model = createCalendarModel(
+    {
+        version: 1,
+        events: [],
+        calendars: [{ id: "company", title: "Company", editable: false }],
+        view: { type: "week", anchorDate: "2026-11-26" },
+    },
+    { features },
+);
+
+// nothing moves into the past
+model.use((ctx, next) => {
+    if (ctx.command !== "event.move") return next();
+    const result = next();
+    if (
+        result.ok &&
+        Date.parse((result.value as { start: string }).start) < Date.now()
+    ) {
+        return veto("an event cannot move into the past");
+    }
+    return result;
+});
+```
+
+<Example id="edit-rules" />
+
+`model.can("event.move", payload)` answers the same question from code, and
+`model.is("event-start-editable", { eventId })` reads the flag chain. With `constraints()`, business
+hours and overlap rules refuse targets the same way
+([Constraints and business hours](/docs/guides/constraints-and-business-hours)).
+
+## Recurring events
+
+With `recurrence()`, a drop of one occurrence runs its move with a scope:
+`dragAndDrop({ recurringScope: "this" })` (the default, the least destructive), `"following"` or
+`"all"`. To ask the user instead, hold the command in a middleware: see
+[Recurring events](/docs/guides/recurring-events).
+
+## Resizing and dropping from outside
+
+`resize()` adds handles that change an event's start or end
+([Resizing events](/docs/guides/resizing)); its preview is the same `DragPreview`.
+`externalDrop()` receives drags from outside the calendar
+([External drop](/docs/guides/external-drop)).

@@ -1,0 +1,101 @@
+---
+title: Time zones and DST
+description: Show a calendar in any IANA zone, keep events in their own home zone, and move events across a daylight saving change without losing an hour.
+---
+
+The calendar works on exact instants and a display zone. Every timed value in the document is an
+RFC 3339 date-time with its offset (`2026-11-26T09:30:00-05:00`), so a server, a browser and an
+assistant read the same instant. The core converts instants to wall clocks with `Intl` only (no
+date library), and never assumes that a day lasts 24 hours. Which zone the reader sees, and the
+switcher that changes it, are yours.
+
+<Example id="time-zones" />
+
+## Choosing the display zone
+
+The display zone is the `timeZone` setting: an IANA name (`"Europe/London"`) or `"local"`, the
+host's zone (the default). Changing it with `settings.set` moves every event to its wall clock in
+the new zone; the instants stay the same.
+
+```tsx
+import { useCalendar } from "@fragiola/calendar-react";
+
+const ZONES = ["America/New_York", "Europe/London", "Asia/Tokyo"] as const;
+
+function ZoneSwitcher() {
+    const { model } = useCalendar();
+    return (
+        <select
+            aria-label="Time zone"
+            defaultValue={model.state.settings.timeZone}
+            onChange={(event) =>
+                model.run("settings.set", {
+                    settings: { timeZone: event.target.value },
+                })
+            }
+        >
+            {ZONES.map((zone) => (
+                <option key={zone} value={zone}>
+                    {zone}
+                </option>
+            ))}
+        </select>
+    );
+}
+```
+
+The time grid's axis is the display zone's wall clock: a 23-hour or a 25-hour day keeps the same
+slots, and each event sits at its wall-clock times. A zone name the engine does not know is
+refused (`invalid_payload`), never guessed.
+
+## An event's home zone
+
+An event may carry a `timeZone` of its own, an IANA name: its home zone. It is what a recurring
+event expands in and what a move by whole days keeps the wall clock in. Without one, the display
+zone is used. The event's `start` and `end` stay instants whatever its zone.
+
+```ts
+import type { CalendarEventJson } from "@fragiola/calendar-react";
+
+const standup: CalendarEventJson = {
+    id: "tokyo-standup",
+    title: "Tokyo standup",
+    start: "2026-11-25T09:00:00+09:00",
+    end: "2026-11-25T09:30:00+09:00",
+    allDay: false,
+    timeZone: "Asia/Tokyo",
+};
+```
+
+Shown in New York, this standup sits on Tuesday evening; shown in Tokyo, on Wednesday morning. A
+result of a move or a resize is written in the event's zone, with that zone's offset.
+
+## Daylight saving time
+
+Moving by whole days is a calendar delta in the event's zone: an event at 09:00 stays at 09:00
+across a daylight saving change. Moving by minutes is an instant delta, and a duration is always
+an instant duration, so an event across the change lasts its real length.
+
+```ts
+// 09:00 on the Friday before New York's DST change (-04:00)
+model.run("event.move", { eventId: "breakfast", delta: { days: 2 } });
+// now 2026-11-01T09:00:00-05:00: still 09:00 on the wall clock
+```
+
+A wall-clock time the zone skips (02:30 on a spring-forward night) moves forward past the gap; a
+repeated one (01:30 on a fall-back night) takes the earlier offset. A day the zone skips entirely
+(Pacific/Apia's 2011-12-30) shows no events.
+
+## All-day events and the next day
+
+All-day events take plain `YYYY-MM-DD` dates and never move with the display zone. Their `end` is
+exclusive, as every end is: a one-day event on 2026-11-26 ends on `"2026-11-27"`. A timed event
+that ends shortly after midnight can stay on its first day with `nextDayThreshold` (an `HH:mm`
+setting, default `"00:00"`): with `"09:00"`, an event from 22:00 to 02:00 shows on one day only.
+
+## Testing in a fixed zone
+
+The core reads "now" from the clock you inject (`now` on `Calendar.Root` or
+`createCalendarModel`), and the zone from the settings. A test that sets `timeZone` and `now`
+gives the same result on every machine. See [Testing your calendar](/docs/guides/testing), and
+[Dates and time zones](/docs/concepts/dates-and-time-zones) for the representation.

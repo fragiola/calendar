@@ -1,0 +1,150 @@
+---
+title: Loading events from a server
+description: Let the model say which days of the view are missing, fetch them your way, and hand the events back as one atomic command per range.
+---
+
+The `eventSources()` feature tracks events that live on a server: per source, the days already
+fetched and the days loading. When the view moves, `model.get("ranges-to-fetch")` says which
+days are missing; your code fetches them and hands the events to `event-sources.receive`, which
+replaces that source's events in the range at once. The feature has no network code: the request,
+its errors, its retries and its cache are yours.
+
+<Example id="event-sources" />
+
+## Declaring a source
+
+A source is a setting: an `id`, and the calendar its events go to when they name none.
+
+```ts
+import { createCalendarModel } from "@fragiola/calendar-react";
+import { eventSources } from "@fragiola/calendar-react/event-sources";
+
+const features = [eventSources()] as const;
+
+const model = createCalendarModel(
+    {
+        version: 1,
+        events: [],
+        calendars: [{ id: "team", title: "Team" }],
+        settings: { eventSources: [{ id: "team-api", calendarId: "team" }] },
+        view: { type: "week", anchorDate: "2026-11-26" },
+    },
+    { features },
+);
+```
+
+An event the source delivers carries its `sourceId`. Removing a source from the settings removes
+its events and what the model knew of it.
+
+## Fetching what is missing
+
+After every change (a new view, a navigation, an invalidation), read what is missing, mark it
+loading, fetch it, and receive it:
+
+```tsx
+import type {
+    AnyTypes,
+    CalendarEventJson,
+    CalendarModel,
+} from "@fragiola/calendar-react";
+import { useEffect } from "react";
+
+// `features` is the array above: [eventSources()]
+type Model = CalendarModel<AnyTypes, typeof features>;
+
+async function fetchEvents(
+    sourceId: string,
+    range: { start: string; end: string },
+    signal: AbortSignal,
+): Promise<CalendarEventJson[]> {
+    const query = new URLSearchParams({ from: range.start, to: range.end });
+    const response = await fetch(`/api/sources/${sourceId}/events?${query}`, { signal });
+    if (!response.ok) throw new Error(response.statusText);
+    return response.json();
+}
+
+export function useFetchMissing(model: Model) {
+    useEffect(() => {
+        const controller = new AbortController();
+        const fetchMissing = () => {
+            for (const { sourceId, range } of model.get("ranges-to-fetch", {})) {
+                model.run("event-sources.set-loading", { sourceId, range, loading: true });
+                fetchEvents(sourceId, range, controller.signal).then(
+                    (events) =>
+                        model.run("event-sources.receive", { sourceId, range, events }),
+                    () =>
+                        // failed or aborted: it is asked for again on the next change
+                        model.run("event-sources.set-loading", {
+                            sourceId,
+                            range,
+                            loading: false,
+                        }),
+                );
+            }
+        };
+        fetchMissing();
+        const stop = model.subscribe(fetchMissing);
+        return () => {
+            stop();
+            controller.abort();
+        };
+    }, [model]);
+}
+```
+
+`ranges-to-fetch` gives, per source, the days of the view that are neither fetched nor loading
+(`{ sourceId, range }`, dates with an exclusive end); a `range` payload asks about other days
+than the view's (a month ahead, for a prefetch). Marking a range loading takes it out of the next
+answer, so a fast series of changes never requests the same days twice.
+
+## Receiving events
+
+`event-sources.receive` replaces, in one command, the source's events whose times touch the range
+(or that share an id with a received event) with the received ones, and marks the range fetched
+and no longer loading. It returns the ids it added and removed:
+
+```ts
+const result = model.run("event-sources.receive", {
+    sourceId: "team-api",
+    range: { start: "2026-11-22", end: "2026-11-29" },
+    events: [
+        {
+            id: "team-api:standup-2026-11-26",
+            title: "Standup",
+            start: "2026-11-26T09:00:00-05:00",
+            end: "2026-11-26T09:15:00-05:00",
+            allDay: false,
+        },
+    ],
+});
+```
+
+Received events are the server's: edit flags and constraints do not refuse them. Give every
+event a stable id from the server, so a refetch replaces it instead of adding it twice; an id
+that belongs to another source's event or to a local one is refused.
+
+## Loading state
+
+`model.is("event-source-loading", { sourceId })` says whether a source is loading (without
+`sourceId`, any source), and `model.get("event-source-by", { id })` what the model knows of one:
+its `fetched` and `loading` ranges. Show a spinner, set `aria-busy` on the root:
+
+```tsx
+import { useSyncExternalStore } from "react";
+
+const loading = useSyncExternalStore(model.subscribe, () =>
+    model.is("event-source-loading", {}),
+);
+```
+
+## Refetching
+
+`event-sources.invalidate` forgets what was fetched, for one source or all of them, in a range or
+everywhere. The events stay on screen until the next `receive` replaces them, so a refresh does
+not flash an empty week:
+
+```ts
+model.run("event-sources.invalidate", { sourceId: "team-api" });
+```
+
+The next `ranges-to-fetch` asks for the invalidated days again, and the loop above fetches them.

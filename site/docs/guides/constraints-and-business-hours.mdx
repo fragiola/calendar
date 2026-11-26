@@ -1,0 +1,121 @@
+---
+title: Constraints and business hours
+description: Declare business hours, keep events and selections inside them or inside date ranges, forbid overlaps per calendar, and shade the hours in the grid.
+---
+
+The `constraints()` feature turns scheduling rules into settings the commands enforce: business
+hours, where events may go (`eventConstraint`), where a range may be selected
+(`selectConstraint`), and which events may overlap (`overlap`). A refused command returns
+`refused` with a message naming the setting, a drag shows no preview over a refused target, and
+`BusinessHours` shades the hours in each column. The rules' values and the look of the shading are
+yours.
+
+<Example id="business-hours-and-constraints" />
+
+## Business hours
+
+`businessHours` is a list of rules in the display zone: the weekdays (0 for Sunday) and a start
+and end time (`HH:mm`, up to `24:00`).
+
+```ts
+import { createCalendarModel } from "@fragiola/calendar-react";
+import { constraints } from "@fragiola/calendar-react/constraints";
+import { dragAndDrop } from "@fragiola/calendar-react/drag-and-drop";
+
+const features = [constraints(), dragAndDrop()] as const;
+
+const model = createCalendarModel(
+    {
+        version: 1,
+        events: [],
+        calendars: [{ id: "company", title: "Company" }],
+        settings: {
+            businessHours: [
+                { daysOfWeek: [1, 2, 3, 4, 5], startTime: "09:00", endTime: "17:00" },
+                { daysOfWeek: [6], startTime: "10:00", endTime: "14:00" },
+            ],
+            eventConstraint: "business-hours",
+            overlap: { company: false },
+        },
+        view: { type: "week", anchorDate: "2026-11-26" },
+    },
+    { features },
+);
+```
+
+Rules that touch on the same day merge. Days with business hours carry `data-business-hours`, and
+so does every slot whose start is within them, so CSS can shade the slots without a part:
+
+```css
+[data-calendar-part="slot"]:not([data-business-hours]) {
+    background: color-mix(in srgb, CanvasText 5%, Canvas);
+}
+```
+
+## Shading the hours in a column
+
+`BusinessHours` renders one element per range of the day, positioned at its fractions of the
+column, in a `Calendar.Column`:
+
+```tsx
+import { Calendar } from "@fragiola/calendar-react";
+import { BusinessHours } from "@fragiola/calendar-react/constraints";
+
+<Calendar.Column column={column} className="column">
+    <BusinessHours className="business-hours" />
+    <Calendar.ColumnEvents>
+        {(segment) => <Calendar.TimeEvent segment={segment} />}
+    </Calendar.ColumnEvents>
+</Calendar.Column>;
+```
+
+Put it before the events so they paint above it. It is hidden from assistive technology.
+`useBusinessHours(date)` gives a day's ranges (their instants and fractions) for anything else
+you draw, and `model.get("business-hours-in", { range })` the same for any days.
+
+## Where events may go
+
+`eventConstraint` keeps every event inside an allowed area:
+
+- `"business-hours"`: a timed event within one day's business hours, an all-day event on days
+  that have some (it needs `businessHours`);
+- a list of ranges, of dates or date-times, either end open: the event within one of them.
+
+```ts
+model.run("settings.set", {
+    settings: { eventConstraint: [{ start: "2026-11-01", end: "2027-01-01" }] },
+});
+```
+
+It is checked on `event.add`, a move, a resize, an `event.update` that changes the times or the
+calendar, and `event.set-recurrence` (each occurrence of a series over a year from its start). A
+rename, a removal and the events a source delivers are not checked.
+
+`selectConstraint` takes the same values and limits what `selection()` may select.
+
+## Overlaps
+
+`overlap` says whether events may overlap: `true` (the default), `false` for none, or per
+calendar id: `{ company: false }` keeps everything off the company's events (either event's
+calendar refusing is enough). An event never overlaps itself, and two events that only touch do
+not overlap.
+
+## What a refusal looks like
+
+A command the rules refuse changes nothing and says why:
+
+```ts
+const result = model.run("event.add", {
+    title: "Late call",
+    start: "2026-11-26T19:00:00-05:00",
+    end: "2026-11-26T20:00:00-05:00",
+    allDay: false,
+});
+if (!result.ok) {
+    // result.error.code === "refused"; the message names eventConstraint
+    console.warn(result.error.message);
+}
+```
+
+`model.can` and `model.check` answer the same question without changing anything: a form can
+disable its Save button, and a drag hides its preview over a refused slot.

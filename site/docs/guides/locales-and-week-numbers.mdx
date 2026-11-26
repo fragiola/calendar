@@ -1,0 +1,87 @@
+---
+title: Locales and week numbers
+description: Change the locale, the first day of the week and the week-number rule, and render dates from Intl parts in the reader's language.
+---
+
+The calendar never renders a date as text: every title, weekday and time comes as `Intl` parts in
+the calendar's `locale`, and your markup joins them. The locale also gives the first day of the
+week and the week numbers. The words around them (the grid's label, the buttons') are yours.
+
+<Example id="locale-and-week-numbers" />
+
+## The locale and the first day of the week
+
+`locale` is a BCP 47 tag (default `"en-US"`). The first day of the week is the locale's unless
+`firstDayOfWeek` (0 is Sunday, 6 Saturday) says otherwise; `settings.set` takes `null` to go back
+to the locale's.
+
+```ts
+model.run("settings.set", { settings: { locale: "de-DE" } }); // weeks start on Monday
+model.run("settings.set", { settings: { firstDayOfWeek: 0 } }); // Sunday, whatever the locale
+model.run("settings.set", { settings: { firstDayOfWeek: null } }); // the locale's again
+```
+
+The visible range follows: a month view's six weeks start on the new first day, and a week view
+moves its columns.
+
+## Formatting as data
+
+Three hooks give the text of the calendar as parts, in the calendar's locale, so you choose the
+markup and the separators:
+
+| hook | gives |
+| --- | --- |
+| `useCalendarTitle(format?)` | the view's title: a month view's month, another view's days |
+| `useDayHeader(date, format?)` | a day's header: the weekday in a month, the weekday and day in a time grid |
+| `useSlotLabel(time, format?)` | a slot's time (`HH:mm`), such as 9 AM or 09:00 |
+
+Each takes optional `Intl.DateTimeFormat` options. Joining the parts' values is enough for most
+headers:
+
+```tsx
+import {
+    Calendar,
+    useCalendarTitle,
+    useDayHeader,
+} from "@fragiola/calendar-react";
+
+const text = (parts: readonly { value: string }[]) =>
+    parts.map((part) => part.value).join("");
+
+function Title() {
+    const parts = useCalendarTitle();
+    return <h2>{text(parts)}</h2>;
+}
+
+function Weekday({ date }: { date: string }) {
+    const parts = useDayHeader(date, { weekday: "short" });
+    return <Calendar.ColumnHeader date={date}>{text(parts)}</Calendar.ColumnHeader>;
+}
+```
+
+In `ja-JP`, the same components show `2026年11月` and `木`; in `de-DE`, `November 2026` and `Do`.
+
+## Week numbers
+
+`weekNumbers` picks the rule: `"locale"` (the default: the locale's first day and minimal days)
+or `"iso"` (ISO 8601: weeks start on Monday, week 1 holds the year's first Thursday). A row's week
+number is its middle day's. `Calendar.WeekNumber` is a row header that gives the number in its
+state:
+
+```tsx
+<Calendar.Week week={week}>
+    <Calendar.WeekNumber className="week-number">
+        {({ weekNumber }) => weekNumber}
+    </Calendar.WeekNumber>
+    <Calendar.Days>{(day) => <Calendar.Day day={day} />}</Calendar.Days>
+</Calendar.Week>
+```
+
+The core's `weekOfYear` and `isoWeekOfYear` compute the same numbers outside a view, as
+`{ week, year }` (the week-year).
+
+## Words that are yours
+
+The library sets no `aria-label` and renders no word: the grid's name, the buttons' labels and
+the "+N more" text come from your markup, in your translation layer. See
+[Accessible names and the keyboard](/docs/getting-started/accessible-names).

@@ -1,0 +1,113 @@
+---
+title: Resizing events
+description: Change an event's start or end with handles you place and style, or with Shift and the arrows on a grabbed event, previewed before it commits.
+---
+
+The `resize()` feature changes an event's length from one of its edges. You place a
+`ResizeHandle` inside an event, at the edge it moves; the engine runs the gesture, asks the model
+about each new edge, previews the result through the same `DragPreview` as a move, and runs one
+`event.resize` on release. Where the handles sit, how they look and the cursor they show are
+yours.
+
+<Example id="drag-and-resize" />
+
+## Placing the handles
+
+`ResizeHandle` goes in a `Calendar.TimeEvent` or a `Calendar.Segment`; `edge` is `"start"` or
+`"end"`. It carries `data-edge` and sets no geometry: put it at its edge yourself.
+
+```tsx
+import { Calendar, type Segment, type TimeSegment } from "@fragiola/calendar-react";
+import { DragPreview, ResizeHandle, resize } from "@fragiola/calendar-react/resize";
+
+export const features = [resize()] as const;
+
+function TimedEvent({ segment }: { segment: TimeSegment }) {
+    return (
+        <Calendar.TimeEvent segment={segment} className="event">
+            <span className="event-box">{/* the title and times */}</span>
+            <ResizeHandle edge="start" className="handle" />
+            <ResizeHandle edge="end" className="handle" />
+        </Calendar.TimeEvent>
+    );
+}
+
+// an all-day event resizes from its last day: no handle where it goes on in the next row
+function AllDayEvent({ segment }: { segment: Segment }) {
+    return (
+        <Calendar.Segment segment={segment} className="segment">
+            <span>{/* the title */}</span>
+            {segment.continuesAfter ? null : (
+                <ResizeHandle edge="end" className="segment-handle" />
+            )}
+        </Calendar.Segment>
+    );
+}
+
+// in each Calendar.Column, and in each row, as for a move
+<DragPreview className="preview" />;
+```
+
+```css
+.handle {
+    position: absolute;
+    inset-inline: 0;
+    block-size: 6px;
+    cursor: ns-resize;
+}
+.handle[data-edge="start"] {
+    inset-block-start: 0;
+}
+.handle[data-edge="end"] {
+    inset-block-end: 0;
+}
+.segment-handle {
+    position: absolute;
+    inset-block: 0;
+    inset-inline-end: 0;
+    inline-size: 6px;
+    cursor: ew-resize;
+}
+```
+
+A `Calendar.TimeEvent` and a `Calendar.Segment` are positioned by the layout, so they are
+already the containing block of what you put in them. The event being resized carries
+`data-resizing`. The handles are hidden from assistive technology: the keyboard has its own way.
+
+`DragPreview` and `useDragPreview` are exported by `@fragiola/calendar-react/resize` too, so a
+calendar that resizes without dragging imports nothing else.
+
+## On the keyboard
+
+Grab a focused event with Space (without `dragAndDrop()`, the grab only resizes), then hold
+Shift:
+
+- in a time grid, Shift and Up or Down move its end by `snapDuration`;
+- in a day grid, Shift and Left or Right move its end by a day.
+
+With `dragAndDrop()`, the arrows alone still move it. Enter commits one command (an `event.resize`, or a `batch` of a
+move and a resize when both changed), Escape cancels. Each step is an announcement
+(`onAnnounce`) your live region words.
+
+## What a resize may do
+
+`event.resize` takes the event, the edge and the edge's new value:
+
+```ts
+model.run("event.resize", {
+    eventId: "review",
+    edge: "end",
+    to: "2026-11-26T12:00:00-05:00",
+});
+```
+
+- The end needs the event's `durationEditable` (from the event, its calendar or the settings);
+  the start needs `startEditable`.
+- An end that is not after the start is refused: a resize never makes an event of no length.
+- A pointer moves the edge the way a move goes: whole days on the display zone's wall clock plus
+  the minutes between the points, so a resize across a daylight saving change lands where the
+  pointer is.
+
+A refused edge shows no preview and its release runs nothing. The root's `onEventDrop` hears a
+resize with `kind: "resize"`. With `recurrence()`, a resize of one occurrence takes a scope as a
+move does: see [Recurring events](/docs/guides/recurring-events).

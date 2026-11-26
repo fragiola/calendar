@@ -1,0 +1,279 @@
+---
+title: Week and day views
+description: Build a time grid for a week, a day or any number of days, with its all-day row, its slots and timed events placed by their times.
+---
+
+A week, a day and an n-day view are one **time grid**: a header row, the all-day row, then a row
+per slot (its label and a cell per day), with a layer of day columns laid over the slot rows
+where each timed event places itself from its times. The core lays it out (`model.get("time-grid")`):
+the slots from `slotMinTime` to `slotMaxTime`, each column's segments with their positions as
+fractions and their overlap columns. The package renders the roles, the keyboard and the
+structural geometry. The sizes, the lines, the event boxes and every label are yours.
+
+<Example id="week" />
+
+## The parts of a time grid
+
+```tsx
+import {
+    Calendar,
+    createCalendarModel,
+    type Segment,
+    type TimeSegment,
+    useCalendar,
+    useDayHeader,
+    useSlotLabel,
+} from "@fragiola/calendar-react";
+import { useState } from "react";
+
+const text = (parts: readonly { value: string }[]) =>
+    parts.map((part) => part.value).join("");
+
+export function WeekCalendar() {
+    const [model] = useState(() =>
+        createCalendarModel({
+            version: 1,
+            events: [
+                {
+                    id: "review",
+                    title: "Design review",
+                    start: "2026-11-26T10:00:00-05:00",
+                    end: "2026-11-26T11:30:00-05:00",
+                    allDay: false,
+                },
+            ],
+            calendars: [],
+            settings: { timeZone: "America/New_York" },
+            view: { type: "week", anchorDate: "2026-11-26" },
+        }),
+    );
+    return (
+        <Calendar.Root model={model} className="week">
+            <Calendar.TimeGrid aria-label="Week" className="grid">
+                <Calendar.ColumnHeaders className="headers">
+                    {(date) => <DayHeader date={date} />}
+                </Calendar.ColumnHeaders>
+                <Calendar.AllDayRow className="all-day">
+                    <Calendar.Days>
+                        {(day) => (
+                            <Calendar.Day day={day} className="all-day-cell">
+                                <Calendar.DayEvents>
+                                    {(segment) => <AllDayEvent segment={segment} />}
+                                </Calendar.DayEvents>
+                            </Calendar.Day>
+                        )}
+                    </Calendar.Days>
+                </Calendar.AllDayRow>
+                <Calendar.Scroller className="scroller">
+                    <div className="body">
+                        <Calendar.SlotRows>
+                            {(slot) => (
+                                <Calendar.SlotRow slot={slot} className="slot-row">
+                                    <Calendar.SlotLabel className="slot-label">
+                                        {slot.time.endsWith(":00") ? (
+                                            <SlotTime time={slot.time} />
+                                        ) : null}
+                                    </Calendar.SlotLabel>
+                                    <Calendar.Slots>
+                                        {(column) => (
+                                            <Calendar.Slot date={column.date} className="slot" />
+                                        )}
+                                    </Calendar.Slots>
+                                </Calendar.SlotRow>
+                            )}
+                        </Calendar.SlotRows>
+                        <Calendar.Columns className="columns">
+                            {(column) => (
+                                <Calendar.Column column={column} className="column">
+                                    <Calendar.ColumnEvents>
+                                        {(segment) => <TimedEvent segment={segment} />}
+                                    </Calendar.ColumnEvents>
+                                </Calendar.Column>
+                            )}
+                        </Calendar.Columns>
+                    </div>
+                </Calendar.Scroller>
+            </Calendar.TimeGrid>
+        </Calendar.Root>
+    );
+}
+
+function DayHeader({ date }: { date: string }) {
+    const parts = useDayHeader(date); // the weekday and the day, in the locale's order
+    return (
+        <Calendar.ColumnHeader date={date} className="header">
+            {text(parts)}
+        </Calendar.ColumnHeader>
+    );
+}
+
+function SlotTime({ time }: { time: string }) {
+    return <span>{text(useSlotLabel(time, { hour: "numeric" }))}</span>;
+}
+
+function AllDayEvent({ segment }: { segment: Segment }) {
+    const { model } = useCalendar();
+    return (
+        <Calendar.Segment segment={segment} className="segment">
+            {model.get("event-by", { id: segment.eventId })?.title}
+        </Calendar.Segment>
+    );
+}
+
+function TimedEvent({ segment }: { segment: TimeSegment }) {
+    const { model } = useCalendar();
+    return (
+        <Calendar.TimeEvent segment={segment} className="event">
+            {model.get("event-by", { id: segment.eventId })?.title}
+        </Calendar.TimeEvent>
+    );
+}
+```
+
+What each part is:
+
+- `Calendar.ColumnHeaders` is the header row, one `Calendar.ColumnHeader` per day. A time axis
+  needs a corner cell before them: put an element of your own first.
+- `Calendar.AllDayRow` is the time grid's day-grid row: its days and segments work as a month
+  row's ([Month view](/docs/guides/month-view)).
+- `Calendar.Scroller` is the element that scrolls. The engine autoscrolls it during a drag.
+- `Calendar.SlotRows` calls your function per slot; `Calendar.SlotRow` is the row,
+  `Calendar.SlotLabel` its row header and `Calendar.Slots` its cells, one `Calendar.Slot` per day.
+  The slots are the grid's cells and its roving focus.
+- `Calendar.Columns` is the layer of day columns, the grid's last row; each `Calendar.Column` is a
+  day's cell and the containing block of its events (`position: relative`), and
+  `Calendar.ColumnEvents` its list of `Calendar.TimeEvent`s.
+
+## Laying the columns over the slots
+
+The layer of columns sets no geometry of its own: you lay it over the slot rows. Give their
+shared wrapper `position: relative` and the layer `position: absolute` across it, after the time
+axis:
+
+```css
+.week {
+    --axis: 4rem;
+}
+.headers,
+.all-day {
+    display: grid;
+    grid-template-columns: var(--axis) repeat(7, minmax(0, 1fr));
+}
+.scroller {
+    overflow: auto;
+    flex: 1;
+    min-height: 0;
+}
+.body {
+    position: relative;
+}
+.slot-row {
+    display: flex;
+    height: 2.5rem;
+}
+.slot-label {
+    width: var(--axis);
+}
+.slot {
+    flex: 1;
+    border-block-start: 1px solid #ddd;
+}
+.columns {
+    position: absolute;
+    inset-block: 0;
+    inset-inline: var(--axis) 0;
+    display: flex;
+}
+.column {
+    flex: 1;
+}
+```
+
+Each `Calendar.TimeEvent` then places itself in its column: `top` and `height` from its times as
+percentages of the column, `inset-inline-start` and `width` from its overlap columns (logical
+properties, so a right-to-left page needs nothing). The column layer passes pointer events
+through to the slots below it, and its events take them back. Draw the event inside its box: a
+padding of your own keeps two side-by-side events apart.
+
+## A day, or any number of days
+
+The same parts show a day or any number of days: the view's type decides how many columns the
+layout has.
+
+```tsx
+model.run("view.set", { type: "day" });
+model.run("view.set", { type: "days", days: 3 }); // three days from the anchor date
+```
+
+`Calendar.ViewButton view="week"` runs `view.set` for you and is pressed (`aria-pressed`,
+`data-pressed`) while that view shows. Previous and Next step by the view's own length.
+
+<Example id="day" />
+
+<Example id="n-days" />
+
+A grid whose column count changes needs a layout that does not hard-code seven: flex rows, or a
+`--days` custom property you set from `useCalendarView()`.
+
+## Hidden days and the slot range
+
+Settings shape the grid, and the layout, the keyboard and the navigation follow them:
+
+- `hiddenDays` (weekdays, 0 for Sunday) leaves days out of every view: `[0, 6]` makes a working
+  week;
+- `slotMinTime` and `slotMaxTime` (`HH:mm`, up to `24:00`) bound the time axis;
+- `slotDuration` sets a slot's minutes (default 30), and `snapDuration` the step a drag snaps to
+  (default the slot).
+
+```ts
+model.run("settings.set", {
+    settings: {
+        hiddenDays: [0, 6],
+        slotMinTime: "07:00",
+        slotMaxTime: "20:00",
+        slotDuration: 15,
+    },
+});
+```
+
+<Example id="hidden-days-and-slot-range" />
+
+The axis is the display zone's wall clock: a day with a daylight saving change keeps the same
+slots, and its events sit at their wall-clock times. See [Time zones and DST](/docs/guides/time-zones).
+
+## Opening at a time of day
+
+The scroll position is yours. A ref callback on the scroller can open the grid at 08:00 from the
+slot rows' `data-time`:
+
+```tsx
+function scrollToMorning(element: HTMLElement | null) {
+    const eight = element?.querySelector<HTMLElement>('[data-time="08:00"]');
+    if (element && eight) element.scrollTop = eight.offsetTop;
+}
+
+<Calendar.Scroller ref={scrollToMorning} className="scroller">
+    {/* the slot rows and the columns */}
+</Calendar.Scroller>;
+```
+
+## The current time
+
+With `nowIndicator()` (`@fragiola/calendar-react/now-indicator`), a `NowIndicator` in today's
+column draws the current time's line, moved by the engine's clock every minute (or every
+`interval`). It renders only in today's column, so it can go in every column.
+
+```tsx
+import { NowIndicator, nowIndicator } from "@fragiola/calendar-react/now-indicator";
+
+const features = [nowIndicator()] as const;
+
+<Calendar.Column column={column} className="column">
+    <Calendar.ColumnEvents>
+        {(segment) => <TimedEvent segment={segment} />}
+    </Calendar.ColumnEvents>
+    <NowIndicator className="now" />
+</Calendar.Column>;
+```
+
+See [NowIndicator](/docs/api/now-indicator) and the [now indicator example](/examples/now-indicator).

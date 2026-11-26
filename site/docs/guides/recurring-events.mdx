@@ -1,0 +1,178 @@
+---
+title: Recurring events
+description: Repeat events with RFC 5545 rules in their own time zone, skip or change one occurrence, and ask which occurrences an edit changes.
+---
+
+The `recurrence()` feature gives an event a `recurrence`: an RFC 5545 RRULE, the occurrences it
+leaves out and the ones changed one by one. The core expands it in the event's zone, over the
+view only (never infinitely), keeps the wall clock across daylight saving changes, and edits one
+occurrence, the following ones or the whole series with the same commands as a single event. The
+question "this event, or all of them?" and its dialog are yours.
+
+<Example id="recurring-events" />
+
+## A recurring event
+
+```ts
+import { createCalendarModel } from "@fragiola/calendar-react";
+import { recurrence } from "@fragiola/calendar-react/recurrence";
+
+const features = [recurrence()] as const;
+
+const model = createCalendarModel(
+    {
+        version: 1,
+        events: [
+            {
+                id: "standup",
+                title: "Standup",
+                start: "2026-11-23T09:00:00-05:00",
+                end: "2026-11-23T09:30:00-05:00",
+                allDay: false,
+                timeZone: "America/New_York",
+                recurrence: {
+                    rule: "FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR",
+                    exdates: ["2026-11-26T09:00:00-05:00"],
+                },
+            },
+        ],
+        calendars: [],
+        view: { type: "week", anchorDate: "2026-11-26" },
+    },
+    { features },
+);
+```
+
+The event's `start` is the first occurrence, and its length is every occurrence's. Give a
+recurring event a `timeZone`: the rule repeats at its wall-clock time there (09:00 stays 09:00 in
+New York in summer and in winter), whatever zone the calendar shows. Without the feature, a
+`recurrence` field is a validation issue, never dropped silently.
+
+## The rules
+
+The subset of RFC 5545 the feature reads:
+
+| part | values |
+| --- | --- |
+| `FREQ` | `DAILY`, `WEEKLY`, `MONTHLY`, `YEARLY` |
+| `INTERVAL` | every n-th period |
+| `COUNT` | how many occurrences |
+| `UNTIL` | the last start: a date, or a UTC date-time (`20270101T000000Z`) |
+| `BYDAY` | weekdays (`MO,WE`), with an ordinal in monthly and yearly rules (`2TU`, `-1FR`) |
+| `BYMONTHDAY` | days of the month, negative from its end (`-1`) |
+| `BYMONTH` | months, 1 to 12 |
+| `WKST` | the week's first day |
+
+Any other part is a validation issue that names it. Names and values are case-insensitive; write
+the rule without the `RRULE:` prefix. `parseRecurrenceRule` and `formatRecurrenceRule` turn a rule
+into an object and back, for an editor of your own.
+
+```ts
+import {
+    formatRecurrenceRule,
+    parseRecurrenceRule,
+} from "@fragiola/calendar-react/recurrence";
+
+const parsed = parseRecurrenceRule("FREQ=MONTHLY;BYDAY=-1FR");
+if (parsed.ok) {
+    console.log(formatRecurrenceRule({ ...parsed.value, count: 6 }));
+}
+```
+
+`exdates` are the original starts of the occurrences left out; `overrides` change one
+occurrence's `title`, or its `start` and `end` (and `allDay`), keyed by its original start.
+`event.set-recurrence` gives an event a rule, changes it, or (`null`) makes it a single event
+again.
+
+## Occurrence ids
+
+An occurrence's id is its event's id and its original start: `standup@2026-11-24T09:00:00-05:00`
+(the RECURRENCE-ID). A single event's one occurrence has the event's id. The layout's segments,
+the engine's events and the edit commands carry both ids, so an occurrence is found again after
+a re-render, and `model.get("occurrence-by", { id })` reads it.
+
+`model.get("occurrences-in", { range })` lists every shown occurrence touching a range, and
+`model.is("event-recurring", { eventId })` says whether an event repeats (a repeat icon, a
+different scope prompt).
+
+## Editing one, the following, or all
+
+`event.move`, `event.resize`, `event.update` and `event.remove` take an `occurrenceId` and a
+`scope`:
+
+| scope | what changes |
+| --- | --- |
+| `"this"` | the occurrence alone: an override (a removal adds an excluded date) |
+| `"following"` | this occurrence and the ones after it: the series ends before it and a new event starts from it |
+| `"all"` | the whole series: a move shifts every occurrence by the same delta |
+
+```ts
+model.run("event.move", {
+    eventId: "standup",
+    occurrenceId: "standup@2026-11-24T09:00:00-05:00",
+    scope: "this",
+    delta: { minutes: 30 },
+});
+```
+
+On a recurring event, an `occurrenceId` needs a `scope`. Without an `occurrenceId`, the edit is
+the series' (`all`). A series never turns all-day or timed as a whole; one occurrence may. A drag
+runs its drop with `dragAndDrop({ recurringScope })`, `"this"` by default.
+
+## Asking which ones
+
+The package never asks. To ask the user, hold the command in a middleware, open your dialog, and
+run it again with the scope they choose; `meta` marks the re-run so the middleware lets it
+through, and dry runs (a drag's previews) pass untouched:
+
+```tsx
+import { createCalendarModel, type EditScope, veto } from "@fragiola/calendar-react";
+import { dragAndDrop } from "@fragiola/calendar-react/drag-and-drop";
+import { recurrence } from "@fragiola/calendar-react/recurrence";
+
+const features = [recurrence(), dragAndDrop()] as const;
+
+interface Pending {
+    command: "event.move" | "event.resize";
+    payload: Record<string, unknown>;
+}
+
+export function createPlannerModel(ask: (pending: Pending) => void) {
+    const model = createCalendarModel(
+        { version: 1, events: [], calendars: [] },
+        { features },
+    );
+    model.use((ctx, next) => {
+        if (
+            ctx.dryRun ||
+            ctx.meta?.scoped === true ||
+            (ctx.command !== "event.move" && ctx.command !== "event.resize")
+        ) {
+            return next();
+        }
+        const { eventId, occurrenceId } = ctx.payload;
+        const event = ctx.get("event-by", { id: eventId });
+        if (occurrenceId === undefined || event?.recurrence === undefined) {
+            return next();
+        }
+        ask({ command: ctx.command, payload: { ...ctx.payload } });
+        return veto("waiting for the user's scope");
+    });
+    return model;
+}
+
+// when the user picks a scope in your dialog
+export function choose(
+    model: ReturnType<typeof createPlannerModel>,
+    pending: Pending,
+    scope: EditScope,
+) {
+    model.run(pending.command, { ...pending.payload, scope } as never, {
+        meta: { scoped: true },
+    });
+}
+```
+
+The vetoed drop changes nothing, and the dialog's choice runs the one command that does. The
+example's dialog is Fragiola UI's `Dialog` with three buttons: this event, this and following
+events, all events.
