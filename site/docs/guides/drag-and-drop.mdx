@@ -275,8 +275,8 @@ refused one shows no preview, and a drop there runs nothing.
 - **Middleware:** an app rule is a middleware around every command, a drag's dry runs included.
 
 ```ts
-import { createCalendarModel, veto } from "@fragiola/calendar-react";
-import { dragAndDrop } from "@fragiola/calendar-react/drag-and-drop";
+import { createCalendarModel, veto } from "@fragiola/calendar";
+import { dragAndDrop } from "@fragiola/calendar/drag-and-drop";
 
 const features = [dragAndDrop()] as const;
 

@@ -163,7 +163,7 @@ An `Announcement` is data, never text: its `kind` is `"grab"`, `"drag-over"`, `"
 ([Keyboard](/docs/guides/keyboard)).
 
 ```ts
-import type { Announcement } from "@fragiola/calendar-react";
+import type { Announcement } from "@fragiola/calendar";
 
 function announcementText(announcement: Announcement): string {
     switch (announcement.kind) {
@@ -215,7 +215,7 @@ client render), `partAttributes(model, part, payload)` gives the same attributes
 focused, the tab stop where the model puts it ([State attributes](/docs/concepts/state-attributes)).
 
 ```ts
-import { createCalendarModel, partAttributes } from "@fragiola/calendar-react";
+import { createCalendarModel, partAttributes } from "@fragiola/calendar";
 
 const model = createCalendarModel({
     version: 1,

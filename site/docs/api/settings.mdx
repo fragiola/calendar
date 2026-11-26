@@ -9,7 +9,7 @@ rest. The model holds them resolved (`model.state.settings`, `model.get("setting
 may change, and the controls for them, are yours.
 
 ```ts
-import { createCalendarModel } from "@fragiola/calendar-react";
+import { createCalendarModel } from "@fragiola/calendar";
 
 const model = createCalendarModel({
     version: 1,
@@ -119,8 +119,8 @@ An `EventConstraint` is `"business-hours"` (which needs `businessHours`) or a no
 | `end` | `string` | the same, exclusive; open when absent |
 
 ```ts
-import { createCalendarModel } from "@fragiola/calendar-react";
-import { constraints } from "@fragiola/calendar-react/constraints";
+import { createCalendarModel } from "@fragiola/calendar";
+import { constraints } from "@fragiola/calendar/constraints";
 
 const model = createCalendarModel(
     {

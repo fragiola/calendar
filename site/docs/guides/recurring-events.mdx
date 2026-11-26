@@ -14,8 +14,8 @@ question "this event, or all of them?" and its dialog are yours.
 ## A recurring event
 
 ```ts
-import { createCalendarModel } from "@fragiola/calendar-react";
-import { recurrence } from "@fragiola/calendar-react/recurrence";
+import { createCalendarModel } from "@fragiola/calendar";
+import { recurrence } from "@fragiola/calendar/recurrence";
 
 const features = [recurrence()] as const;
 
@@ -71,7 +71,7 @@ into an object and back, for an editor of your own.
 import {
     formatRecurrenceRule,
     parseRecurrenceRule,
-} from "@fragiola/calendar-react/recurrence";
+} from "@fragiola/calendar/recurrence";
 
 const parsed = parseRecurrenceRule("FREQ=MONTHLY;BYDAY=-1FR");
 if (parsed.ok) {
@@ -126,9 +126,9 @@ run it again with the scope they choose; `meta` marks the re-run so the middlewa
 through, and dry runs (a drag's previews) pass untouched:
 
 ```ts
-import { createCalendarModel, type EditScope, veto } from "@fragiola/calendar-react";
-import { dragAndDrop } from "@fragiola/calendar-react/drag-and-drop";
-import { recurrence } from "@fragiola/calendar-react/recurrence";
+import { createCalendarModel, type EditScope, veto } from "@fragiola/calendar";
+import { dragAndDrop } from "@fragiola/calendar/drag-and-drop";
+import { recurrence } from "@fragiola/calendar/recurrence";
 
 const features = [recurrence(), dragAndDrop()] as const;
 

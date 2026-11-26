@@ -657,6 +657,31 @@ describe("the concept pages", () => {
         }
     });
 
+    it("import framework-neutral snippets from the core, never from one framework's package", () => {
+        // a code block outside <Framework> is read by every framework's reader: one that names a
+        // framework package names both (an adapter type, as styling-tailwind's), else it imports
+        // the core; api/vue is the Vue page
+        const offenders: string[] = [];
+        for (const [path, mdx] of readPages(DOCS_DIR)) {
+            if (path === "api/vue") continue;
+            const neutral = mdx.replace(
+                /^<Framework[\s\S]*?^<\/Framework>/gm,
+                "",
+            );
+            for (const block of neutral.matchAll(
+                /^```[^\n]*\n([\s\S]*?)^```/gm,
+            )) {
+                const code = block[1] ?? "";
+                const react = code.includes("@fragiola/calendar-react");
+                const vue = code.includes("@fragiola/calendar-vue");
+                if (react !== vue) {
+                    offenders.push(`${path}: ${code.split("\n")[0]}`);
+                }
+            }
+        }
+        expect(offenders).toEqual([]);
+    });
+
     it("link every example from a page", () => {
         const pages = [...readPages(DOCS_DIR).values()].join("\n");
         const examples = readdirSync(

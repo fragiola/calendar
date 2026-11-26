@@ -16,7 +16,7 @@ what you do with them (ask the user, log, sync, undo) is yours. The commands the
 `PayloadOf<T, C>` and `ResultOf<T, C>` type its payload and value, and `CommandMap` holds them.
 
 ```ts
-import { createCalendarModel } from "@fragiola/calendar-react";
+import { createCalendarModel } from "@fragiola/calendar";
 
 const model = createCalendarModel({
     version: 1,
@@ -133,7 +133,7 @@ checking `ctx.command` narrows `ctx.payload`) and `next`:
 Returning `undefined` passes on `next`'s result. A middleware runs for dry runs too (`ctx.dryRun`): keep its side effects out of them.
 
 ```ts
-import { veto } from "@fragiola/calendar-react";
+import { veto } from "@fragiola/calendar";
 
 const stopGuarding = model.use((ctx, next) => {
     if (ctx.command === "event.remove" && ctx.meta?.source === "assistant") {

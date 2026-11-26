@@ -17,10 +17,11 @@ package places every event and wires the keyboard; the markup, the words and the
 A registry types what the app keeps on its events: each event kind and the type of its `data`
 ([Typed data](/docs/concepts/typed-data)). The document is plain JSON, as a server would send it:
 all-day dates are `YYYY-MM-DD`, timed values RFC 3339 date-times with their offset, and `end` is
-exclusive. (In a Vue app, the types come from `@fragiola/calendar-vue`.)
+exclusive. (The types are the core's, `@fragiola/calendar`; both framework packages re-export
+them.)
 
 ```ts title="calendar-data.ts"
-import type { CalendarDocument } from "@fragiola/calendar-react";
+import type { CalendarDocument } from "@fragiola/calendar";
 
 export type Types = {
     events: { meeting: { room: string }; focus: undefined };

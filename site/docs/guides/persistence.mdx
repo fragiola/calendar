@@ -16,7 +16,7 @@ package ships no persistence.
 import {
     type CalendarDocument,
     createCalendarModel,
-} from "@fragiola/calendar-react";
+} from "@fragiola/calendar";
 
 const model = createCalendarModel({
     version: 1,
@@ -39,14 +39,15 @@ The view is model state, not document: it is left out unless you ask for it. The
 
 ## Saving to local storage
 
-The examples keep a copyable helper in `_kit/persist.ts`:
+The examples keep a copyable helper in `_kit/persist.ts` (importing its types from their framework's
+package):
 
 ```ts title="persist.ts"
 import type {
     CalendarDocument,
     CalendarModel,
     CalendarTypes,
-} from "@fragiola/calendar-react";
+} from "@fragiola/calendar";
 
 /** The saved document under `key`, or undefined (nothing saved, storage blocked, bad JSON). */
 export function restoreCalendar<T extends CalendarTypes>(
@@ -102,7 +103,7 @@ import {
     type CalendarDocument,
     createCalendarModel,
     validateCalendar,
-} from "@fragiola/calendar-react";
+} from "@fragiola/calendar";
 
 declare const text: string;
 declare function initial(): CalendarDocument;

@@ -17,7 +17,7 @@ its `description`, its `payloadSchema` and `resultSchema`, plain JSON Schema. Ma
 provider's tool definitions:
 
 ```ts
-import type { CalendarModel } from "@fragiola/calendar-react";
+import type { CalendarModel } from "@fragiola/calendar";
 
 export function toolsOf(model: CalendarModel) {
     return model
@@ -41,7 +41,7 @@ against the command's schema and runs it like `run` would, through the middlewar
 throws: it returns a `CommandResult` the agent can read and retry on.
 
 ```ts
-import type { CalendarModel } from "@fragiola/calendar-react";
+import type { CalendarModel } from "@fragiola/calendar";
 
 export function runToolCall(
     model: CalendarModel,
@@ -69,7 +69,7 @@ example's scripted assistant makes one such mistake on purpose and shows the err
 reader's: ask first, limit what it may touch, log it.
 
 ```ts
-import { veto } from "@fragiola/calendar-react";
+import { veto } from "@fragiola/calendar";
 
 model.use((ctx, next) => {
     if (ctx.meta?.source !== "assistant") return next();

@@ -91,7 +91,7 @@ Each factory returns its feature type: `SelectionFeature`, `DragAndDropFeature`,
 | `draft` | `externalDrop()` | none | the `ExternalEventDraft` a native drop adds, from its `DataTransfer` and `GridPoint`, or `null` to leave the drop to the app |
 
 ```ts
-import { externalDrop } from "@fragiola/calendar-react/external-drop";
+import { externalDrop } from "@fragiola/calendar/external-drop";
 
 const files = externalDrop({
     accept: (types) => types.includes("Files"),
@@ -126,7 +126,7 @@ list of `RecurrenceWeekday` (`{ weekday, ordinal? }`).
 import {
     formatRecurrenceRule,
     parseRecurrenceRule,
-} from "@fragiola/calendar-react/recurrence";
+} from "@fragiola/calendar/recurrence";
 
 const parsed = parseRecurrenceRule("FREQ=MONTHLY;BYDAY=-1FR");
 if (parsed.ok) {
