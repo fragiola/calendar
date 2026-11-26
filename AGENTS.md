@@ -19,12 +19,13 @@ the core**.
 |---|---|---|---|
 | `packages/core` | `@fragiola/calendar` | the calendar document (v1) and its JSON Schemas, the date and time-zone engine (`Intl` only), the model and its command bus (commands with JSON Schemas, `get`/`is` queries, middleware, events), the views, ranges and layout, the feature registry and every opt-in feature on its own subpath (D2), and the engine (keyboard, gestures, measurement). Today: the date and time-zone engine (`time/`, `time-zone/`, `locale/`, Issue #2) and the model (`schema/`, `document/`, `state/`, `commands/`, `view/`, `layout/`, `attributes/`, `features/`, `model/`, `format/`, Issue #3; formatting keys, Issue #4) and the model features `recurrence/`, `constraints/`, `event-sources/` (Issue #4), the engine (`engine/`) and the interactive features `selection/`, `drag-and-drop/`, `resize/`, `external-drop/`, `now-indicator/` with their shared `drop-target/` (Issue #5), each feature on its subpath | DOM only, zero runtime deps |
 | `packages/react` | `@fragiola/calendar-react` | the `Calendar.*` primitives and hooks over the core, every feature's entry mirrored with its parts, and the core re-exported (Issue #7) | the core (`workspace:*`, published as the exact version); peer `react`, `react-dom` (^19) |
-| `packages/vue` | `@fragiola/calendar-vue` | the same primitives in Vue (Vue Epic) | the core; peer `vue` (^3.5) |
+| `packages/vue` | `@fragiola/calendar-vue` | the same `Calendar.*` primitives and composables in Vue idioms, every feature's entry mirrored, `typedCalendar<T, F>()`, and the core re-exported (Issue #11) | the core (`workspace:*`, published as the exact version); peer `vue` (^3.5) |
 | `packages/angular` | `@fragiola/calendar-angular` | the same primitives as Angular directives (Angular Epic) | the core; peer `@angular/core` |
 | `site` | `site`, private | the site export (fragiola.com/calendar, contract v1.7): `project.json`, `examples.json`, `export.ts`, `contract.ts`, `dev.ts`, `dev-proxy.ts`, `sources.ts`, the docs (`site/docs`), and the repository's script tests (Issue #9) | |
 
-`packages/core`, `packages/react`, `apps/playground`, `examples/shared`, `examples/react` and `site`
-exist; the Vue and Angular adapters and examples arrive with their Epics.
+`packages/core`, `packages/react`, `packages/vue`, `apps/playground`, `examples/shared`,
+`examples/react` and `site` exist; the Vue examples arrive with Issue #12, the Angular adapter and
+examples with their Epic.
 
 ## Non-negotiable rules
 
@@ -619,8 +620,8 @@ drag and ranges; RFC 5545 for recurrence; FullCalendar's documented default for 
 | `pnpm check:layout` | the source layout check (`scripts/check-layout.ts`, from Dockable): every tracked name kebab-case, a package's `src/` root holds only its entries |
 | `pnpm check:commands` | builds the core, then `packages/core/scripts/generate-command-docs.ts --check`: fails when `site/docs/api/commands.mdx` drifts from the command catalogue (`pnpm --filter @fragiola/calendar generate:commands` rewrites it) |
 | `pnpm check:fix` | Biome check with auto-fix |
-| `pnpm typecheck` | `pnpm -r typecheck` (TypeScript 7, no emit) |
-| `pnpm test` | Vitest projects: `core (TZ=UTC)` and `core (TZ=America/Sao_Paulo)` (the core's suite twice, host zone forced, same expectations; node, jsdom per file with a docblock), `react` (jsdom + Testing Library over a fake layout, `TZ=UTC`; a server render in node), `playground` (its catalog and scenarios), `examples-shared` (metadata, themes, manifest, loaders), `examples-react` (copyable imports, styles, kit, themes), `site` (the export's contract, the docs reference, frameworks, the dev proxy, and the repository's script tests) |
+| `pnpm typecheck` | `pnpm -r typecheck` (TypeScript 7, no emit; `packages/vue`: `vue-tsc` on TypeScript 6.0.3, its `.vue` type fixtures included) |
+| `pnpm test` | Vitest projects: `core (TZ=UTC)` and `core (TZ=America/Sao_Paulo)` (the core's suite twice, host zone forced, same expectations; node, jsdom per file with a docblock), `react` (jsdom + Testing Library over a fake layout, `TZ=UTC`; a server render in node), `vue` (jsdom + `@vue/test-utils` over the same fake layout, templates compiled at runtime by Vue's full build; a server render in node), `playground` (its catalog and scenarios), `examples-shared` (metadata, themes, manifest, loaders), `examples-react` (copyable imports, styles, kit, themes), `site` (the export's contract, the docs reference, frameworks, the dev proxy, and the repository's script tests) |
 | `pnpm build` | `pnpm -r build` (tsdown), then `scripts/check-dts.ts` (no `any` in the built declarations) and `scripts/check-features.ts` (the bundle guard) |
 | `pnpm size` | the bundle size of every entry point (raw, gzip, min + gzip): a report, after `pnpm build` |
 | `pnpm check:package` | builds the packages, packs them with pnpm, checks the packed `exports` are the repo's without the source condition (only `types`/`import`/`default`, targets in `dist`), runs `publint --strict` and `attw --profile esm-only` on the tarballs, fails on a package neither the core nor in `ADAPTERS`, and runs each adapter's pin check and smoke app (`scripts/check-package.ts`) |
@@ -659,6 +660,8 @@ trigger exists yet.
 ```
 packages/react/     @fragiola/calendar-react  src/components, hooks, utils, one folder per feature entry;
                                          tests/ by behaviour, tests/types/
+packages/vue/       @fragiola/calendar-vue    src/components, composables, utils, one folder per feature entry,
+                                         typed.ts; tests/ by behaviour, tests/types/ (.vue fixtures)
 packages/core/      @fragiola/calendar   src/<domain>/ (schema, document, time, time-zone, locale, state, commands, model,
                                          view, layout, attributes, features, engine) and one folder per feature;
                                          tests/ mirroring src/, tests/types/ (type fixtures), tests/guard.test.ts;
@@ -820,4 +823,82 @@ the root: `createCalendarRef<T, F>()` / `useCalendarRef<T, F>()` (`calendarRef` 
 Root event callbacks: `onEventClick`, `onDateClick`, `onMoreClick`, `onTodayChange`,
 `onAnnounce`, and with their feature `onSelect`, `onEventDrop`, `onExternalDrop`.
 
-The Vue and Angular idioms come with their Epics.
+## In Vue (`@fragiola/calendar-vue`)
+
+The same parts, part attributes, roles, state and composables as React, with the same file names
+(`components/`, `composables/` for `hooks/`, `utils/`, the feature folders; `tests/index.test.ts`
+compares the trees), in the idioms of `../guidelines/components/primitives.md#in-vue-and-angular`
+and Tree's Vue adapter (Issue #11). The adapter renders and wires only: a behaviour difference
+from React is an adapter bug or a missing core key.
+
+- **Primitives** are `definePrimitive` components (`utils/primitive.ts`, Tree's): `inheritAttrs:
+  false`, the fallthrough attributes merged by `renderElement` (`utils/render.ts`, Tree's) over the
+  part's own: listeners composed internal first, classes joined, the structural style winning over
+  the app's `style` (a plain value: no function form, state looks go through `data-*` or the
+  `#render` slot's `state`). `as` takes a tag or a component; the `#render="{ props, state,
+  children }"` scoped slot replaces the element (`v-bind="props"`, `<component :is="children" />`).
+  A template ref on a part is its component (`$el` the element).
+- **Slots for children functions.** A collection part calls its default scoped slot per entity:
+  `Weeks` `{ week }`, `Days` `{ day, week }`, `SlotRows` `{ slot }`, `Slots` / `Columns`
+  `{ column }`, `ColumnHeaders` `{ date }`, `DayEvents` / `ColumnEvents` `{ segment }`,
+  `ListDays` `{ day }`, `ListDay` `{ item }`. React's "a function per day, or elements" is a named
+  slot: `Week` / `AllDayRow` `#day="{ day, week }"`, `SlotRow` `#column="{ column }"` (rendered as
+  `Days` / `Slots`), else the default slot. Every other part's default slot receives its state
+  (`Day`: its `DayState` plus `segments`; `Segment`, `TimeEvent`, `ListEvent`: their event state;
+  `More`: `{ hiddenCount, hiddenOccurrenceIds, date }`; buttons: `{ disabled }`, `ViewButton`
+  `{ disabled, pressed }`).
+- **Memo parity (D11, Issue #9).** Each per-entity call is a `MemoCall` component
+  (`utils/memo-call.ts`) on the layout objects and the slot; Vue tracks the reactive state a slot
+  reads in that call's own render, so it is never stale. A template's slot is compiled anew on
+  every render, but Vue flags one that reads only its scope and reactive state as stable
+  (`SlotFlags.STABLE`, read from the component vnode's children: Vue drops it from `slots` when the
+  parent renders through `h`, as every primitive does); a stable slot is called through one function
+  for the part's life, so only a changed layout object calls it again. A dynamic slot (under
+  `v-for` / `v-if`) or a render function's (Vue wraps it anew on every render) is compared by
+  identity: every row renders again with it, as an inline function in React; `$stable: true` on a
+  render function's slots keeps them. `tests/rerender.test.ts` checks both.
+- **Reactivity.** The model's state is frozen data, never proxied (Vue does not proxy a
+  non-extensible object, so an app's `ref` of the reported events holds the model's own list).
+  The root holds `version` (a `shallowRef` bumped by `model.subscribe` and
+  `engine.adapter.subscribe`, on the client only) and `engine` (a `shallowRef`); each part reads
+  through `useCalendarValue`, a `computed` on both that keeps the previous object while
+  `sameValue`, so a part renders again only when what it shows changed (React's
+  `useSyncExternalStore` store). The engine is created in `onMounted`, destroyed in
+  `onBeforeUnmount`; another `model` remounts the root (a key per model object, Tree's).
+- **Registration.** Vue calls a function template ref while it mounts a subtree, before the
+  subtree is in the document: a part registers a detached element after the flush that inserts it
+  (`nextTick`), and the root calls `engine.adapter.committed()` after those (a `flush: "post"`
+  watcher on `version` and `engine`, then `nextTick`). A part renders again when the engine
+  appears, so its ref registers it.
+- **Root.** Props: React's (`model`, `default-events`, `default-calendars`, `settings`,
+  `default-view`, `days`, `default-date`, `features`, `now`, `create-id`, `calendar-ref`, the
+  engine options). `v-model:events` (`events` + `update:events`), `v-model:view` (`view` +
+  `update:view`, the type), `v-model:date` (`date` + `update:date`, the anchor date), with
+  `@events-change`, `@view-change` (`{ type, days? }`) and `@date-change` beside them; sent, not
+  enforced, with `meta: { source: "controlled" }`, as React's. A server render shows the model's
+  state (the controlled props are applied before mount, on the client).
+- **Engine and feature events are fallthrough attributes** the root reads (`onEventClick`, …: every
+  `ENGINE_EVENT_CALLBACKS` name), never put on its element (`@select` is not the DOM's `select`):
+  `@event-click`, `@date-click`, `@more-click`, `@today-change`, `@announce`, and with their
+  feature `@select`, `@event-drop`, `@external-drop`. Typed as the root's emits by the features
+  (`RootEngineEmits<F>`), and the missing features' listeners as `never` props
+  (`RootMissingEvents<F>`), so `@select` without `selection()` is a vue-tsc error; at runtime one
+  warns, as React's.
+- **`typedCalendar<T, F>()`** (`typed.ts`, Tree's `typedTree`) gives the namespace typed by the
+  registry and the features (the root's `model`, `events`, v-models and feature events), what React
+  writes as type arguments; the untyped `Calendar.Root` takes any model and every event.
+- **Composables** have React's names and return `ComputedRef`s (value composables) or
+  `{ state, props }` of `ComputedRef`s (part composables, `props` with the registering `ref` and the
+  structural `style`: `v-bind="props"`); they take a value, a ref or a getter. `useCalendar` gives
+  the plain model and the facade. `createCalendarRef` / `useCalendarRef` are Tree's Vue calendar
+  ref: `calendar.value` (reactive, not a Vue ref: a template reads `.value`), `:calendar-ref`.
+- **No portal.** No calendar part renders elsewhere (React has none either): `Teleport` is the
+  app's, for its popovers.
+- **Tests and toolchain.** `vue-tsc` 3.3.14 on TypeScript 6.0.3 in this package only (D22);
+  Vitest aliases `vue` to its full build so the tests' calendars are templates, as an app's SFCs;
+  the SSR test hydrates `@vue/server-renderer`'s output (`vue/server-renderer`) with no mismatch
+  warning and the same elements and attributes once the engine runs. `check:package`'s Vue smoke
+  app: single-file components (`typedCalendar`, v-models, `@select`, every feature's part from its
+  entry, a composable) checked by `vue-tsc`, built, and loaded through the dev server (its own
+  `/src/*.vue` modules followed), `@vitejs/plugin-vue` 6.0.11 pinned as `../primitives`' until
+  `examples/vue` pins it.
