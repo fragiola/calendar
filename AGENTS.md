@@ -17,7 +17,7 @@ the core**.
 
 | package | name | contains | depends on |
 |---|---|---|---|
-| `packages/core` | `@fragiola/calendar` | the calendar document (v1) and its JSON Schemas, the date and time-zone engine (`Intl` only), the model and its command bus (commands with JSON Schemas, `get`/`is` queries, middleware, events), the views, ranges and layout, the feature registry and every opt-in feature on its own subpath (D2), and the engine (keyboard, gestures, measurement). Today: the empty entry, its packaging and its guard (Issue #1) | DOM only, zero runtime deps |
+| `packages/core` | `@fragiola/calendar` | the calendar document (v1) and its JSON Schemas, the date and time-zone engine (`Intl` only), the model and its command bus (commands with JSON Schemas, `get`/`is` queries, middleware, events), the views, ranges and layout, the feature registry and every opt-in feature on its own subpath (D2), and the engine (keyboard, gestures, measurement). Today: the date and time-zone engine (`time/`, `time-zone/`, `locale/`, Issue #2) | DOM only, zero runtime deps |
 | `packages/react` | `@fragiola/calendar-react` | the `Calendar.*` primitives and hooks over the core, and the core re-exported (React Epic) | the core (`workspace:*`, published as the exact version); peer `react`, `react-dom` (^19) |
 | `packages/vue` | `@fragiola/calendar-vue` | the same primitives in Vue (Vue Epic) | the core; peer `vue` (^3.5) |
 | `packages/angular` | `@fragiola/calendar-angular` | the same primitives as Angular directives (Angular Epic) | the core; peer `@angular/core` |
@@ -80,6 +80,7 @@ Taken while planning Epic #6 (fragiola/calendar#6); binding for every Epic.
   - **Moves keep wall-clock time across DST**: moving by whole days is a calendar delta in the event's zone (09:00 stays 09:00 across a DST change); moving by a time delta is an instant delta. Durations of timed events are instant durations.
   - `Intl` is not DOM: the model may use it in Node. Formatting is exposed as data (`get("title-parts")`, `get("day-header-by")`, slot labels as `Intl.DateTimeFormat` parts), never as text in a primitive.
   - The tests run the DST cases of `America/Sao_Paulo` (historic DST), `America/New_York`, `Europe/London`, `Australia/Lord_Howe` (30-minute DST), `Pacific/Apia` (a skipped day) and `UTC`, with `TZ` forced in Vitest so results do not depend on the machine.
+  - *Implementation notes (Issue #2).* `src/time/` holds `PlainDate`, `PlainTime` (`{ hour, minute }`, `24:00` allowed as a day's end), `Instant` (branded epoch ms), `ZonedDateTimeFields` and the strict parsers (`parsePlainDate`, `parsePlainTime`, `parseDateTime`: `ValidationResult` with JSON-pointer issues, never a throw) and printers; dates are epoch days on the proleptic Gregorian calendar with integer math (no `Date`: the guard refuses `new Date`, `Date()`, `Date.parse` and local-time getters in `src/`). `src/time-zone/` reads offsets from `formatToParts` cached per zone and UTC hour, except an hour holding a transition (Lord Howe's at :30), read to the second; wall clock → instant tries the offsets a day before and after, so Apia's 24-hour jump resolves; `startOfDay` is the transition instant when midnight is skipped, and a skipped day lasts 0 minutes (`minutesInDay`). `src/locale/` reads `Intl.Locale#getWeekInfo` / `weekInfo`; Vitest runs the core twice (`core (TZ=UTC)`, `core (TZ=America/Sao_Paulo)`, root `vitest.config.ts`).
 - **D5 No dependency on `@fragiola/primitives` (ecosystem gap 2).** The calendar writes its own date code (an event calendar needs zoned date-times, which the toolkit's `PlainDate` does not cover). Its public plain-date type is **structurally identical** to the toolkit's `PlainDate` (`{ year, month, day }`, `month` 1–12), so a date picked in `@fragiola/primitives`' date picker passes to `view.go-to` with no conversion; commands accept that object or a `YYYY-MM-DD` string. A shared date package, if ever, is an ecosystem decision for the user.
 - **D6 Glossary.** An **event** (a document entity) has **occurrences** (what is shown; a non-recurring event has one); a **calendar** is a category of events (`calendarId`); a **view** is a layout type (`month`, `week`, `day`, `days`, `list`) over a **range**; the **anchor date** is the date a view is built around; a **day grid** (month, the all-day row) holds **segments** (an occurrence's part within one week row); a **time grid** has **columns** (days) and **slots**; an event is **selected** (`selection()` selects ranges, not events: a range is **selected**, an event is **focused**). Written in the concepts docs later.
 - **D7 View state is model state, not document.** `view` (`{ type, anchorDate, days? }`) lives in the model (an AI or a server can navigate without a screen) and is not in `calendar-json` unless `get("calendar-json", { includeView: true })`. Commands `view.set` (`{ type, days? }`), `view.go-to` (`{ date }`), `view.next`, `view.previous`, `view.today`; `validRange` refuses navigation outside it (`refused`). The visible **range** per view is derived (`get("visible-range")`, `get("current-range")`: the month vs the six weeks shown), with `firstDayOfWeek` and `hiddenDays`. Adapters map controlled `view` / `date` props onto these commands.
@@ -149,6 +150,34 @@ drag and ranges; RFC 5545 for recurrence; FullCalendar's documented default for 
 - **Issue #1.** The first changeset is a `minor` (`0.0.0` → `0.1.0` on the first Version Packages
   PR, once releasing is set up after the user validates the library).
 
+- **Issue #2.** `PlainDateString`, `PlainTimeString` and `DateTimeString` are documented
+  aliases of `string`, not template-literal types, so a JSON document typed `string` assigns to
+  them; the parsers are the check. `Instant` is branded (`instant(ms)`).
+- **Issue #2.** `parseDateTime` follows RFC 3339 strictly (uppercase `T`/`Z`, seconds and an
+  offset required, no leap second `:60`); `-00:00` is read as `Z`; a fraction finer than
+  milliseconds is truncated. `formatDateTime` prints `Z` for a zero offset and milliseconds only
+  when not zero, so `+00:00` round-trips as `Z`.
+- **Issue #2.** Zone offsets are minutes east of UTC (Sao Paulo today: -180); historic local mean
+  time may give fractional minutes, and `formatInstant` rounds such an offset to the minute and
+  writes the wall clock with it, so the string is still the exact instant. Zone and locale
+  validation (`validateTimeZone`, `validateLocale`) return issues; the math throws a `RangeError`
+  on an unknown zone or locale (callers validate the document first). `validateTimeZone` accepts
+  `"local"` (`resolveTimeZone` reads the host zone when called); whether an event's `timeZone` may
+  be `"local"` is the document's call (Issue #3).
+- **Issue #2.** Week rules: `weekInfo(locale, { firstDayOfWeek })` takes the first day and weekend
+  from `Intl.Locale`; the engines dropped `minimalDays` (Node 26 gives none), so the table-free
+  rule is 4 when the locale's week starts on Monday and 1 otherwise (wrong for a Monday-first
+  locale outside Europe such as `en-AU`, whose CLDR value is 1); an engine with no week data gives
+  ISO 8601's week. An explicit `firstDayOfWeek` keeps the locale's minimal days. `isoWeekOfYear`
+  and `weekOfYear(date, rules)` return `{ week, year }` (the week-year).
+- **Issue #2.** `timedDayRange(start, end, nextDayThreshold)` takes wall-clock fields in the display
+  zone and the threshold in wall-clock minutes after midnight (default 0, FullCalendar's
+  `00:00`); the settings' representation of `nextDayThreshold` is Issue #3's.
+- **Issue #2.** Helpers return plain readonly objects (not frozen); the model freezes its state.
+  `formatDateParts`, `formatTimeParts` and `formatDateRangeParts` format in UTC from the plain
+  value, so the host zone never moves a date; `formatDateRangeParts` takes a range with an
+  exclusive end and formats up to its last day.
+
 ## Commands
 
 | command | does |
@@ -159,7 +188,7 @@ drag and ranges; RFC 5545 for recurrence; FullCalendar's documented default for 
 | `pnpm check:commands` | builds the core, then `packages/core/scripts/generate-command-docs.ts --check`: fails when `site/docs/api/commands.mdx` drifts from the command catalogue (`pnpm --filter @fragiola/calendar generate:commands` rewrites it) |
 | `pnpm check:fix` | Biome check with auto-fix |
 | `pnpm typecheck` | `pnpm -r typecheck` (TypeScript 7, no emit) |
-| `pnpm test` | Vitest projects: `core` (node; jsdom per file with a docblock), `site` (the repository's script tests) |
+| `pnpm test` | Vitest projects: `core (TZ=UTC)` and `core (TZ=America/Sao_Paulo)` (the core's suite twice, host zone forced, same expectations; node, jsdom per file with a docblock), `site` (the repository's script tests) |
 | `pnpm build` | `pnpm -r build` (tsdown), then `scripts/check-dts.ts` (no `any` in the built declarations) and `scripts/check-features.ts` (the bundle guard) |
 | `pnpm size` | the bundle size of every entry point (raw, gzip, min + gzip): a report, after `pnpm build` |
 | `pnpm check:package` | builds the packages, packs them with pnpm, checks the packed `exports` are the repo's without the source condition (only `types`/`import`/`default`, targets in `dist`), runs `publint --strict` and `attw --profile esm-only` on the tarballs, fails on a package neither the core nor in `ADAPTERS`, and runs each adapter's pin check and smoke app (`scripts/check-package.ts`) |

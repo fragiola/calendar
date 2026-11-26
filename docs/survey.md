@@ -119,6 +119,10 @@ be read, not to code to reuse.
   own).
 - Linked events (`groupId`), virtualization of long ranges, iCal import and export (an app
   recipe), print layouts.
+- Calendar systems other than the Gregorian (Islamic, Hebrew, Persian, Japanese eras, ...): v1
+  computes and numbers dates on the proleptic Gregorian calendar only, as the document's
+  `YYYY-MM-DD` and RFC 3339 values are; a locale only changes how a date is formatted (`Intl`
+  parts) and its week rules.
 
 ### Never in the packages
 
