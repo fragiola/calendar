@@ -169,6 +169,9 @@ const TOUCH_SLOP = 5;
 const MAX_DELAY = 2_147_483_647;
 
 const FOCUSABLE: ReadonlySet<string> = new Set(["day", "slot", "event"]);
+/** The app's own controls: inside the root, the grid's keys leave them alone. */
+const INTERACTIVE =
+    'button, input, textarea, select, a[href], [contenteditable="true"], [contenteditable=""]';
 /** The parts that are buttons: the grid's keys leave them alone. */
 const BUTTONS: ReadonlySet<string> = new Set([
     "more",
@@ -696,13 +699,22 @@ class Engine<T extends CalendarTypes, F extends CalendarFeatures> {
     private keyDown(event: KeyboardEvent): void {
         if (this.destroyed || event.defaultPrevented) return;
         const registration = this.registrationOf(event.target);
-        // a button's keys are its own (a navigation button's click); a "+N more" link's Enter or
-        // Space is its tap
+        // a button's keys are its own (a navigation button's click); a "+N more" link's Enter is
+        // its tap (its Space clicks it: `click`)
+        // an app's own control inside a part (a button, a field) keeps its keys
+        if (
+            event.target !== registration?.element &&
+            (event.target as Element | null)?.closest?.(INTERACTIVE) &&
+            !(
+                registration &&
+                (event.target as Element).closest(INTERACTIVE) ===
+                    registration.element
+            )
+        ) {
+            return;
+        }
         if (registration && BUTTONS.has(registration.part)) {
-            if (
-                registration.part === "more" &&
-                (event.key === "Enter" || event.key === " ")
-            ) {
+            if (registration.part === "more" && event.key === "Enter") {
                 this.moreClick(String(registration.payload.date));
                 event.preventDefault();
                 event.stopPropagation();
@@ -962,6 +974,7 @@ class Engine<T extends CalendarTypes, F extends CalendarFeatures> {
                 (event) => this.keyDown(event as KeyboardEvent),
             ],
             [element, "focusin", (event) => this.focusIn(event as FocusEvent)],
+            [element, "click", (event) => this.click(event as MouseEvent)],
             [
                 element,
                 "focusout",
@@ -1482,6 +1495,18 @@ class Engine<T extends CalendarTypes, F extends CalendarFeatures> {
         }
     }
 
+    /**
+     * A click with no pointer and no key behind it (`detail` 0: assistive technology activating a
+     * "+N more" link) is its tap; a pointer's tap or Enter already told the app.
+     */
+    private click(event: MouseEvent): void {
+        if (this.destroyed || event.detail !== 0) return;
+        const registration = this.registrationOf(event.target);
+        if (registration?.part === "more") {
+            this.moreClick(String(registration.payload.date));
+        }
+    }
+
     /** A day's "+N more" link was pressed (a tap, Enter or Space): the app opens its popover. */
     private moreClick(date: string): void {
         const day = this.dayGrid()
@@ -1591,7 +1616,7 @@ class Engine<T extends CalendarTypes, F extends CalendarFeatures> {
             this.erased(),
             part,
             payload,
-            { tabStop: this.tabStop(), focused: this.focusPosition },
+            { tabStop: () => this.tabStop(), focused: this.focusPosition },
             this.parts,
         );
     }

@@ -97,16 +97,23 @@ export function selectionEngine(
         const result = host.model.run("selection.set", range);
         if (result.ok) host.emit({ type: "select", range, keyboard });
     };
-    // the segments of the range shown (the pending one, else the selected one), kept per range
-    let laidOut: { range: object; segments: PreviewSegments } | null = null;
+    // the segments of the range shown (the pending one, else the selected one), kept per range and
+    // state (the view, the settings and today lay it out)
+    let laidOut: {
+        range: object;
+        state: object;
+        segments: PreviewSegments;
+    } | null = null;
     const segments = (): PreviewSegments | null => {
         const range =
             pending ??
             (host.model.get("selected-range") as SelectionRange | null);
         if (!range) return null;
-        if (laidOut?.range !== range) {
+        const state = host.model.state as object;
+        if (laidOut?.range !== range || laidOut.state !== state) {
             laidOut = {
                 range,
+                state,
                 segments: host.previewSegments({
                     eventId: null,
                     occurrenceId: null,

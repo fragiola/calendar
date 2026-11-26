@@ -456,7 +456,7 @@ export const eventSetFlags = defineCommand({
 export const eventSetAll = defineCommand({
     name: "event.set-all",
     description:
-        "Replace every event with `events` (an app's controlled list: give each its `id`). An event object the calendar already holds is kept as it is; the others are validated like the document's. The edit flags and the constraints, which guard the user's edits, do not apply.",
+        "Replace every event with `events` (an app's controlled list: give each its `id`). An event object the calendar already holds is kept as it is; the others are validated like the document's. The edit flags and the constraints, which guard the user's edits, do not apply; an event source's fetched ranges stay as they are (a list that drops a source's events does not refetch them).",
     payloadSchema: {
         type: "object",
         properties: { events: { type: "array", items: EVENT_SCHEMA } },
@@ -507,6 +507,19 @@ export const eventSetAll = defineCommand({
                         `${at}/${key}`,
                     );
                 }
+            }
+            const sources = (
+                draft.state.settings as { eventSources?: { id: string }[] }
+            ).eventSources;
+            if (
+                json.sourceId !== undefined &&
+                !sources?.some((source) => source.id === json.sourceId)
+            ) {
+                return fail(
+                    "not_found",
+                    `no event source has the id "${json.sourceId}"`,
+                    `${at}/sourceId`,
+                );
             }
             if (
                 json.calendarId !== undefined &&

@@ -322,4 +322,19 @@ describe("the selection's highlight", () => {
             segments: [{ startColumn: 2, span: 2 }],
         });
     });
+
+    it("lays the highlight out again when the view or the settings change", () => {
+        const m = mount({ view: week, features: [selection()] });
+        m.model.run("selection.set", {
+            start: "2026-11-26T09:00:00Z",
+            end: "2026-11-26T10:00:00Z",
+            allDay: false,
+        });
+        m.model.run("settings.set", { settings: { slotMinTime: "08:00" } });
+        expect(
+            m.engine.get("selection-segments")?.columns[0]?.segments[0]?.top,
+        ).toBeCloseTo(1 / 16);
+        m.model.run("view.next", {});
+        expect(m.engine.get("selection-segments")?.columns).toEqual([]);
+    });
 });

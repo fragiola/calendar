@@ -3,6 +3,7 @@
 // behaviour), whole days keep the wall clock across DST, nonsense is refused, and `can` / `check`
 // answer what `run` would.
 import { describe, expect, it } from "vitest";
+import { eventSources } from "../../src/event-sources/index";
 import { allDay, modelOf, timed } from "../fixture";
 
 const times = (model: ReturnType<typeof modelOf>, id: string) => {
@@ -646,5 +647,37 @@ describe("event.set-all (an app's controlled list)", () => {
             if (path && !result.ok) expect(result.error.path).toBe(path);
         }
         expect(model.state.events.map((event) => event.id)).toEqual(["a"]);
+    });
+
+    it("refuses an event source no setting names, with eventSources()", () => {
+        const model = modelOf(
+            [],
+            { eventSources: [{ id: "holidays" }] },
+            {},
+            { features: [eventSources()] },
+        );
+        expect(
+            model.run("event.set-all", {
+                events: [
+                    {
+                        ...allDay("x", "2026-11-26", "2026-11-27"),
+                        sourceId: "nope",
+                    },
+                ],
+            }),
+        ).toMatchObject({
+            ok: false,
+            error: { code: "not_found", path: "/events/0/sourceId" },
+        });
+        expect(
+            model.run("event.set-all", {
+                events: [
+                    {
+                        ...allDay("x", "2026-11-26", "2026-11-27"),
+                        sourceId: "holidays",
+                    },
+                ],
+            }).ok,
+        ).toBe(true);
     });
 });

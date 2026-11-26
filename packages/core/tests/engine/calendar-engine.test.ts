@@ -693,4 +693,32 @@ describe("buttons inside the root", () => {
             occurrenceIds: [],
         });
     });
+
+    it('leaves an app\'s own control inside a part its keys, and takes an assistive click on "+N more"', () => {
+        const m = mount({
+            events: [allDay("a", "2026-11-26", "2026-11-27")],
+            view: { type: "month", anchorDate: "2026-11-26" },
+        });
+        const control = document.createElement("button");
+        m.element("event a 2026-11-26").append(control);
+        control.focus();
+        expect(m.key("ArrowRight").defaultPrevented).toBe(false);
+        expect(m.key("Enter").defaultPrevented).toBe(false);
+        const more = document.createElement("button");
+        m.root.append(more);
+        m.engine.adapter.register("more", { date: "2026-11-27" }, more);
+        more.dispatchEvent(
+            new MouseEvent("click", { bubbles: true, detail: 0 }),
+        );
+        expect(m.events.at(-1)).toMatchObject({
+            type: "more-click",
+            date: "2026-11-27",
+        });
+        const count = m.events.length;
+        // a pointer's click (detail 1) was its tap already
+        more.dispatchEvent(
+            new MouseEvent("click", { bubbles: true, detail: 1 }),
+        );
+        expect(m.events).toHaveLength(count);
+    });
 });

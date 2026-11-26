@@ -219,7 +219,7 @@ model.dispatch({"command":"event.set-flags","payload":{"eventId":"standup","dura
 
 ### `event.set-all`
 
-Replace every event with `events` (an app's controlled list: give each its `id`). An event object the calendar already holds is kept as it is; the others are validated like the document's. The edit flags and the constraints, which guard the user's edits, do not apply.
+Replace every event with `events` (an app's controlled list: give each its `id`). An event object the calendar already holds is kept as it is; the others are validated like the document's. The edit flags and the constraints, which guard the user's edits, do not apply; an event source's fetched ranges stay as they are (a list that drops a source's events does not refetch them).
 
 **Payload**
 

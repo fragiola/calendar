@@ -32,8 +32,8 @@ import {
 
 /** The engine's focus, as the attributes read it. */
 export interface FocusView {
-    /** the position holding the grid's one tab stop */
-    readonly tabStop: FocusPosition | null;
+    /** the position holding the grid's one tab stop (read only for the focusable parts) */
+    readonly tabStop: () => FocusPosition | null;
     /** the focused position (`data-focused`) */
     readonly focused: FocusPosition | null;
 }
@@ -60,10 +60,8 @@ function focusAttributes(
 ): void {
     const position = positionOfPart(model, part, payload);
     const key = position === null ? undefined : keyOfPosition(position);
-    into.tabindex =
-        focus.tabStop !== null && key === keyOfPosition(focus.tabStop)
-            ? "0"
-            : "-1";
+    const stop = focus.tabStop();
+    into.tabindex = stop !== null && key === keyOfPosition(stop) ? "0" : "-1";
     into["data-focused"] =
         focus.focused !== null && key === keyOfPosition(focus.focused)
             ? ""
@@ -226,7 +224,7 @@ export function partAttributes<
         loose,
         part,
         payload as Readonly<Record<string, unknown>>,
-        { tabStop: defaultTabStop(loose, today), focused: null },
+        { tabStop: () => defaultTabStop(loose, today), focused: null },
         [],
     );
 }
