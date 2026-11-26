@@ -169,6 +169,14 @@ const TOUCH_SLOP = 5;
 const MAX_DELAY = 2_147_483_647;
 
 const FOCUSABLE: ReadonlySet<string> = new Set(["day", "slot", "event"]);
+/** The parts that are buttons: the grid's keys leave them alone. */
+const BUTTONS: ReadonlySet<string> = new Set([
+    "more",
+    "previous",
+    "next",
+    "today",
+    "view-button",
+]);
 
 /** The registry key of a part's element. */
 function keyOf(part: string, payload: Readonly<Record<string, unknown>>) {
@@ -688,6 +696,19 @@ class Engine<T extends CalendarTypes, F extends CalendarFeatures> {
     private keyDown(event: KeyboardEvent): void {
         if (this.destroyed || event.defaultPrevented) return;
         const registration = this.registrationOf(event.target);
+        // a button's keys are its own (a navigation button's click); a "+N more" link's Enter or
+        // Space is its tap
+        if (registration && BUTTONS.has(registration.part)) {
+            if (
+                registration.part === "more" &&
+                (event.key === "Enter" || event.key === " ")
+            ) {
+                this.moreClick(String(registration.payload.date));
+                event.preventDefault();
+                event.stopPropagation();
+            }
+            return;
+        }
         const fromElement = registration ? this.positionOf(registration) : null;
         if (fromElement) this.focusPosition = fromElement;
         const position = fromElement ?? this.focusPosition;
@@ -1439,14 +1460,7 @@ class Engine<T extends CalendarTypes, F extends CalendarFeatures> {
             return;
         }
         if (target.kind === "more" && target.date !== undefined) {
-            const day = this.dayGrid()
-                ?.weeks.flatMap((week) => week.days)
-                .find((one) => one.date === target.date);
-            this.emit({
-                type: "more-click",
-                date: target.date,
-                occurrenceIds: day?.hiddenOccurrenceIds ?? [],
-            });
+            this.moreClick(target.date);
             return;
         }
         if (target.kind === "day" && target.date !== undefined) {
@@ -1466,6 +1480,18 @@ class Engine<T extends CalendarTypes, F extends CalendarFeatures> {
                 at: point.at,
             });
         }
+    }
+
+    /** A day's "+N more" link was pressed (a tap, Enter or Space): the app opens its popover. */
+    private moreClick(date: string): void {
+        const day = this.dayGrid()
+            ?.weeks.flatMap((week) => week.days)
+            .find((one) => one.date === date);
+        this.emit({
+            type: "more-click",
+            date,
+            occurrenceIds: day?.hiddenOccurrenceIds ?? [],
+        });
     }
 
     private slotPoint(date: string, time: string): GridPoint | null {

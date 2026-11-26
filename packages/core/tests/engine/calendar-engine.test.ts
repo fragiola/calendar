@@ -661,3 +661,36 @@ describe("partAttributes (before an engine)", () => {
         engine.destroy();
     });
 });
+
+describe("buttons inside the root", () => {
+    it("leaves a navigation button's keys to it, and takes a \"+N more\" link's Enter as its tap", () => {
+        const m = mount({ view: { type: "month", anchorDate: "2026-11-26" } });
+        const button = (part: "previous" | "more") => {
+            const element = document.createElement("button");
+            m.root.append(element);
+            m.engine.adapter.register(
+                part,
+                part === "more" ? { date: "2026-11-26" } : {},
+                element,
+            );
+            element.focus();
+            return element;
+        };
+        // a cell held the focus before
+        m.engine.run("focus", { date: "2026-11-25" });
+        button("previous");
+        expect(m.key("ArrowRight").defaultPrevented).toBe(false);
+        expect(m.key("Enter").defaultPrevented).toBe(false);
+        expect(m.engine.get("focused")).toEqual({
+            kind: "day",
+            date: "2026-11-25",
+        });
+        button("more");
+        expect(m.key("Enter").defaultPrevented).toBe(true);
+        expect(m.events.at(-1)).toEqual({
+            type: "more-click",
+            date: "2026-11-26",
+            occurrenceIds: [],
+        });
+    });
+});
