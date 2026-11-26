@@ -17,7 +17,7 @@ the core**.
 
 | package | name | contains | depends on |
 |---|---|---|---|
-| `packages/core` | `@fragiola/calendar` | the calendar document (v1) and its JSON Schemas, the date and time-zone engine (`Intl` only), the model and its command bus (commands with JSON Schemas, `get`/`is` queries, middleware, events), the views, ranges and layout, the feature registry and every opt-in feature on its own subpath (D2), and the engine (keyboard, gestures, measurement). Today: the date and time-zone engine (`time/`, `time-zone/`, `locale/`, Issue #2) | DOM only, zero runtime deps |
+| `packages/core` | `@fragiola/calendar` | the calendar document (v1) and its JSON Schemas, the date and time-zone engine (`Intl` only), the model and its command bus (commands with JSON Schemas, `get`/`is` queries, middleware, events), the views, ranges and layout, the feature registry and every opt-in feature on its own subpath (D2), and the engine (keyboard, gestures, measurement). Today: the date and time-zone engine (`time/`, `time-zone/`, `locale/`, Issue #2) and the model (`schema/`, `document/`, `state/`, `commands/`, `view/`, `layout/`, `attributes/`, `features/`, `model/`, Issue #3) | DOM only, zero runtime deps |
 | `packages/react` | `@fragiola/calendar-react` | the `Calendar.*` primitives and hooks over the core, and the core re-exported (React Epic) | the core (`workspace:*`, published as the exact version); peer `react`, `react-dom` (^19) |
 | `packages/vue` | `@fragiola/calendar-vue` | the same primitives in Vue (Vue Epic) | the core; peer `vue` (^3.5) |
 | `packages/angular` | `@fragiola/calendar-angular` | the same primitives as Angular directives (Angular Epic) | the core; peer `@angular/core` |
@@ -128,7 +128,8 @@ drag and ranges; RFC 5545 for recurrence; FullCalendar's documented default for 
 
 - **Issue #1.** `check:commands` runs from the first commit: until the core exports
   `createCalendarModel` (Issue #3), `packages/core/scripts/generate-command-docs.ts --check`
-  expects no `site/docs/api/commands.mdx` and fails if one is committed.
+  expects no `site/docs/api/commands.mdx` and fails if one is committed. (Since Issue #3 the page
+  is generated and checked.)
 - **Issue #1.** `check-features.ts` uses Data Grid's string markers (each feature's command, `get`
   and `is` keys read from its built factory) with an empty `FEATURES` list; each feature adds its
   `{ subpath, factory }` there with its entry in `tsdown.config.ts` and both `exports`.
@@ -178,6 +179,83 @@ drag and ranges; RFC 5545 for recurrence; FullCalendar's documented default for 
   value, so the host zone never moves a date; `formatDateRangeParts` takes a range with an
   exclusive end and formats up to its last day.
 
+- **Issue #3.** `nextDayThreshold` is an `HH:mm` wall-clock string in the settings (default
+  `00:00`, FullCalendar's; `24:00` refused), read as minutes after midnight by `timedDayRange`.
+- **Issue #3.** An event's `timeZone` is an IANA name only: `"local"` is the display setting's
+  alone (an event's home zone must mean the same on every host); an event without one uses the
+  display zone. A timed result of a move or a resize is written in the event's zone.
+- **Issue #3.** A timed event may last no time (`end === start`, a deadline: the layout counts it
+  as `eventMinDuration`); `end < start` is refused everywhere. D9's `end <= start` refusal holds
+  for all-day events and for `event.resize` (a resize to nothing is nonsense). The document
+  requires `end`; `event.add` alone fills a missing one with the default durations.
+- **Issue #3.** Setting defaults (FullCalendar's documented ones where D3 fixes none):
+  `timeZone: "local"`, `locale: "en-US"`, `weekNumbers: "locale"`, `slotDuration: 30`,
+  `slotMinTime: "00:00"`, `slotMaxTime: "24:00"`, `dayMaxEvents: null`,
+  `defaultTimedDuration: 60` (minutes), `defaultAllDayDuration: 1` (days),
+  `allDayMaintainDuration: false`, `eventOrder: "start,-duration,allDay,title"`,
+  `eventMinDuration: 15`, `fixedWeekCount: true`, `editable: true` (the model's own commands are
+  editable: the drag features are what is opt-in). `firstDayOfWeek` (the locale's), `snapDuration`
+  (the slot), `validRange` and `startEditable` / `durationEditable` / `deletable` (`editable`) stay
+  absent when not given; `settings.set` takes `null` to remove them. `calendar-json` writes every
+  setting, so a round trip is stable.
+- **Issue #3.** The edit rules' chain (D9) for a flag is: the event's flag, the event's
+  `editable`, its calendar's `editable`, the settings' flag, the settings' `editable`.
+  `event.update` needs `editable`, `event.move` `startEditable`, `event.resize` `durationEditable`
+  (`startEditable` for the start edge), `event.remove` `deletable`. `event.set-data`,
+  `event.set-flags` and the calendar commands are the app's and take no flag, except
+  `calendar.remove` with `events: "remove"`, refused when one of its events may not be removed.
+  The refusal names where the flag came from (`the event`, `its calendar`, `the settings`).
+- **Issue #3.** Navigation (D7): a month (and a list without `duration`) steps by a month and
+  anchors on its first day, a week on its first day, a day skips hidden days in the step's
+  direction, a `days` view steps by `days` days that are not hidden; `visible-range` leaves the
+  hidden edge days out. `validRange` refuses a `go-to` or `today` outside it and a step whose
+  range would not touch it (never clamped); a document without a view opens on today moved into
+  `validRange`. Anchors stay in the years 0000–9999.
+- **Issue #3.** `is("list-empty")`, not `get` (D11 wrote `get`): a yes/no question is an `is` key
+  (`model-api.md`). `get("day-grid")` is `null` for a list view, `get("time-grid")` for month and
+  list views; `get("list")` lists the visible days of any view (an agenda).
+- **Issue #3.** Layout details: the time grid's axis is the display zone's wall clock
+  (FullCalendar's), so a 23- or 25-hour day keeps the same slots and a segment sits at its
+  wall-clock times; a day the zone skips whole shows nothing. `eventMinDuration` is the least any
+  occurrence counts for in the overlap (a zero-length one included). A segment in a lane at or
+  past the lane limit (`dayMaxEvents`, or the engine's `maxLanes` for `"auto"`, a `day-grid`
+  payload) is left out of `segments`, each day listing its hidden occurrence ids. A row's week
+  number is its middle day's. `eventOrder` reads an unknown field from the event's `data`; strings
+  compare by code point. A layout part (week row, column, list day) keeps its identity while it is
+  equal by value and laid out from the same event objects, so a title change makes its rows new.
+- **Issue #3.** The feature registry follows Data Grid's composition (one function per
+  contribution point, `featuresOf(model)` from a module `WeakMap`, `defineFeature`) with Tree's
+  names table (`FEATURE_KEYS`: `commands`, `get`, `is`, engine keys, `fields`, `eventFields`,
+  `payloadFields`, `settings`, `rootProps`) and Tree's command definitions: a feature's commands
+  carry JSON Schemas (`model.get("commands")` lists them) and their payload types go in the core's
+  `CommandMap` (types cost no bytes). Contribution points ready for #4/#5: `occurrences` (the
+  layout's one source of occurrences, `layout/occurrence.ts`), `editTarget` / `writeEdit` (an edit
+  of an occurrence: the core computes the edit with its rules, the feature writes it as an
+  override, an exdate or a split), `checkEvent` (constraints refusing `event.add`, a move, a resize,
+  a removal), `stateChanged`, `load` / `toJson` / `issues` / `eventIssues` (document fields),
+  `settings` defaults, `day` / `event` / `rootAttributes`. The engine's hook points join with the
+  engine (#5).
+- **Issue #3.** `occurrenceId` and `scope` are in the edit commands' schemas and types now
+  (`OccurrenceTarget`), owned by `recurrence` in `FEATURE_KEYS.payloadFields`: without the feature
+  the bus refuses them (`not_found`, naming it) before the schema. The document schema has the
+  event's `recurrence` field, refused the same way without the feature.
+- **Issue #3.** The model type has Data Grid's two forms: `CalendarModel<T>` (any features: the
+  core's keys) and `CalendarModel<T, typeof features>`; every model is assignable to the first. The
+  features' state slices are merged by walking the tuple, not by a union turned intersection
+  (which made `F` contravariant). `createCalendarModel<Types>(json, { features })` needs the
+  features' tuple as a second type argument (TypeScript infers none once one is given).
+- **Issue #3.** `check-features.ts` reads a feature's markers less the names the core's
+  `FEATURE_KEYS` lists (those are in the main entry by design), and also fails on a source map
+  naming `src/<subpath>/` (Tree's check).
+- **Issue #3.** A dry run draws ids from a copy; the ids a custom `createId` gave it are kept for
+  the next draws, so `check` and the `run` after it name the same id. With any middleware
+  installed, the payload is validated again before the reducer (a middleware may change it in
+  place).
+- **Issue #3.** The command reference (`site/docs/api/commands.mdx`) shows each command's payload
+  and result fields from its schemas and an example that the generator runs on a sample calendar
+  (a malformed example fails it). Formatting as data (`title-parts`, `day-header-by`, D4) is not in
+  this Issue: the adapter Epics add it with the parts that render it.
+
 ## Commands
 
 | command | does |
@@ -217,7 +295,7 @@ suite's test step passes about 3 minutes.
 ## Repository layout
 
 ```
-packages/core/      @fragiola/calendar   src/<domain>/ (document, time, time-zone, locale, state, commands, model,
+packages/core/      @fragiola/calendar   src/<domain>/ (schema, document, time, time-zone, locale, state, commands, model,
                                          view, layout, attributes, features, engine) and one folder per feature;
                                          tests/ mirroring src/, tests/types/ (type fixtures), tests/guard.test.ts;
                                          scripts/generate-command-docs.ts
