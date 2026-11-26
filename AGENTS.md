@@ -1067,7 +1067,11 @@ directive binds its React primitive's part.
   model subscription and the controlled inputs wait for the first render (`afterNextRender`): a
   server render subscribes to nothing, sets no timer and shows the model's state, which the client
   hydrates before applying a controlled value that differs (`tests/server.test.ts`,
-  `@angular/platform-server`; `tests/controlled.test.ts`).
+  `@angular/platform-server`; `tests/controlled.test.ts`). Angular's client hydration
+  (`provideClientHydration`) cannot match the `SlotViews` (root views whose elements sit before
+  the template's anchor: NG0500-style mismatch), so the calendar's component goes under
+  `ngSkipHydration` and the client renders it again (`tests/hydration.test.ts`; the docs' Angular
+  page says so).
 - **Feature directives on the root** (Data Grid's form): `[calendarRoot][calendarSelection]`
   (`(rangeSelect)`), `[calendarRoot][calendarDragAndDrop]` or `[calendarResize]` (one directive, so
   `(eventDrop)` is told once with both), `[calendarRoot][calendarExternalDrop]` (`(externalDrop)`),

@@ -199,8 +199,11 @@ root ticks the application once, in a microtask, so a pointer's drop or a key's 
 before the next task, with or without zone.js. A render error goes to the app's `ErrorHandler`.
 A server render (`@angular/platform-server`, `@angular/ssr`) outputs the calendar's markup from
 the model's state, with no timer and no listener: the engine, the model subscription and the
-controlled inputs start after the first render in the browser, and hydration finds the same
-elements.
+controlled inputs start after the first render in the browser. With Angular's client hydration
+(`provideClientHydration()`), put the component that renders the calendar under
+`ngSkipHydration` (`<team-calendar ngSkipHydration />`): a collection's rows and cells are views
+of their own, which hydration cannot match, so the client renders the calendar again in place of
+the server's markup (the rest of the page is hydrated).
 
 ## Injection functions
 
