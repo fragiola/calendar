@@ -10,10 +10,13 @@ import {
 
 // `pnpm check:package` packs every package and checks what would be published.
 describe("the package check", () => {
-    it("has no adapter yet, and fails a package that is neither the core nor listed", () => {
-        expect(ADAPTERS).toEqual([]);
-        expect(unlistedPackages(["core"])).toEqual([]);
-        expect(unlistedPackages(["core", "react"])).toEqual(["react"]);
+    it("lists the React adapter with its smoke app, and fails a package that is neither the core nor listed", () => {
+        expect(
+            ADAPTERS.map(({ dir, framework }) => ({ dir, framework })),
+        ).toEqual([{ dir: "react", framework: "react" }]);
+        expect(unlistedPackages(["core", "react"])).toEqual([]);
+        expect(unlistedPackages(["core", "react", "vue"])).toEqual(["vue"]);
+        expect(unlistedPackages(["core", "react"], [])).toEqual(["react"]);
     });
 
     it("refuses a published source condition or a target outside dist", () => {

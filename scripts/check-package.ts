@@ -6,13 +6,14 @@
 // - its packed `exports` (from `publishConfig.exports`) are the repo's `exports` without the source
 //   condition, and use only the `types`, `import` and `default` conditions, with targets in `dist`;
 // - publint (strict) and attw (`esm-only` profile) pass on the tarball;
-// - the core's tarball exports every feature's subpath (`FEATURES` of `check-features.ts`), its
-//   `types` and `import` targets packed;
-// - every adapter (`ADAPTERS`: each package under packages/ but the core; none yet, they come with
-//   the React, Vue and Angular Epics, and a package missing from the list fails) depends on the
-//   core at its exact version, and passes its smoke test: a scratch app outside the workspace that
+// - the core's and the React adapter's tarballs export every feature's subpath (`FEATURES` of
+//   `check-features.ts`), their `types` and `import` targets packed;
+// - every adapter (`ADAPTERS`: each package under packages/ but the core; React today, Vue and
+//   Angular with their Epics, and a package missing from the list fails) depends on the core at
+//   its exact version, and passes its smoke test: a scratch app outside the workspace that
 //   installs the adapter's tarball only (the core tarball comes as its dependency), typechecks,
-//   builds and loads its dev server. A package published from its build output
+//   builds and loads its dev server (`reactSmoke`: a Vite + React app, its pins the examples
+//   app's, the adapter's own until it exists). A package published from its build output
 //   (`publishConfig.directory`: an Angular one, which ng-packagr builds into `dist`) is packed from
 //   that directory: its packed `exports` are the repo's relative to it, each target a file of the
 //   tarball.
@@ -21,8 +22,17 @@
 // release workflow (none yet) passes the directory `changeset pack` wrote, so what is checked is
 // what is published. A package with no tarball there (a publish plan may hold only some packages) is
 // packed from the repo, as without the option.
-import { execFileSync } from "node:child_process";
-import { mkdtempSync, readdirSync, readFileSync, rmSync } from "node:fs";
+import { execFileSync, spawn } from "node:child_process";
+import {
+    existsSync,
+    mkdirSync,
+    mkdtempSync,
+    readdirSync,
+    readFileSync,
+    rmSync,
+    writeFileSync,
+} from "node:fs";
+import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { FEATURES } from "./check-features.ts";
@@ -207,7 +217,7 @@ function lint(name: string, tarball: string): string[] {
               ]
     )
         .concat(
-            name === "core"
+            name === "core" || name === "react"
                 ? featureExportProblems(
                       manifest.exports,
                       FEATURES.map((feature) => feature.subpath),
@@ -269,9 +279,349 @@ export interface AdapterCheck {
     ) => Promise<void>;
 }
 
+/** The version the adapter `packages/<dir>` pins for `name` (a dependency or a dev dependency). */
+function adapterVersion(dir: string, name: string): string {
+    const manifest = JSON.parse(
+        readFileSync(join(root, "packages", dir, "package.json"), "utf8"),
+    ) as {
+        dependencies?: Record<string, string>;
+        devDependencies?: Record<string, string>;
+    };
+    const version =
+        manifest.dependencies?.[name] ?? manifest.devDependencies?.[name];
+    if (version === undefined) {
+        throw new Error(`packages/${dir} does not depend on ${name}`);
+    }
+    return version;
+}
+
+/**
+ * The version the smoke app of `framework` installs of `name`: the examples app's
+ * (`examples/<framework>`) once it exists, else the adapter's own (the same pins: AGENTS.md D22).
+ */
+function smokeVersion(framework: Framework, dir: string, name: string): string {
+    const examples = join(root, "examples", framework, "package.json");
+    if (existsSync(examples)) {
+        const manifest = JSON.parse(readFileSync(examples, "utf8")) as {
+            dependencies?: Record<string, string>;
+            devDependencies?: Record<string, string>;
+        };
+        const version =
+            manifest.dependencies?.[name] ?? manifest.devDependencies?.[name];
+        if (version !== undefined) return version;
+    }
+    return adapterVersion(dir, name);
+}
+
+// Everything from the React package, the core included: a React app installs that one only. A
+// month and a week with the features' parts, each from its entry of the package, typed by the
+// registry.
+const REACT_SMOKE_MAIN = `import {
+    Calendar,
+    type CalendarEngineEventOf,
+    type CalendarModel,
+    createCalendarModel,
+    useCalendarTitle,
+    useDayHeader,
+} from "@fragiola/calendar-react";
+import { BusinessHours, constraints } from "@fragiola/calendar-react/constraints";
+import { DragPreview, dragAndDrop } from "@fragiola/calendar-react/drag-and-drop";
+import { NowIndicator, nowIndicator } from "@fragiola/calendar-react/now-indicator";
+import { recurrence } from "@fragiola/calendar-react/recurrence";
+import { ResizeHandle, resize } from "@fragiola/calendar-react/resize";
+import { Selection, selection } from "@fragiola/calendar-react/selection";
+import { createRoot } from "react-dom/client";
+
+type Types = {
+    events: { meeting: { room: string } };
+    calendar: undefined;
+};
+
+const features = [
+    selection(),
+    dragAndDrop(),
+    resize(),
+    nowIndicator(),
+    constraints(),
+    recurrence(),
+] as const;
+const model: CalendarModel<Types, typeof features> = createCalendarModel<
+    Types,
+    typeof features
+>(
+    {
+        version: 1,
+        events: [
+            {
+                id: "standup",
+                kind: "meeting",
+                title: "Standup",
+                start: "2026-11-26T09:00:00-03:00",
+                end: "2026-11-26T09:15:00-03:00",
+                allDay: false,
+                data: { room: "Blue" },
+                recurrence: { rule: "FREQ=WEEKLY;BYDAY=MO,TH" },
+            },
+        ],
+        settings: { timeZone: "America/Sao_Paulo" },
+        view: { type: "week", anchorDate: "2026-11-26" },
+    },
+    { features },
+);
+
+function Title() {
+    const parts = useCalendarTitle();
+    return <h2>{parts.map((part) => part.value).join("")}</h2>;
+}
+
+function Header(props: { date: string }) {
+    const parts = useDayHeader(props.date);
+    return (
+        <Calendar.ColumnHeader date={props.date}>
+            {parts.map((part) => part.value).join("")}
+        </Calendar.ColumnHeader>
+    );
+}
+
+function Week() {
+    return (
+        <Calendar.TimeGrid aria-label="Week">
+            <Calendar.ColumnHeaders>
+                {(date) => <Header date={date} />}
+            </Calendar.ColumnHeaders>
+            <Calendar.AllDayRow>
+                {(day) => (
+                    <Calendar.Day day={day}>
+                        <Calendar.DayEvents>
+                            {(segment) => <Calendar.Segment segment={segment} />}
+                        </Calendar.DayEvents>
+                    </Calendar.Day>
+                )}
+            </Calendar.AllDayRow>
+            <Calendar.Scroller style={{ height: 600, overflow: "auto" }}>
+                <Calendar.SlotRows>
+                    {(slot) => (
+                        <Calendar.SlotRow slot={slot}>
+                            <Calendar.SlotLabel>{slot.time}</Calendar.SlotLabel>
+                            <Calendar.Slots>
+                                {(column) => <Calendar.Slot date={column.date} />}
+                            </Calendar.Slots>
+                        </Calendar.SlotRow>
+                    )}
+                </Calendar.SlotRows>
+                <Calendar.Columns>
+                    {(column) => (
+                        <Calendar.Column column={column}>
+                            <BusinessHours />
+                            <Calendar.ColumnEvents>
+                                {(segment) => (
+                                    <Calendar.TimeEvent segment={segment}>
+                                        {(state) => (
+                                            <>
+                                                {model.get("event-by", { id: state.eventId })?.title}
+                                                <ResizeHandle edge="end" />
+                                            </>
+                                        )}
+                                    </Calendar.TimeEvent>
+                                )}
+                            </Calendar.ColumnEvents>
+                            <Selection />
+                            <DragPreview />
+                            <NowIndicator />
+                        </Calendar.Column>
+                    )}
+                </Calendar.Columns>
+            </Calendar.Scroller>
+        </Calendar.TimeGrid>
+    );
+}
+
+const container = document.getElementById("root");
+if (container) {
+    createRoot(container).render(
+        <Calendar.Root
+            model={model}
+            onSelect={(event: CalendarEngineEventOf<"select">) =>
+                console.log(event.range)
+            }
+        >
+            <Title />
+            <Calendar.Previous>Previous</Calendar.Previous>
+            <Calendar.Today>Today</Calendar.Today>
+            <Calendar.Next>Next</Calendar.Next>
+            <Calendar.ViewButton view="month">Month</Calendar.ViewButton>
+            <Calendar.ViewButton view="week">Week</Calendar.ViewButton>
+            <Week />
+        </Calendar.Root>,
+    );
+}
+`;
+
+/**
+ * A scratch Vite + React app in \`dir\` that depends on the React tarball only: the core tarball is
+ * installed as its dependency, never declared by the app. Its versions are the examples app's
+ * (the adapter's own until it exists); Vite compiles the JSX itself.
+ */
+function writeReactSmokeApp(dir: string, core: string, react: string): void {
+    const version = (name: string) => smokeVersion("react", "react", name);
+    const manifest = {
+        name: "calendar-smoke",
+        private: true,
+        type: "module",
+        dependencies: {
+            "@fragiola/calendar-react": `file:${react}`,
+            react: version("react"),
+            "react-dom": version("react-dom"),
+        },
+        devDependencies: {
+            "@types/react": version("@types/react"),
+            "@types/react-dom": version("@types/react-dom"),
+            typescript: version("typescript"),
+            vite: version("vite"),
+        },
+    };
+    writeFileSync(
+        join(dir, "package.json"),
+        `${JSON.stringify(manifest, null, 4)}\n`,
+    );
+    // The React tarball depends on the core at its own version, which the registry does not have:
+    // the packed core stands in for it. A file of its own also keeps the app out of any workspace.
+    writeFileSync(
+        join(dir, "pnpm-workspace.yaml"),
+        `overrides:\n  "@fragiola/calendar": "file:${core}"\n`,
+    );
+    writeFileSync(
+        join(dir, "index.html"),
+        `<!doctype html>\n<html lang="en">\n<body>\n<div id="root"></div>\n<script type="module" src="/src/main.tsx"></script>\n</body>\n</html>\n`,
+    );
+    // strict, with the published declarations checked too (no skipLibCheck)
+    const tsconfig = {
+        compilerOptions: {
+            target: "ES2022",
+            lib: ["ES2022", "DOM", "DOM.Iterable"],
+            module: "ESNext",
+            moduleResolution: "bundler",
+            jsx: "react-jsx",
+            strict: true,
+            noUncheckedIndexedAccess: true,
+            verbatimModuleSyntax: true,
+            noEmit: true,
+            types: [],
+        },
+        include: ["src"],
+    };
+    writeFileSync(
+        join(dir, "tsconfig.json"),
+        `${JSON.stringify(tsconfig, null, 4)}\n`,
+    );
+    mkdirSync(join(dir, "src"));
+    writeFileSync(join(dir, "src/main.tsx"), REACT_SMOKE_MAIN);
+}
+
+function freePort(): Promise<number> {
+    return new Promise((resolve, reject) => {
+        const server = createServer();
+        server.once("error", reject);
+        server.listen(0, "127.0.0.1", () => {
+            const address = server.address();
+            const port =
+                typeof address === "object" && address ? address.port : 0;
+            server.close(() => resolve(port));
+        });
+    });
+}
+
+async function fetchOk(url: string): Promise<string> {
+    const response = await fetch(url);
+    const body = await response.text();
+    if (!response.ok) {
+        throw new Error(`${url}: ${response.status}\n${body.slice(0, 2000)}`);
+    }
+    return body;
+}
+
+/** The absolute imports of a module served by Vite (`/node_modules/.vite/deps/…`, `/@id/…`). */
+export function servedImports(code: string): string[] {
+    return [...code.matchAll(/(?:from|import)\s*["'](\/[^"']+)["']/g)].flatMap(
+        ([, path]) => (path === undefined ? [] : [path]),
+    );
+}
+
+/**
+ * Starts the app's dev server, loads its entry (`/src/main.tsx`) and every module it imports,
+ * then stops it.
+ */
+async function loadThroughDevServer(
+    dir: string,
+    entryPath: string,
+): Promise<void> {
+    const port = await freePort();
+    const base = `http://127.0.0.1:${port}`;
+    const server = spawn(
+        process.execPath,
+        [
+            join(dir, "node_modules/vite/bin/vite.js"),
+            "--host",
+            "127.0.0.1",
+            "--port",
+            String(port),
+            "--strictPort",
+        ],
+        { cwd: dir, stdio: "inherit" },
+    );
+    const exited = new Promise<void>((resolve) => {
+        server.once("exit", () => resolve());
+    });
+    try {
+        const deadline = Date.now() + 30_000;
+        for (;;) {
+            try {
+                await fetchOk(`${base}/`);
+                break;
+            } catch (error) {
+                if (Date.now() > deadline) throw error;
+                await new Promise((resolve) => setTimeout(resolve, 250));
+            }
+        }
+        const entry = await fetchOk(`${base}${entryPath}`);
+        const imports = servedImports(entry);
+        if (!imports.some((path) => path.includes("@fragiola"))) {
+            throw new Error(
+                `the dev server's entry imports no package:\n${entry}`,
+            );
+        }
+        for (const path of imports) {
+            await fetchOk(`${base}${path}`);
+        }
+        console.log(
+            `check-package: the dev server loads the entry (${imports.length} imports)`,
+        );
+    } finally {
+        // the app's directory is removed next: the server must be gone first
+        server.kill();
+        await exited;
+    }
+}
+
+/**
+ * The React smoke test: the scratch Vite + React app installs the React tarball, typechecks,
+ * builds and loads its dev server.
+ */
+async function reactSmoke(
+    app: string,
+    tarballs: { core: string; adapter: string },
+): Promise<void> {
+    writeReactSmokeApp(app, tarballs.core, tarballs.adapter);
+    run("pnpm", ["install", "--no-frozen-lockfile"], app);
+    run("pnpm", ["exec", "tsc", "--noEmit"], app);
+    run("pnpm", ["exec", "vite", "build"], app);
+    await loadThroughDevServer(app, "/src/main.tsx");
+}
+
 /** Every adapter, one per package under packages/ but the core (`unlistedPackages` checks it). */
 export const ADAPTERS: readonly AdapterCheck[] = [
-    // the React, Vue and Angular adapters join with their Epics, each with its smoke app
+    // the Vue and Angular adapters join with their Epics, each with its smoke app
+    { dir: "react", framework: "react", smoke: reactSmoke },
 ];
 
 /** The packages/ directories that are neither the core nor an adapter of `adapters`. */
