@@ -21,11 +21,10 @@ the core**.
 | `packages/react` | `@fragiola/calendar-react` | the `Calendar.*` primitives and hooks over the core, every feature's entry mirrored with its parts, and the core re-exported (Issue #7) | the core (`workspace:*`, published as the exact version); peer `react`, `react-dom` (^19) |
 | `packages/vue` | `@fragiola/calendar-vue` | the same primitives in Vue (Vue Epic) | the core; peer `vue` (^3.5) |
 | `packages/angular` | `@fragiola/calendar-angular` | the same primitives as Angular directives (Angular Epic) | the core; peer `@angular/core` |
-| `site` | `site`, private | the repository's script tests today; the site export (fragiola.com/calendar) and `site/docs` from the React Epic | |
+| `site` | `site`, private | the site export (fragiola.com/calendar, contract v1.7): `project.json`, `examples.json`, `export.ts`, `contract.ts`, `dev.ts`, `dev-proxy.ts`, `sources.ts`, the docs (`site/docs`), and the repository's script tests (Issue #9) | |
 
 `packages/core`, `packages/react`, `apps/playground`, `examples/shared`, `examples/react` and `site`
-exist; the Vue and Angular adapters and examples arrive with their Epics. `site:export` and
-`site:dev` come with Issue #9.
+exist; the Vue and Angular adapters and examples arrive with their Epics.
 
 ## Non-negotiable rules
 
@@ -478,15 +477,11 @@ drag and ranges; RFC 5545 for recurrence; FullCalendar's documented default for 
   only reads them.
 - **Issue #8, re-render cost (D11).** Each collection part (`Weeks`, `Days`, `SlotRows`, `Slots`,
   `Columns`, `ColumnEvents`, `DayEvents`, `ListDays`, `ListDay`, `ColumnHeaders`) calls the app's
-  children function through `MemoCall` (`utils/memo-call.tsx`): memoized on the layout objects it
-  passes (a week row, a day and its row, a slot, a column, a segment, a list day or item), with the
-  function read through a ref, so a new inline function (a re-render of the app) re-renders no
-  unchanged row. Moving an event re-renders the rows or columns it touches
-  (`tests/rerender.test.tsx`; the playground's stress fixture counts renders in e2e). The rule for
-  apps: a children function renders from its arguments, hooks and contexts; app state it shows
-  goes through a hook or a context of the components it renders (they update on their own), not
-  through the function's closure, which is read only when the row's layout changes. (Replaced by
-  Issue #9, "children identity": the closure is read again whenever the function changes.)
+  children function through `MemoCall` (`utils/memo-call.tsx`), memoized on the layout objects it
+  passes (a week row, a day and its row, a slot, a column, a segment, a list day or item) and on the
+  function itself (Issue #9, "children identity", replaced Issue #8's ref-read function). With a
+  stable function, moving an event re-renders the rows or columns it touches
+  (`tests/rerender.test.tsx`; the playground's stress fixture counts renders in e2e).
 
 - **Issue #8, the playground.** `apps/playground` is Tree's shell (sidebar, the five themes, the
   source panel, the Inspector of a scenario's model: its commands, `calendar-json`, every part's
@@ -541,7 +536,7 @@ drag and ranges; RFC 5545 for recurrence; FullCalendar's documented default for 
   `mcr.microsoft.com/playwright:v1.65.1-noble` (`--user 1001`) when `Changes` selects them;
   `site/tests/ci-workflow.test.ts` ties the tag to every app's `@playwright/test` and checks both
   jobs' container. Measured locally (4 workers): the examples' 234 tests in 1.1 min, the
-  playground's 38 in 12 s; no shards. The Site export job is Issue #9's.
+  playground's 38 in 12 s; no shards. The Site export job came with Issue #9.
 - **Issue #8, package check.** The React smoke app's pins come from `examples/react` (it exists
   now): React 19.3.1, Vite 8.3.8, TypeScript 7.0.2, `@types/react` 19.3.0.
 - **Issue #8, focus on a multi-day segment.** A day-grid segment over several days is one element
@@ -567,6 +562,26 @@ drag and ranges; RFC 5545 for recurrence; FullCalendar's documented default for 
   `more-events` closes over its open day directly (its context is gone). The docs' composition and
   performance pages say it.
 
+- **Issue #9, the site export.** `site/` follows Primitives' (itself Tree's and Dockable's):
+  `contract.ts` (`CONTRACT_VERSION` `"1.7"`), `export.ts`, `dev.ts` (defaults `--base /calendar`,
+  `--port 5192`, `DEV_PORT`), `dev-proxy.ts`, `sources.ts`; `site/examples.json` names the levels
+  (`basics`, `interaction`, `data`, `apps`: the shared categories, checked equal) and the five themes
+  in switcher order, whose titles, swatches and CSS come from `examples/shared`. `project.json`:
+  `frameworks: ["react"]`, no `registry`, no `create`, eight keywords. Not registered in
+  `../www/projects.json` and no `Trigger www build` job (after the user validates the library).
+- **Issue #9, the docs.** Dockable's IA: Getting started (5), Concepts (12, with a glossary),
+  Guides (24: the Epic's list plus "+N more", controlled state and performance), API: primitives
+  (one page per `Calendar.*` part, one per feature part, and the hooks: 38), API: core (8, with
+  the generated `commands.mdx`), More (the issues link): 87 pages and the landing (Hero actions
+  examples → `/ai` → docs → GitHub, then the `team-planner` showcase). `site/tests/docs-reference.test.ts`
+  fails when an export of the React package, of a feature entry or of the core is on no page, when a
+  part's `## Props` table differs from its `<Part>Props` (the root's `RootBaseProps`, its engine
+  options and every engine event callback), when an exported interface's field has no row, a hook
+  no section, a part no `data-calendar-part`, a model or engine key, member or option, a command
+  field, an error code, a document field or a setting is undocumented, or a `data-*` attribute or a
+  part name is missing from `concepts/state-attributes`; `contract.test.ts` also refuses wording that
+  lists gaps on a public page. What is missing lives in `~/organizations/fragiola/todo/calendar.md`.
+
 ## Commands
 
 | command | does |
@@ -577,7 +592,7 @@ drag and ranges; RFC 5545 for recurrence; FullCalendar's documented default for 
 | `pnpm check:commands` | builds the core, then `packages/core/scripts/generate-command-docs.ts --check`: fails when `site/docs/api/commands.mdx` drifts from the command catalogue (`pnpm --filter @fragiola/calendar generate:commands` rewrites it) |
 | `pnpm check:fix` | Biome check with auto-fix |
 | `pnpm typecheck` | `pnpm -r typecheck` (TypeScript 7, no emit) |
-| `pnpm test` | Vitest projects: `core (TZ=UTC)` and `core (TZ=America/Sao_Paulo)` (the core's suite twice, host zone forced, same expectations; node, jsdom per file with a docblock), `react` (jsdom + Testing Library over a fake layout, `TZ=UTC`; a server render in node), `playground` (its catalog and scenarios), `examples-shared` (metadata, themes, manifest, loaders), `examples-react` (copyable imports, styles, kit, themes), `site` (the repository's script tests) |
+| `pnpm test` | Vitest projects: `core (TZ=UTC)` and `core (TZ=America/Sao_Paulo)` (the core's suite twice, host zone forced, same expectations; node, jsdom per file with a docblock), `react` (jsdom + Testing Library over a fake layout, `TZ=UTC`; a server render in node), `playground` (its catalog and scenarios), `examples-shared` (metadata, themes, manifest, loaders), `examples-react` (copyable imports, styles, kit, themes), `site` (the export's contract, the docs reference, frameworks, the dev proxy, and the repository's script tests) |
 | `pnpm build` | `pnpm -r build` (tsdown), then `scripts/check-dts.ts` (no `any` in the built declarations) and `scripts/check-features.ts` (the bundle guard) |
 | `pnpm size` | the bundle size of every entry point (raw, gzip, min + gzip): a report, after `pnpm build` |
 | `pnpm check:package` | builds the packages, packs them with pnpm, checks the packed `exports` are the repo's without the source condition (only `types`/`import`/`default`, targets in `dist`), runs `publint --strict` and `attw --profile esm-only` on the tarballs, fails on a package neither the core nor in `ADAPTERS`, and runs each adapter's pin check and smoke app (`scripts/check-package.ts`) |
@@ -587,7 +602,8 @@ drag and ranges; RFC 5545 for recurrence; FullCalendar's documented default for 
 | `pnpm e2e` | the Playwright suites, one after the other: the playground's (`apps/playground/e2e`, against `pnpm dev`) and each examples app's (`examples/shared/e2e`, against a production build of the embed under `/calendar/embed/<framework>/`, built against the packages' `dist`: run `pnpm build` first) |
 | `pnpm --filter examples-react dev` | the embed alone (port 5192, `PORT`; `?id=<slug>&theme=<name>`) |
 | `pnpm --filter examples-react vendor` | re-vendors Fragiola UI (`FRAGIOLA_REGISTRY`) |
-| `pnpm site:export`, `pnpm site:dev` | the site export and its dev server (Issue #9) |
+| `pnpm site:export --base /calendar --out <dir>` | builds the packages and the React embed (`<base>/embed/react/`), writes `project.json`, `docs/`, `examples.json` and the manifest, then validates the output against `../www/CONTRACT.md` v1.7 (`site/contract.ts`) and exits non-zero on any problem; it only deletes `--out` when it holds a previous export |
+| `pnpm site:dev [--base /calendar] [--port 5192]` | every framework's embed dev server (hot reload, the packages' sources) behind one Node proxy (`site/dev-proxy.ts`) on port 5192, which `www` in dev proxies under `/calendar/embed/**`; each embed serves its `manifest.json` |
 
 ## CI
 
@@ -606,7 +622,9 @@ its paths. **E2E (playground)** and **E2E (examples <framework>)** (a matrix ove
 with a `playwright.config.ts`) run in `mcr.microsoft.com/playwright:v<version>-noble`
 (`--user 1001`), its tag the version of `@playwright/test`, with no browser install
 (`site/tests/ci-workflow.test.ts`). No shards until a suite's test step passes about 3 minutes
-(today about one minute each). The Site export job comes with Issue #9.
+(today about one minute each). **Site export** runs `pnpm site:export --base /calendar --out
+"$RUNNER_TEMP/site-export"` (self-validated); `ci-workflow.test.ts` checks it and that no www
+trigger exists yet.
 
 ## Repository layout
 
@@ -617,8 +635,11 @@ packages/core/      @fragiola/calendar   src/<domain>/ (schema, document, time, 
                                          view, layout, attributes, features, engine) and one folder per feature;
                                          tests/ mirroring src/, tests/types/ (type fixtures), tests/guard.test.ts;
                                          scripts/generate-command-docs.ts
-site/               site                 tests/: the repository's script tests (layout, e2e selection, CI
-                                         workflow, bundle guard, package check); docs/ and the export later
+site/               site                 export.ts, contract.ts, dev.ts, dev-proxy.ts, sources.ts, project.json,
+                                         examples.json; docs/ (config.json, index.mdx, getting-started/,
+                                         concepts/, guides/, api/); tests/ (contract, docs-reference,
+                                         frameworks, dev-proxy, and the script tests: layout, e2e
+                                         selection, CI workflow, bundle guard, package check)
 scripts/                                 check-layout, check-dts, check-features, check-package, e2e-suites,
                                          source-condition, exported-names, built-files, size-report
 docs/                                    survey.md (the references' behaviour notes), reports
@@ -629,7 +650,8 @@ examples/shared/    examples-shared      src/meta/<slug>.ts, src/themes/, src/em
                                          (finder, manifest, loaders), e2e/ (every spec), tests/
 examples/react/     examples-react       src/examples/<slug>/ and _kit/, src/components (vendored Fragiola UI),
                                          src/embed/ (main, overlay promotion), scripts/vendor-fragiola.ts, tests/
-.github/workflows/ci.yml                 Checks, Package, Changesets, Changes, E2E (playground, examples)
+.github/workflows/ci.yml                 Checks, Package, Changesets, Changes, E2E (playground, examples),
+                                         Site export
 ```
 
 ## Provenance
