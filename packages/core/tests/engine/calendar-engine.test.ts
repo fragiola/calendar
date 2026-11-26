@@ -709,6 +709,36 @@ describe("a multi-day segment on the keyboard (D12)", () => {
         m.key("Escape");
         expect(document.activeElement).toBe(m.element("day 2026-11-26"));
     });
+    it("marks the segment focused from another of its days, and Up from More comes back to it", () => {
+        const m = mount({
+            events: [
+                allDay("first", "2026-11-24", "2026-11-27"),
+                allDay("long", "2026-11-25", "2026-11-28"),
+                allDay("hidden", "2026-11-26", "2026-11-27"),
+            ],
+            settings: { dayMaxEvents: 2 },
+            view: { type: "month", anchorDate: "2026-11-26" },
+        });
+        const more = document.createElement("button");
+        m.element("day 2026-11-26").append(more);
+        m.engine.adapter.register("more", { date: "2026-11-26" }, more);
+        m.engine.run("focus", { date: "2026-11-26" });
+        m.key("Enter");
+        m.key("ArrowDown");
+        const long = m.element("event long 2026-11-25");
+        expect(document.activeElement).toBe(long);
+        expect(
+            m.engine.adapter.attributes("event", {
+                occurrenceId: "long",
+                date: "2026-11-25",
+            })["data-focused"],
+        ).toBe("");
+        m.key("ArrowDown");
+        expect(document.activeElement).toBe(more);
+        m.key("ArrowUp");
+        expect(document.activeElement).toBe(long);
+    });
+
     it("focuses the part of a multi-week event in the row of the day", () => {
         const m = mount({
             events: [allDay("span", "2026-11-26", "2026-12-02")],

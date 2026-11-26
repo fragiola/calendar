@@ -23,9 +23,9 @@ the core**.
 | `packages/angular` | `@fragiola/calendar-angular` | the same primitives as Angular directives (Angular Epic) | the core; peer `@angular/core` |
 | `site` | `site`, private | the repository's script tests today; the site export (fragiola.com/calendar) and `site/docs` from the React Epic | |
 
-`packages/core`, `packages/react` and `site` exist. `apps/playground`, `examples/*` and the adapters arrive
-with their Epics; the root scripts that need them (`dev`, `e2e`, `site:export`, `site:dev`) are in
-place and do nothing useful until then.
+`packages/core`, `packages/react`, `apps/playground`, `examples/shared`, `examples/react` and `site`
+exist; the Vue and Angular adapters and examples arrive with their Epics. `site:export` and
+`site:dev` come with Issue #9.
 
 ## Non-negotiable rules
 
@@ -487,6 +487,70 @@ drag and ranges; RFC 5545 for recurrence; FullCalendar's documented default for 
   goes through a hook or a context of the components it renders (they update on their own), not
   through the function's closure, which is read only when the row's layout changes.
 
+- **Issue #8, the playground.** `apps/playground` is Tree's shell (sidebar, the five themes, the
+  source panel, the Inspector of a scenario's model: its commands, `calendar-json`, every part's
+  `data-*`/ARIA state, the focus included). Fixtures (`fixtures/<name>/`, unstyled, Playwright's):
+  `bare` (no feature), `interaction` (every feature, the engine's events logged, a native task),
+  `more` (`dayMaxEvents: 2`), `dst` (America/New_York's 2026-11-01 week, Saturday first), `stress`
+  (every feature, 2 000 events, `window.renders` counting each week row's and column's children
+  calls). Each reads `?view=`, `&date=`, `&dir=rtl`, and the injected clock (Thursday 2026-11-26,
+  12:00 New York). Scenarios: `views/every-view`, `interaction/every-feature`,
+  `time-zones/display-zone`, `api/commands`. The Vite config scans the examples at start
+  (`optimizeDeps.entries`), so a dependency first met when an example opens never reloads the page
+  with a second React.
+- **Issue #8, Playwright.** Both suites run with `TZ` and `timezoneId` America/New_York and
+  `locale` en-US; the playground's fixtures inject their clock, the examples' specs fix the
+  page's (`page.clock.setFixedTime`, helpers.ts `fixClock`). Chromium runs every spec, a Pixel 7
+  emulation (Chromium) the `*.touch.spec.ts` ones (a long press through the DevTools protocol's
+  touch events). Specs reach the calendar only through `data-calendar-part`, `data-date`,
+  `data-time`, `data-event-id`, roles, accessible names and test ids. The examples' e2e builds one
+  embed per port (`.e2e/dist-<port>`), so runs on two ports never share a build.
+- **Issue #8, the examples.** Every example of the Epic (25: `month`, `week`, `day`, `n-days`,
+  `list`, `all-day-and-multi-day`, `more-events`, `custom-event-content`,
+  `locale-and-week-numbers`, `time-zones`, `rtl`, `hidden-days-and-slot-range`,
+  `select-to-create`, `drag-and-resize`, `keyboard`, `external-drop`, `edit-rules`,
+  `now-indicator`, `recurring-events`, `business-hours-and-constraints`, `event-sources`,
+  `save-and-restore`, `undo-redo`, `ai-commands`, `team-planner`) in four categories (`basics`,
+  `interaction`, `data`, `apps`: the contract's levels). `_kit/` holds `data.ts` (the team's
+  calendars with a palette each, the week around today as JSON with this computer's offset),
+  `format.ts` (text from `Intl` parts and model fields), `fake-server.ts`, `persist.ts`,
+  `undo.ts` (over `event.set-all`). An event takes its calendar's palette class; the root hands
+  the theme's lane to `--calendar-lane-size`. The theme contract (`examples/shared/tests/themes.test.ts`)
+  checks the `--cal-*` tokens (font, size, radius, event radius, slot height, lane size, event
+  padding and stripe, grid width and style, header weight and case, today's marker, now line and
+  dot, shadow, motion, focus; per palette: lines, event, today, selected, weekend, hover);
+  `examples/react/tests/themes.test.ts` that every token an example reads is declared by every
+  theme and that no example writes a fixed colour. The scope prompt of a recurring edit is a
+  middleware that holds the move and re-runs it with the chosen `scope` (Fragiola UI's `Dialog`:
+  no alert dialog is vendored).
+- **Issue #8, Fragiola UI.** Vendored from the registry's default base (Fragiola Primitives):
+  `scripts/vendor-fragiola.ts` reads `FRAGIOLA_REGISTRY` (a directory built by
+  `../ui/packages/registry`'s `build-registry.ts --out`, or the deployed one), writes each file's
+  header with the item's public URL, and the copies are committed. `@fragiola/primitives-react`
+  0.2.0 (and its toolkit) was published the day the examples were vendored: `pnpm-workspace.yaml`
+  waives the seven-day gate (D22) for those two exact versions only. Its date picker is also
+  named `Calendar`: the team planner imports it as `DatePicker` (D1).
+- **Issue #8, the embed.** `examples/react/src/embed/overlay-promotion.ts` is Fragiola UI's
+  (`../ui/examples/react/src/host/overlay-promotion.ts`) without the sidebar trigger; the embed
+  starts it with `?id=`, `index.html`'s stage carries `data-stage`. The shared messages hold the
+  `overlay` / `armed` messages and `holdResize`. The root's `color-scheme` is the theme's scheme
+  (before paint and on each `theme` message). The e2e server's host page promotes the frame with
+  `&promote=1` (the team planner's spec checks the editor covers the page).
+- **Issue #8, CI.** `E2E (playground)` and `E2E (examples <framework>)` run in
+  `mcr.microsoft.com/playwright:v1.65.1-noble` (`--user 1001`) when `Changes` selects them;
+  `site/tests/ci-workflow.test.ts` ties the tag to every app's `@playwright/test` and checks both
+  jobs' container. Measured locally (4 workers): the examples' 234 tests in 1.1 min, the
+  playground's 38 in 12 s; no shards. The Site export job is Issue #9's.
+- **Issue #8, package check.** The React smoke app's pins come from `examples/react` (it exists
+  now): React 19.3.1, Vite 8.3.8, TypeScript 7.0.2, `@types/react` 19.3.0.
+- **Issue #8, focus on a multi-day segment.** A day-grid segment over several days is one element
+  per row, registered with its first day there. An event position keeps the day the focus entered
+  it from (Up/Down move among that day's events, Escape returns to it); the engine maps it to the
+  element's registration (`shownAt`: the day its segment starts in that row) to find the element,
+  to mark it `data-focused` and the tab stop, and to keep the day only while the same element is
+  focused (another week's part of the event is another element). A pending focus resolves loosely
+  in `committed()`, once the commit has removed what it removes.
+
 ## Commands
 
 | command | does |
@@ -497,13 +561,17 @@ drag and ranges; RFC 5545 for recurrence; FullCalendar's documented default for 
 | `pnpm check:commands` | builds the core, then `packages/core/scripts/generate-command-docs.ts --check`: fails when `site/docs/api/commands.mdx` drifts from the command catalogue (`pnpm --filter @fragiola/calendar generate:commands` rewrites it) |
 | `pnpm check:fix` | Biome check with auto-fix |
 | `pnpm typecheck` | `pnpm -r typecheck` (TypeScript 7, no emit) |
-| `pnpm test` | Vitest projects: `core (TZ=UTC)` and `core (TZ=America/Sao_Paulo)` (the core's suite twice, host zone forced, same expectations; node, jsdom per file with a docblock), `react` (jsdom + Testing Library over a fake layout, `TZ=UTC`; a server render in node), `site` (the repository's script tests) |
+| `pnpm test` | Vitest projects: `core (TZ=UTC)` and `core (TZ=America/Sao_Paulo)` (the core's suite twice, host zone forced, same expectations; node, jsdom per file with a docblock), `react` (jsdom + Testing Library over a fake layout, `TZ=UTC`; a server render in node), `playground` (its catalog and scenarios), `examples-shared` (metadata, themes, manifest, loaders), `examples-react` (copyable imports, styles, kit, themes), `site` (the repository's script tests) |
 | `pnpm build` | `pnpm -r build` (tsdown), then `scripts/check-dts.ts` (no `any` in the built declarations) and `scripts/check-features.ts` (the bundle guard) |
 | `pnpm size` | the bundle size of every entry point (raw, gzip, min + gzip): a report, after `pnpm build` |
 | `pnpm check:package` | builds the packages, packs them with pnpm, checks the packed `exports` are the repo's without the source condition (only `types`/`import`/`default`, targets in `dist`), runs `publint --strict` and `attw --profile esm-only` on the tarballs, fails on a package neither the core nor in `ADAPTERS`, and runs each adapter's pin check and smoke app (`scripts/check-package.ts`) |
 | `pnpm changeset` | adds a changeset: every PR that changes what a package ships (`changedFilePatterns` in `.changeset/config.json`) carries one; every package is in one `fixed` group (`@fragiola/*`) |
 | `pnpm release:version` | `changeset version`: only a release workflow runs it (none yet: releasing comes after the user validates the library) |
-| `pnpm e2e`, `pnpm dev`, `pnpm site:export`, `pnpm site:dev` | the Playwright suites, the playground (dev port **5192**), the site export: from the React Epic |
+| `pnpm dev` | the playground (`apps/playground`, port 5173, `PLAYGROUND_PORT`): the examples, the scenarios with the Inspector, the fixtures |
+| `pnpm e2e` | the Playwright suites, one after the other: the playground's (`apps/playground/e2e`, against `pnpm dev`) and each examples app's (`examples/shared/e2e`, against a production build of the embed under `/calendar/embed/<framework>/`, built against the packages' `dist`: run `pnpm build` first) |
+| `pnpm --filter examples-react dev` | the embed alone (port 5192, `PORT`; `?id=<slug>&theme=<name>`) |
+| `pnpm --filter examples-react vendor` | re-vendors Fragiola UI (`FRAGIOLA_REGISTRY`) |
+| `pnpm site:export`, `pnpm site:dev` | the site export and its dev server (Issue #9) |
 
 ## CI
 
@@ -518,10 +586,11 @@ it). Jobs: **Checks** (`pnpm check`, `typecheck`, `test`, `build`, `size`), **Pa
 `examples/vue`: examples vue; `packages/angular` or `examples/angular`: examples angular; any
 other path, and a manual run: every suite. It is an allow-list of what may skip: a new rule names
 what it skips, never what it runs. The diff uses `--no-renames`, so a moved file counts under both
-its paths. The E2E jobs and the Site export job arrive with the React Epic; they run in
-`mcr.microsoft.com/playwright:v<version>-noble` (`--user 1001`), its tag the version of
-`@playwright/test`, with no browser install (`site/tests/ci-workflow.test.ts`). No shards until a
-suite's test step passes about 3 minutes.
+its paths. **E2E (playground)** and **E2E (examples <framework>)** (a matrix over the examples apps
+with a `playwright.config.ts`) run in `mcr.microsoft.com/playwright:v<version>-noble`
+(`--user 1001`), its tag the version of `@playwright/test`, with no browser install
+(`site/tests/ci-workflow.test.ts`). No shards until a suite's test step passes about 3 minutes
+(today about one minute each). The Site export job comes with Issue #9.
 
 ## Repository layout
 
@@ -538,7 +607,13 @@ scripts/                                 check-layout, check-dts, check-features
                                          source-condition, exported-names, built-files, size-report
 docs/                                    survey.md (the references' behaviour notes), reports
 .changeset/                              config.json and the pending changesets
-.github/workflows/ci.yml                 Checks, Package, Changesets, Changes
+apps/playground/     playground           the dev shell: src/ (shell, inspector, scenarios/<area>/, fixture/),
+                                         fixtures/<name>/ (Playwright's pages), e2e/, tests/
+examples/shared/    examples-shared      src/meta/<slug>.ts, src/themes/, src/embed/messages.ts, scripts/
+                                         (finder, manifest, loaders), e2e/ (every spec), tests/
+examples/react/     examples-react       src/examples/<slug>/ and _kit/, src/components (vendored Fragiola UI),
+                                         src/embed/ (main, overlay promotion), scripts/vendor-fragiola.ts, tests/
+.github/workflows/ci.yml                 Checks, Package, Changesets, Changes, E2E (playground, examples)
 ```
 
 ## Provenance

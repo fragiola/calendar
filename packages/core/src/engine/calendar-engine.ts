@@ -565,11 +565,40 @@ class Engine<T extends CalendarTypes, F extends CalendarFeatures> {
         return keyOfPosition(position);
     }
 
+    /**
+     * A position as its element is registered: a day-grid segment over several days is one
+     * element per row, registered with its first day there, so an event position in a day cell
+     * names the day its segment starts in that row (the same position otherwise).
+     */
+    private shownAt(position: FocusPosition): FocusPosition {
+        if (position.kind !== "event" || position.cell.kind !== "day") {
+            return position;
+        }
+        const { cell, occurrenceId } = position;
+        for (const week of this.dayGrid()?.weeks ?? []) {
+            const column = week.days.findIndex((day) => day.date === cell.date);
+            if (column < 0) continue;
+            const segment = week.segments.find(
+                (one) =>
+                    one.occurrenceId === occurrenceId &&
+                    one.startColumn <= column &&
+                    column < one.startColumn + one.span,
+            );
+            const start = segment && week.days[segment.startColumn]?.date;
+            return start && start !== cell.date
+                ? { ...position, cell: { kind: "day", date: start } }
+                : position;
+        }
+        return position;
+    }
+
     private elementOf(
         position: FocusPosition,
         loose: boolean,
     ): HTMLElement | undefined {
-        const exact = this.registry.get(this.keyOfPosition(position));
+        const exact = this.registry.get(
+            this.keyOfPosition(this.shownAt(position)),
+        );
         if (exact || !loose || position.kind !== "event") {
             return exact?.element;
         }
@@ -880,7 +909,9 @@ class Engine<T extends CalendarTypes, F extends CalendarFeatures> {
             position?.kind === "event" &&
             current?.kind === "event" &&
             current.occurrenceId === position.occurrenceId &&
-            this.eventsIn(current.cell).includes(position.occurrenceId)
+            // the same element: the same row's segment (not another week's, or another column's)
+            this.keyOfPosition(this.shownAt(current)) ===
+                this.keyOfPosition(position)
         ) {
             return current;
         }
@@ -1004,14 +1035,15 @@ class Engine<T extends CalendarTypes, F extends CalendarFeatures> {
             element.tabIndex =
                 position &&
                 stop &&
-                this.keyOfPosition(position) === this.keyOfPosition(stop)
+                this.keyOfPosition(position) ===
+                    this.keyOfPosition(this.shownAt(stop))
                     ? 0
                     : -1;
         }
         if (
             this.pendingFocus &&
             this.focusPosition &&
-            key === this.keyOfPosition(this.focusPosition)
+            key === this.keyOfPosition(this.shownAt(this.focusPosition))
         ) {
             this.pendingFocus = false;
             this.focusElement(element);
@@ -1697,7 +1729,14 @@ class Engine<T extends CalendarTypes, F extends CalendarFeatures> {
             this.erased(),
             part,
             payload,
-            { tabStop: () => this.tabStop(), focused: this.focusPosition },
+            {
+                // as the elements are registered: a multi-day segment is focused from any of its days
+                tabStop: () => {
+                    const stop = this.tabStop();
+                    return stop && this.shownAt(stop);
+                },
+                focused: this.focusPosition && this.shownAt(this.focusPosition),
+            },
             this.parts,
         );
     }
