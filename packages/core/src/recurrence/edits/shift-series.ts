@@ -47,9 +47,22 @@ function wallOf(at: number, zone: string): number {
 function shiftedRule(
     rule: RecurrenceRule,
     days: number,
+    fromDay: number,
+    toDay: number,
 ): RecurrenceRule | Failure {
-    if (days === 0 || (!rule.byDay && !rule.byMonthDay && !rule.byMonth)) {
-        return rule;
+    if (days === 0) return rule;
+    if (!rule.byDay && !rule.byMonthDay && !rule.byMonth) {
+        // a monthly or yearly rule repeats its start's day of the month: a day some months (or
+        // years: February 29) lack would add or drop occurrences, so that shift is refused too
+        const lacking =
+            (rule.freq === "MONTHLY" || rule.freq === "YEARLY") &&
+            (fromEpochDay(fromDay).day > 28 || fromEpochDay(toDay).day > 28);
+        if (!lacking) return rule;
+        return fail(
+            "refused",
+            'moving every occurrence by whole days onto or off a day of the month some months lack (29–31) would change the rule\'s pattern: move this occurrence alone (scope "this"), or change the rule with event.set-recurrence',
+            "/scope",
+        );
     }
     if (
         (rule.freq === "WEEKLY" || rule.freq === "DAILY") &&
@@ -181,7 +194,8 @@ export function shiftSeries(
         ? delta
         : Math.floor(wallOf(start, newZone) / DAY) -
           Math.floor(wallOf(base, oldZone) / DAY);
-    const shifted = shiftedRule(rule, days);
+    const fromDay = allDay ? base : Math.floor(wallOf(base, oldZone) / DAY);
+    const shifted = shiftedRule(rule, days, fromDay, fromDay + days);
     if ("ok" in shifted) return shifted;
     let nextRule: RecurrenceRule = shifted;
     if (rule.until !== undefined) {

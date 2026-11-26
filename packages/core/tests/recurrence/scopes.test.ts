@@ -342,6 +342,42 @@ describe('scope "all"', () => {
         ).toBe(true);
     });
 
+    it("refuses a move by days of a plain monthly or yearly rule onto or off days 29–31", () => {
+        const monthly = (start: string, rule: string): CalendarEventJson => ({
+            id: "m",
+            title: "Rent",
+            start,
+            end: start,
+            allDay: true,
+            recurrence: { rule },
+        });
+        const move = (start: string, rule: string, days: number) =>
+            recurringModel([
+                {
+                    ...monthly(start, rule),
+                    end: start.replace(/..$/, (d) =>
+                        String(Number(d) + 1).padStart(2, "0"),
+                    ),
+                },
+            ]).check("event.move", {
+                eventId: "m",
+                occurrenceId: `m@${start}`,
+                scope: "all",
+                delta: { days },
+            });
+        // Jan 30 → 31 would skip every 30-day month; 2028-02-28 → 29 would keep only leap years
+        expect(move("2026-01-30", "FREQ=MONTHLY;COUNT=6", 1)).toMatchObject({
+            ok: false,
+            error: { code: "refused", path: "/scope" },
+        });
+        expect(move("2028-02-28", "FREQ=YEARLY;COUNT=3", 1)).toMatchObject({
+            ok: false,
+            error: { code: "refused" },
+        });
+        // days every month has shift cleanly
+        expect(move("2026-01-10", "FREQ=MONTHLY;COUNT=6", 1).ok).toBe(true);
+    });
+
     it("an edit without occurrenceId is an edit of the series; removing it removes the event", () => {
         const model = recurringModel([weekly()]);
         model.run("event.resize", {
