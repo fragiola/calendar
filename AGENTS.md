@@ -24,8 +24,8 @@ the core**.
 | `site` | `site`, private | the site export (fragiola.com/calendar, contract v1.7): `project.json`, `examples.json`, `export.ts`, `contract.ts`, `dev.ts`, `dev-proxy.ts`, `sources.ts`, the docs (`site/docs`), and the repository's script tests (Issue #9) | |
 
 `packages/core`, `packages/react`, `packages/vue`, `apps/playground`, `examples/shared`,
-`examples/react` and `site` exist; the Vue examples arrive with Issue #12, the Angular adapter and
-examples with their Epic.
+`examples/react`, `examples/vue` and `site` exist; the Angular adapter and examples come with their
+Epic.
 
 ## Non-negotiable rules
 
@@ -568,7 +568,7 @@ drag and ranges; RFC 5545 for recurrence; FullCalendar's documented default for 
   `--port 5192`, `DEV_PORT`), `dev-proxy.ts`, `sources.ts`; `site/examples.json` names the levels
   (`basics`, `interaction`, `data`, `apps`: the shared categories, checked equal) and the five themes
   in switcher order, whose titles, swatches and CSS come from `examples/shared`. `project.json`:
-  `frameworks: ["react"]`, no `registry`, no `create`, eight keywords. Not registered in
+  `frameworks: ["react", "vue"]` (Vue since Issue #12), no `registry`, no `create`, eight keywords. Not registered in
   `../www/projects.json` and no `Trigger www build` job (after the user validates the library).
 - **Issue #9, the docs.** Dockable's IA: Getting started (5), Concepts (12, with a glossary),
   Guides (24: the Epic's list plus "+N more", controlled state and performance), API: primitives
@@ -611,6 +611,36 @@ drag and ranges; RFC 5545 for recurrence; FullCalendar's documented default for 
   `--port` that is not an integer from 1 to 65535 (`parsePort`) and exits 1 when a dev server is
   ended by a signal (`exitCodeOf`).
 
+- **Issue #12, the Vue examples.** `examples/vue` (`examples-vue`) follows Tree's Vue app: every
+  example id as `src/examples/<id>/index.vue` with sibling SFCs (one per React component,
+  kebab-case), the React example's `styles.ts` (the Vue package's types, "read by the SFCs": the
+  test compares them, so both frameworks look the same), React's framework-free siblings and `_kit/`
+  copied with the package's name changed (compared too). `index.vue` types the root with
+  `typedCalendar<Types, typeof features>()` (the untyped root takes a model of `AnyTypes` only); the
+  siblings use the plain `Calendar`. A look that is a function of a part's state is applied in its
+  `#render` slot (`v-bind="props" :class="styles.segment(state)"`). Text sits next to its tags (a
+  template's line break is a space, and the specs read text exactly). Pins: TypeScript 6.0.3 and
+  `vue-tsc` 3.3.14 (this app and the package only), Vue 3.5.45, Reka UI 2.11.0, `@lucide/vue`
+  1.75.0 (lucide-react's version), `@vitejs/plugin-vue` 6.0.11; the rest as `examples/react`. The
+  standalone embed's port is 5192, as React's (`site:dev` gives each its own).
+- **Issue #12, the Vue kit.** `src/components` holds Fragiola UI's pieces the examples import
+  (`Clickable`, `Input`, `Field`, `Dialog`, `Popover`, `Select`, `Checkbox`, `SegmentedControl`,
+  the date picker `Calendar`) over Reka UI with the React kit's classes, Base UI's state attributes
+  added on Reka's parts; the class families (`families/*`), `cn` and the theme are copies
+  (`tests/vendored.test.ts`), `tests/kit.test.ts` checks the pieces in jsdom. The date picker is
+  written over `{ year, month, day }` (Reka's needs `@internationalized/date`), the segmented
+  control over Reka's RadioGroup. `Dialog.Portal` teleports a `data-slot="dialog-portal"` element
+  into `<body>` only while open (no exit animation), so the embed's overlay promotion
+  (`src/embed/overlay-promotion.ts`, React's framework-free module) sees it come and go. The
+  checkbox adds no click listener of its own: Vue drops a listener attached at the event's own
+  timestamp, which a frozen clock (`page.clock.setFixedTime`) makes equal.
+- **Issue #12, the suite and the site.** Vue is in `COMPLETE_FRAMEWORKS`: every shared spec runs
+  unchanged against the Vue embed, none skipped, and no spec needed an adapter fix. `project.json`
+  lists `vue`; every docs page with framework code has a `<Framework name="vue">` variant, and
+  `api/vue.mdx` ("Vue primitives") maps React's props to Vue props, slots and events for every part
+  and lists the composables and types (`docs-reference.test.ts`, "the Vue reference"). Measured
+  locally (4 workers): examples vue's 235 tests in 1.1 min.
+
 ## Commands
 
 | command | does |
@@ -621,7 +651,7 @@ drag and ranges; RFC 5545 for recurrence; FullCalendar's documented default for 
 | `pnpm check:commands` | builds the core, then `packages/core/scripts/generate-command-docs.ts --check`: fails when `site/docs/api/commands.mdx` drifts from the command catalogue (`pnpm --filter @fragiola/calendar generate:commands` rewrites it) |
 | `pnpm check:fix` | Biome check with auto-fix |
 | `pnpm typecheck` | `pnpm -r typecheck` (TypeScript 7, no emit; `packages/vue`: `vue-tsc` on TypeScript 6.0.3, its `.vue` type fixtures included) |
-| `pnpm test` | Vitest projects: `core (TZ=UTC)` and `core (TZ=America/Sao_Paulo)` (the core's suite twice, host zone forced, same expectations; node, jsdom per file with a docblock), `react` (jsdom + Testing Library over a fake layout, `TZ=UTC`; a server render in node), `vue` (jsdom + `@vue/test-utils` over the same fake layout, templates compiled at runtime by Vue's full build; a server render in node), `playground` (its catalog and scenarios), `examples-shared` (metadata, themes, manifest, loaders), `examples-react` (copyable imports, styles, kit, themes), `site` (the export's contract, the docs reference, frameworks, the dev proxy, and the repository's script tests) |
+| `pnpm test` | Vitest projects: `core (TZ=UTC)` and `core (TZ=America/Sao_Paulo)` (the core's suite twice, host zone forced, same expectations; node, jsdom per file with a docblock), `react` (jsdom + Testing Library over a fake layout, `TZ=UTC`; a server render in node), `vue` (jsdom + `@vue/test-utils` over the same fake layout, templates compiled at runtime by Vue's full build; a server render in node), `playground` (its catalog and scenarios), `examples-shared` (metadata, themes, manifest, loaders), `examples-react` (copyable imports, styles, kit, themes), `examples-vue` (the same contract for the Vue examples, styles and kit equal to React's, the copied theme, the Vue kit in jsdom), `site` (the export's contract, the docs reference, frameworks, the dev proxy, and the repository's script tests) |
 | `pnpm build` | `pnpm -r build` (tsdown), then `scripts/check-dts.ts` (no `any` in the built declarations) and `scripts/check-features.ts` (the bundle guard) |
 | `pnpm size` | the bundle size of every entry point (raw, gzip, min + gzip): a report, after `pnpm build` |
 | `pnpm check:package` | builds the packages, packs them with pnpm, checks the packed `exports` are the repo's without the source condition (only `types`/`import`/`default`, targets in `dist`), runs `publint --strict` and `attw --profile esm-only` on the tarballs, fails on a package neither the core nor in `ADAPTERS`, and runs each adapter's pin check and smoke app (`scripts/check-package.ts`) |
@@ -631,7 +661,8 @@ drag and ranges; RFC 5545 for recurrence; FullCalendar's documented default for 
 | `pnpm e2e` | the Playwright suites, one after the other: the playground's (`apps/playground/e2e`, against `pnpm dev`) and each examples app's (`examples/shared/e2e`, against a production build of the embed under `/calendar/embed/<framework>/`, built against the packages' `dist`: run `pnpm build` first) |
 | `pnpm --filter examples-react dev` | the embed alone (port 5192, `PORT`; `?id=<slug>&theme=<name>`) |
 | `pnpm --filter examples-react vendor` | re-vendors Fragiola UI (`FRAGIOLA_REGISTRY`) |
-| `pnpm site:export --base /calendar --out <dir>` | builds the packages and the React embed (`<base>/embed/react/`), writes `project.json`, `docs/`, `examples.json` and the manifest, then validates the output against `../www/CONTRACT.md` v1.7 (`site/contract.ts`) and exits non-zero on any problem; it only deletes `--out` when it holds a previous export |
+| `pnpm --filter examples-vue dev` | the Vue embed alone (port 5192, `PORT`; `?id=<slug>&theme=<name>`) |
+| `pnpm site:export --base /calendar --out <dir>` | builds the packages and every framework's embed of `project.json` (`<base>/embed/<framework>/`: React, Vue), writes `project.json`, `docs/`, `examples.json` and the manifest, then validates the output against `../www/CONTRACT.md` v1.7 (`site/contract.ts`) and exits non-zero on any problem; it only deletes `--out` when it holds a previous export |
 | `pnpm site:dev [--base /calendar] [--port 5192]` | every framework's embed dev server (hot reload, the packages' sources) behind one Node proxy (`site/dev-proxy.ts`) on port 5192, which `www` in dev proxies under `/calendar/embed/**`; each embed serves its `manifest.json` |
 
 ## CI
@@ -681,6 +712,9 @@ examples/shared/    examples-shared      src/meta/<slug>.ts, src/themes/, src/em
                                          (finder, manifest, loaders), e2e/ (every spec), tests/
 examples/react/     examples-react       src/examples/<slug>/ and _kit/, src/components (vendored Fragiola UI),
                                          src/embed/ (main, overlay promotion), scripts/vendor-fragiola.ts, tests/
+examples/vue/       examples-vue         src/examples/<slug>/ (index.vue, sibling SFCs, React's styles.ts) and _kit/
+                                         (React's), src/components (the Vue kit over Reka UI), src/styles and
+                                         src/lib/cn.ts (copied), src/embed/ (main, overlay promotion), tests/
 .github/workflows/ci.yml                 Checks, Package, Changesets, Changes, E2E (playground, examples),
                                          Site export
 ```
@@ -886,7 +920,8 @@ from React is an adapter bug or a missing core key.
   warns, as React's.
 - **`typedCalendar<T, F>()`** (`typed.ts`, Tree's `typedTree`) gives the namespace typed by the
   registry and the features (the root's `model`, `events`, v-models and feature events), what React
-  writes as type arguments; the untyped `Calendar.Root` takes any model and every event.
+  writes as type arguments; the untyped `Calendar.Root` takes a model of `AnyTypes` and every event
+  (a registry-typed model needs `typedCalendar<Types>().Root`, Issue #12).
 - **Composables** have React's names and return `ComputedRef`s (value composables) or
   `{ state, props }` of `ComputedRef`s (part composables, `props` with the registering `ref` and the
   structural `style`: `v-bind="props"`); they take a value, a ref or a getter. `useCalendar` gives
@@ -900,5 +935,5 @@ from React is an adapter bug or a missing core key.
   warning and the same elements and attributes once the engine runs. `check:package`'s Vue smoke
   app: single-file components (`typedCalendar`, v-models, `@select`, every feature's part from its
   entry, a composable) checked by `vue-tsc`, built, and loaded through the dev server (its own
-  `/src/*.vue` modules followed), `@vitejs/plugin-vue` 6.0.11 pinned as `../primitives`' until
-  `examples/vue` pins it.
+  `/src/*.vue` modules followed), every pin `examples/vue`'s (`@vitejs/plugin-vue` 6.0.11 included,
+  Issue #12).
