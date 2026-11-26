@@ -1,0 +1,59 @@
+---
+title: Calendar — a headless event calendar for React
+description: A headless, accessible event calendar. It ships the views, the keyboard, drag and drop, recurrence and time zones; every pixel, icon and word is yours.
+layout: landing
+---
+
+<Hero
+    eyebrow="@fragiola/calendar · React"
+    title="An event calendar that brings the behaviour, and none of the looks."
+    description="Month, week, day, n-day and list views; selecting, moving and resizing events by pointer and keyboard; recurring events and time zones, over a typed JSON model. It ships the behaviour and the accessibility. Every pixel is yours."
+    actions={[
+        { label: "Browse the {examples} examples", href: "/examples", variant: "primary", icon: "arrow" },
+        { label: "Set up your agent", href: "/ai", variant: "secondary" },
+        { label: "Read the docs", href: "/docs/getting-started/introduction", variant: "ghost" },
+        { label: "GitHub", href: "https://github.com/fragiola/calendar", variant: "ghost", icon: "external" },
+    ]}
+/>
+
+<Example
+    id="team-planner"
+    variant="showcase"
+    theme="light"
+    label="A team's week, five themes:"
+/>
+
+<Features columns={4}>
+<Feature title="Views">
+Month, week, day, any number of days and a list, laid out by the core: lanes for all-day events,
+overlap columns for timed ones, "+N more" when a day is full.
+</Feature>
+<Feature title="Interaction">
+Select a range, drag an event across days and between the all-day row and the time grid, resize
+it, drop something from outside: with the pointer, a touch or the keyboard.
+</Feature>
+<Feature title="Exact dates">
+Time zones and daylight saving time with `Intl` only, RFC 5545 recurrence with edit scopes, and
+an injectable clock. No date library, no runtime dependency.
+</Feature>
+<Feature title="A typed JSON model">
+The calendar is data, typed by your registry: load it, save it, and veto or rewrite every command
+with middleware, from a click, a server or an assistant.
+</Feature>
+</Features>
+
+<Section title="What it never ships">
+<Pills strike items={["CSS", "Icons", "Text", "Event editors", "Popovers", "Date pickers"]} />
+
+The state is exposed as `data-*` attributes and ARIA, so any styling solution works: Tailwind,
+plain CSS, CSS modules, CSS-in-JS. Dates and titles are data you format; the examples use
+Fragiola UI and its palettes.
+</Section>
+
+<Section title="Start here">
+<Cards>
+<Card title="Your first calendar" href="/docs/getting-started/first-calendar" description="A typed week view in about sixty lines: the document, the time grid, the events." />
+<Card title="The model and commands" href="/docs/concepts/model-and-commands" description="Every change is a command: run it, ask whether it would succeed, or veto it." />
+<Card title="Drag and drop" href="/docs/guides/drag-and-drop" description="Pointer Events, a keyboard grab and edit rules the commands enforce." />
+</Cards>
+</Section>

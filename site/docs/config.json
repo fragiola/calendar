@@ -1,0 +1,391 @@
+{
+    "sections": [
+        {
+            "label": "Getting started",
+            "pages": [
+                {
+                    "label": "Introduction",
+                    "path": "getting-started/introduction"
+                },
+                {
+                    "label": "Installation",
+                    "path": "getting-started/installation"
+                },
+                {
+                    "label": "Your first calendar",
+                    "path": "getting-started/first-calendar"
+                },
+                {
+                    "label": "Sizing and scrolling",
+                    "path": "getting-started/sizing"
+                },
+                {
+                    "label": "Accessible names and the keyboard",
+                    "path": "getting-started/accessible-names"
+                }
+            ]
+        },
+        {
+            "label": "Concepts",
+            "collapsible": true,
+            "pages": [
+                {
+                    "label": "The model and commands",
+                    "path": "concepts/model-and-commands"
+                },
+                {
+                    "label": "Model and engine",
+                    "path": "concepts/model-and-engine"
+                },
+                {
+                    "label": "Features",
+                    "path": "concepts/features"
+                },
+                {
+                    "label": "Composition",
+                    "path": "concepts/composition"
+                },
+                {
+                    "label": "The primitive contract",
+                    "path": "concepts/primitive-contract"
+                },
+                {
+                    "label": "State attributes",
+                    "path": "concepts/state-attributes"
+                },
+                {
+                    "label": "Typed data",
+                    "path": "concepts/typed-data"
+                },
+                {
+                    "label": "Dates and time zones",
+                    "path": "concepts/dates-and-time-zones"
+                },
+                {
+                    "label": "Views and ranges",
+                    "path": "concepts/views-and-ranges"
+                },
+                {
+                    "label": "Layout",
+                    "path": "concepts/layout"
+                },
+                {
+                    "label": "Occurrences and recurrence",
+                    "path": "concepts/occurrences-and-recurrence"
+                },
+                {
+                    "label": "Glossary",
+                    "path": "concepts/glossary"
+                }
+            ]
+        },
+        {
+            "label": "Guides",
+            "collapsible": true,
+            "pages": [
+                {
+                    "label": "Month view",
+                    "path": "guides/month-view"
+                },
+                {
+                    "label": "Week and day views",
+                    "path": "guides/week-and-day-views"
+                },
+                {
+                    "label": "List view",
+                    "path": "guides/list-view"
+                },
+                {
+                    "label": "More events and \"+N more\"",
+                    "path": "guides/more-events"
+                },
+                {
+                    "label": "Controlled state",
+                    "path": "guides/controlled-state"
+                },
+                {
+                    "label": "Selecting ranges",
+                    "path": "guides/selecting-ranges"
+                },
+                {
+                    "label": "Drag and drop",
+                    "path": "guides/drag-and-drop"
+                },
+                {
+                    "label": "Resizing events",
+                    "path": "guides/resizing"
+                },
+                {
+                    "label": "External drop",
+                    "path": "guides/external-drop"
+                },
+                {
+                    "label": "Recurring events",
+                    "path": "guides/recurring-events"
+                },
+                {
+                    "label": "Constraints and business hours",
+                    "path": "guides/constraints-and-business-hours"
+                },
+                {
+                    "label": "Loading events from a server",
+                    "path": "guides/loading-events"
+                },
+                {
+                    "label": "Time zones and DST",
+                    "path": "guides/time-zones"
+                },
+                {
+                    "label": "Locales and week numbers",
+                    "path": "guides/locales-and-week-numbers"
+                },
+                {
+                    "label": "Right-to-left calendars",
+                    "path": "guides/rtl"
+                },
+                {
+                    "label": "Keyboard",
+                    "path": "guides/keyboard"
+                },
+                {
+                    "label": "Styling with plain CSS",
+                    "path": "guides/styling-css"
+                },
+                {
+                    "label": "Styling with Tailwind",
+                    "path": "guides/styling-tailwind"
+                },
+                {
+                    "label": "Theming",
+                    "path": "guides/theming"
+                },
+                {
+                    "label": "Performance",
+                    "path": "guides/performance"
+                },
+                {
+                    "label": "Saving and restoring",
+                    "path": "guides/persistence"
+                },
+                {
+                    "label": "Undo and redo",
+                    "path": "guides/undo-redo"
+                },
+                {
+                    "label": "Testing your calendar",
+                    "path": "guides/testing"
+                },
+                {
+                    "label": "AI and automation",
+                    "path": "guides/ai-and-automation"
+                }
+            ]
+        },
+        {
+            "label": "API: primitives (@fragiola/calendar-react)",
+            "collapsible": true,
+            "pages": [
+                {
+                    "label": "Calendar.Root",
+                    "path": "api/root"
+                },
+                {
+                    "label": "Calendar.Previous",
+                    "path": "api/previous"
+                },
+                {
+                    "label": "Calendar.Next",
+                    "path": "api/next"
+                },
+                {
+                    "label": "Calendar.Today",
+                    "path": "api/today"
+                },
+                {
+                    "label": "Calendar.ViewButton",
+                    "path": "api/view-button"
+                },
+                {
+                    "label": "Calendar.DayGrid",
+                    "path": "api/day-grid"
+                },
+                {
+                    "label": "Calendar.ColumnHeaders",
+                    "path": "api/column-headers"
+                },
+                {
+                    "label": "Calendar.ColumnHeader",
+                    "path": "api/column-header"
+                },
+                {
+                    "label": "Calendar.Weeks",
+                    "path": "api/weeks"
+                },
+                {
+                    "label": "Calendar.Week",
+                    "path": "api/week"
+                },
+                {
+                    "label": "Calendar.WeekNumber",
+                    "path": "api/week-number"
+                },
+                {
+                    "label": "Calendar.Days",
+                    "path": "api/days"
+                },
+                {
+                    "label": "Calendar.Day",
+                    "path": "api/day"
+                },
+                {
+                    "label": "Calendar.DayEvents",
+                    "path": "api/day-events"
+                },
+                {
+                    "label": "Calendar.Segment",
+                    "path": "api/segment"
+                },
+                {
+                    "label": "Calendar.More",
+                    "path": "api/more"
+                },
+                {
+                    "label": "Calendar.TimeGrid",
+                    "path": "api/time-grid"
+                },
+                {
+                    "label": "Calendar.AllDayRow",
+                    "path": "api/all-day-row"
+                },
+                {
+                    "label": "Calendar.Scroller",
+                    "path": "api/scroller"
+                },
+                {
+                    "label": "Calendar.SlotRows",
+                    "path": "api/slot-rows"
+                },
+                {
+                    "label": "Calendar.SlotRow",
+                    "path": "api/slot-row"
+                },
+                {
+                    "label": "Calendar.SlotLabel",
+                    "path": "api/slot-label"
+                },
+                {
+                    "label": "Calendar.Slots",
+                    "path": "api/slots"
+                },
+                {
+                    "label": "Calendar.Slot",
+                    "path": "api/slot"
+                },
+                {
+                    "label": "Calendar.Columns",
+                    "path": "api/columns"
+                },
+                {
+                    "label": "Calendar.Column",
+                    "path": "api/column"
+                },
+                {
+                    "label": "Calendar.ColumnEvents",
+                    "path": "api/column-events"
+                },
+                {
+                    "label": "Calendar.TimeEvent",
+                    "path": "api/time-event"
+                },
+                {
+                    "label": "Calendar.List",
+                    "path": "api/list"
+                },
+                {
+                    "label": "Calendar.ListDays",
+                    "path": "api/list-days"
+                },
+                {
+                    "label": "Calendar.ListDay",
+                    "path": "api/list-day"
+                },
+                {
+                    "label": "Calendar.ListEvent",
+                    "path": "api/list-event"
+                },
+                {
+                    "label": "Selection",
+                    "path": "api/selection"
+                },
+                {
+                    "label": "DragPreview",
+                    "path": "api/drag-preview"
+                },
+                {
+                    "label": "ResizeHandle",
+                    "path": "api/resize-handle"
+                },
+                {
+                    "label": "NowIndicator",
+                    "path": "api/now-indicator"
+                },
+                {
+                    "label": "BusinessHours",
+                    "path": "api/business-hours"
+                },
+                {
+                    "label": "Hooks",
+                    "path": "api/hooks"
+                }
+            ]
+        },
+        {
+            "label": "API: core (@fragiola/calendar)",
+            "collapsible": true,
+            "pages": [
+                {
+                    "label": "Model",
+                    "path": "api/model"
+                },
+                {
+                    "label": "The command bus",
+                    "path": "api/command-bus"
+                },
+                {
+                    "label": "Commands",
+                    "path": "api/commands"
+                },
+                {
+                    "label": "The JSON document",
+                    "path": "api/json-document"
+                },
+                {
+                    "label": "Settings",
+                    "path": "api/settings"
+                },
+                {
+                    "label": "Engine",
+                    "path": "api/engine"
+                },
+                {
+                    "label": "Features",
+                    "path": "api/features"
+                },
+                {
+                    "label": "Date helpers",
+                    "path": "api/date-helpers"
+                }
+            ]
+        },
+        {
+            "label": "More",
+            "pages": [
+                {
+                    "label": "Found a problem?",
+                    "href": "https://github.com/fragiola/calendar/issues",
+                    "external": true
+                }
+            ]
+        }
+    ]
+}
