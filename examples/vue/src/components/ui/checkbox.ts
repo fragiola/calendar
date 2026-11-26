@@ -5,9 +5,10 @@
 //   - Fragiola Primitives marks the state with `data-checked`/`data-unchecked`/
 //     `data-indeterminate`; Reka UI with `data-state`. The root adds those attributes, so the
 //     `choice` classes (and the indicator's `in-data-indeterminate:`) are the React ones.
-//   - `checked` and `indeterminate` are props, as React's; a change is `@checked-change="(checked,
-//     { event }) => …"` (React's `onCheckedChange(checked, details)`), and `v-model:checked` binds
-//     it.
+//   - `checked` and `indeterminate` are props, as React's; a change is `@checked-change="(checked)
+//     => …"` (React's `onCheckedChange`, without its details: Reka UI tells the new state only, and
+//     a listener of the box's own in the capture phase would make Vue drop Reka UI's click under a
+//     frozen clock, its handlers' attach-time check), and `v-model:checked` binds it.
 //   - Inside a `Field.Root` / `Field.ChoiceRoot` the box takes the field's id (unless given one),
 //     so `Field.Label` names it.
 
@@ -21,11 +22,6 @@ import { choice } from "#/components/families/choice";
 import { useFieldControlId } from "#/components/ui/field";
 import { cn } from "#/lib/cn";
 
-/** What a change carries besides the new state: the click (or key) that made it. */
-export interface CheckedChangeDetails {
-    event: Event;
-}
-
 const CheckboxRoot = defineComponent({
     name: "CheckboxRoot",
     inheritAttrs: false,
@@ -35,14 +31,11 @@ const CheckboxRoot = defineComponent({
         disabled: { type: Boolean, default: false },
     },
     emits: {
-        checkedChange: (_checked: boolean, _details: CheckedChangeDetails) =>
-            true,
+        checkedChange: (_checked: boolean) => true,
         "update:checked": (_checked: boolean) => true,
     },
     setup(props, { attrs, slots, emit }) {
         const id = useFieldControlId();
-        // the click that is toggling the box: Reka UI tells the new state without it
-        let pressed: Event | undefined;
         return () => {
             const state = props.indeterminate ? "indeterminate" : props.checked;
             const { class: className, ...rest } = attrs;
@@ -58,14 +51,9 @@ const CheckboxRoot = defineComponent({
                     "data-indeterminate":
                         state === "indeterminate" ? "" : undefined,
                     "data-disabled": props.disabled ? "" : undefined,
-                    onClickCapture: (event: Event) => {
-                        pressed = event;
-                    },
                     "onUpdate:modelValue": (value: unknown) => {
-                        const event = pressed ?? new Event("change");
-                        pressed = undefined;
                         emit("update:checked", value === true);
-                        emit("checkedChange", value === true, { event });
+                        emit("checkedChange", value === true);
                     },
                     class: cn(choice.mark(), className as string),
                 }),
