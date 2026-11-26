@@ -21,6 +21,25 @@ function commits(m: Mounted): CommandEvent[] {
 const month = { type: "month", anchorDate: "2026-11-26" } as const;
 const week = { type: "week", anchorDate: "2026-11-26" } as const;
 
+describe("the structural touch-action (D18)", () => {
+    it("is removed from events when the root detaches or the engine is destroyed", () => {
+        const m = mount({
+            events: [allDay("a", "2026-11-26", "2026-11-27")],
+            view: month,
+            features: [dragAndDrop()],
+        });
+        const event = m.element("event a 2026-11-26");
+        expect(event.style.touchAction).toBe("none");
+        m.engine.adapter.detachRoot();
+        expect(event.style.touchAction).toBe("");
+        m.engine.adapter.attachRoot(m.root);
+        expect(event.style.touchAction).toBe("none");
+        m.engine.destroy();
+        expect(event.style.touchAction).toBe("");
+        expect(event.getAttribute("style") ?? "").toBe("");
+    });
+});
+
 describe("a pointer drag (D14)", () => {
     it("starts past the threshold, previews as view state and drops one event.move", () => {
         const m = mount({

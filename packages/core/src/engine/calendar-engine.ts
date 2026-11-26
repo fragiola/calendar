@@ -948,7 +948,8 @@ class Engine<T extends CalendarTypes, F extends CalendarFeatures> {
         const registration: Registration = { part, payload, element };
         this.registry.set(key, registration);
         this.byElement.set(element, registration);
-        if (part === "event" && this.dragsEvents) {
+        // written while a root is attached (an adapter may register its parts before the root)
+        if (part === "event" && this.dragsEvents && this.rootElement) {
             writeEventTouchAction(element);
         }
         if (part === "day-events") this.observer?.observe(element);
@@ -1056,8 +1057,19 @@ class Engine<T extends CalendarTypes, F extends CalendarFeatures> {
                 }
             }
         }
+        this.writeTouchActions(true);
         for (const part of this.parts) part.attached?.(element);
         this.scheduleMidnight();
+    }
+
+    /** Writes, or removes, the structural `touch-action` of every registered event (D18). */
+    private writeTouchActions(on: boolean): void {
+        if (!this.dragsEvents) return;
+        for (const registration of this.byElement.values()) {
+            if (registration.part !== "event") continue;
+            if (on) writeEventTouchAction(registration.element);
+            else clearEventTouchAction(registration.element);
+        }
     }
 
     private detachRoot(): void {
@@ -1067,6 +1079,7 @@ class Engine<T extends CalendarTypes, F extends CalendarFeatures> {
         this.observer = null;
         this.removeRootListeners?.();
         this.removeRootListeners = undefined;
+        this.writeTouchActions(false);
         this.rootElement = undefined;
         this.geometry = undefined;
         for (const part of this.parts) part.detached?.();
