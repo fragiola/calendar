@@ -1,0 +1,98 @@
+---
+title: Sizing and scrolling
+description: Give the calendar its size, let the time grid scroll inside its Scroller, lay the column layer over the slots and leave a full day its room.
+---
+
+The parts set no size of their own: the calendar is as large as the box you give it. What the
+package does set is structural: an event's place inside its day or column, a day's lanes, the
+column layer's `pointer-events`. This page is what the rest takes, for a month, a time grid and a
+day that shows "as many events as fit".
+
+## Size the root
+
+`Calendar.Root` renders a `div` with no style. Give it a height (or let a flex or grid parent do
+it), and make its grid fill what is left after your toolbar:
+
+```css
+.calendar { display: flex; flex-direction: column; height: 100%; min-height: 0; }
+.calendar > .grid { flex: 1; min-height: 0; }
+```
+
+A month (`Calendar.DayGrid`) whose weeks share the height is a column of rows that each grow:
+
+```css
+.month { display: flex; flex-direction: column; }
+.week { flex: 1 0 auto; display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); }
+```
+
+## Scroll the time grid
+
+A time grid is usually taller than its box. Put its slot rows and its columns inside
+`Calendar.Scroller`, the element that scrolls: the engine registers it, scrolls it while a drag
+nears its edges and drops its cached hit boxes when it scrolls. The header row and the all-day row
+stay outside it, so they stay in view.
+
+```tsx
+<Calendar.TimeGrid aria-label="Week" className="grid">
+    <Calendar.ColumnHeaders className="headers">
+        {(date) => <Calendar.ColumnHeader date={date} />}
+    </Calendar.ColumnHeaders>
+    <Calendar.AllDayRow className="all-day">{/* … */}</Calendar.AllDayRow>
+    <Calendar.Scroller className="scroller" ref={scrollToMorning}>
+        <div className="body">
+            <Calendar.SlotRows>{/* … */}</Calendar.SlotRows>
+            <Calendar.Columns className="columns">{/* … */}</Calendar.Columns>
+        </div>
+    </Calendar.Scroller>
+</Calendar.TimeGrid>
+```
+
+```css
+.scroller { flex: 1; min-height: 0; overflow: auto; }
+.slot-row { height: 2rem; }
+```
+
+The scroll position is yours. To open the grid at 08:00, scroll the scroller when it mounts,
+for instance with a ref callback that finds the slot row of that time (`data-time`):
+
+```tsx
+function scrollToMorning(element: HTMLElement | null) {
+    const eight = element?.querySelector<HTMLElement>('[data-time="08:00"]');
+    if (element && eight) element.scrollTop = eight.offsetTop - 8;
+}
+```
+
+## Lay the columns over the slots
+
+The time grid's rows are its slots (the grid's cells and its roving focus); the days' timed
+events live in a layer of columns, `Calendar.Columns`, the grid's last row. Position that layer
+over the slot rows yourself: the slot rows' wrapper is its containing block, and the layer starts
+after your time axis.
+
+```css
+.body { position: relative; }
+.columns { position: absolute; inset-block: 0; inset-inline: 4rem 0; display: flex; }
+.column { flex: 1; }
+```
+
+`Calendar.Columns` sets `pointer-events: none`, so a press goes through it to the slot under it
+(a click, a selection), and each `Calendar.TimeEvent` sets it back to `auto`. Each event is
+positioned in its column (`position: absolute`, its `top` and `height` as percentages of the
+column), so a column needs no size of its own beyond the layer's height.
+
+## Give a full day its room
+
+With `dayMaxEvents` a number, each day of a row holds the row's lanes (`Calendar.DayEvents` gets a
+`min-block-size`), so a row grows to its tallest day. With `dayMaxEvents: "auto"` the engine
+measures how many events fit: `Calendar.DayEvents` holds no lanes then, so give it the room left in
+its day, and give the rows their height.
+
+```css
+.day { display: flex; flex-direction: column; }
+.day-events { flex: 1; min-height: 0; }
+```
+
+The lane height is `--calendar-lane-size` (default `1.5rem`), set on any ancestor
+([Layout](/docs/concepts/layout)).
+
+<Example id="month" />

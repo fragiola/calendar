@@ -1,0 +1,99 @@
+---
+title: Occurrences and recurrence
+description: An event is what the document holds; its occurrences are what the views show. A recurring event repeats by a rule, and each edit says its scope.
+---
+
+An **event** is an entity of the document. What a view shows are its **occurrences**: a
+non-recurring event has one, itself, whose id is the event's id; a recurring event has one per
+date its rule gives, each with its own id. The layouts, the parts and the engine's events all
+speak of occurrences, and every occurrence knows its event (`eventId`).
+
+## Recurring events
+
+With the `recurrence()` feature (`@fragiola/calendar-react/recurrence`), an event takes a
+`recurrence` field: an RFC 5545 rule, the dates left out, and the occurrences changed one by one.
+
+```ts
+import { createCalendarModel } from "@fragiola/calendar-react";
+import { recurrence } from "@fragiola/calendar-react/recurrence";
+import type { Types } from "./calendar-data";
+
+const features = [recurrence()] as const;
+
+const model = createCalendarModel<Types, typeof features>(
+    {
+        version: 1,
+        events: [
+            {
+                id: "standup",
+                title: "Standup",
+                start: "2026-11-23T09:00:00-05:00",
+                end: "2026-11-23T09:15:00-05:00",
+                allDay: false,
+                timeZone: "America/New_York",
+                recurrence: { rule: "FREQ=WEEKLY;BYDAY=MO,WE,FR" },
+            },
+        ],
+        settings: { timeZone: "America/New_York" },
+    },
+    { features },
+);
+```
+
+The rule's subset: `FREQ` (`DAILY`, `WEEKLY`, `MONTHLY`, `YEARLY`), `INTERVAL`, `COUNT`, `UNTIL`,
+`BYDAY` (with ordinals for monthly and yearly rules: `2TU`, `-1FR`), `BYMONTHDAY` (negative too),
+`BYMONTH` and `WKST`. Anything else is a validation issue naming the part. The event's start is
+always its first occurrence. The rule is expanded in the event's `timeZone`, keeping the wall
+clock across daylight saving time (give a recurring event a zone), and only over the days shown
+plus a margin, never infinitely.
+
+## Occurrence ids
+
+An occurrence's id is `<eventId>@<original start>`, the start the rule gave it, in the event's
+zone: `standup@2026-11-25T09:00:00-05:00`. It stays the same when the occurrence is moved, so it
+keys the changes made to it. `model.get("occurrence-by", { id })` finds any occurrence of a series,
+shown or not; `model.get("occurrences-in", { range })` lists the occurrences touching a range.
+
+## Edit scopes
+
+`event.move`, `event.resize`, `event.update` and `event.remove` take the occurrence they start from
+(`occurrenceId`) and a `scope`. On a recurring event the scope is required with an occurrence:
+
+| scope | what changes |
+| --- | --- |
+| `"this"` | that occurrence alone: an override (a removal adds an excluded date) |
+| `"following"` | that occurrence and the ones after it: the series ends before it, and a new event continues from it (one batch) |
+| `"all"` | the whole series: a move shifts every occurrence by the same delta |
+
+```ts
+const wednesday = "standup@2026-11-25T09:00:00-05:00";
+
+model.run("event.move", {
+    eventId: "standup",
+    occurrenceId: wednesday,
+    scope: "this",
+    delta: { minutes: 30 },
+});
+// recurrence.overrides["2026-11-25T09:00:00-05:00"]: its new start and end
+
+model.run("event.remove", {
+    eventId: "standup",
+    occurrenceId: "standup@2026-11-27T09:00:00-05:00",
+    scope: "this",
+});
+// recurrence.exdates: ["2026-11-27T09:00:00-05:00"]
+```
+
+Without `scope` the command is refused (`invalid_payload`), never guessed. A series never turns
+all-day or timed as a whole; `this` may. `event.set-recurrence` gives an event a rule, changes it or
+removes it (`null`), and `model.is("event-recurring", { eventId })` asks whether it has one.
+
+## Asking the reader
+
+A drag drops a recurring occurrence with the scope of `dragAndDrop({ recurringScope })` (default
+`"this"`, the least destructive). To ask the reader instead, hold the command in a middleware and
+run it again with the scope they pick; the [recurring events](/examples/recurring-events) example
+opens a "this, following or all" dialog that way
+([Recurring events](/docs/guides/recurring-events)).
+
+<Example id="recurring-events" />

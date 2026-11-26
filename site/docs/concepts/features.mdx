@@ -1,0 +1,95 @@
+---
+title: Features
+description: Selection, drag and drop, resizing, recurrence and the rest are opt-in features, each on its own entry, given to the model once and typed through it.
+---
+
+The core is a minimal calendar: the document, the views and their layout, the event commands and
+their edit rules, the keyboard over dates and events. Everything else is a **feature** you opt in
+to, each from its own entry, so a read-only month ships none of the drag code.
+
+| feature | entry | adds |
+| --- | --- | --- |
+| `selection()` | `/selection` | selecting a range of days or times, by pointer and keyboard |
+| `dragAndDrop()` | `/drag-and-drop` | moving events, across days and between the all-day row and the time grid |
+| `resize()` | `/resize` | changing an event's start or end by its handles or the keyboard |
+| `externalDrop()` | `/external-drop` | receiving drags from outside the calendar (needs `dragAndDrop()`) |
+| `recurrence()` | `/recurrence` | recurring events, occurrences and edit scopes |
+| `constraints()` | `/constraints` | business hours, allowed ranges and overlap rules |
+| `nowIndicator()` | `/now-indicator` | the current time's place in the time grid |
+| `eventSources()` | `/event-sources` | the ranges to fetch per source, and their loading state |
+
+Each entry is `@fragiola/calendar-react/<entry>`: the factory, and the parts and hooks of the
+feature ([Installation](/docs/getting-started/installation)).
+
+## Give them to the model
+
+The features are fixed for the model's life: pass them when you create it, as a `const` tuple, and
+pass its type as the model's second type argument.
+
+```tsx
+import {
+    Calendar,
+    type CalendarDocument,
+    createCalendarModel,
+} from "@fragiola/calendar-react";
+import { dragAndDrop } from "@fragiola/calendar-react/drag-and-drop";
+import { resize } from "@fragiola/calendar-react/resize";
+import { selection } from "@fragiola/calendar-react/selection";
+import { useState } from "react";
+import type { Types } from "./calendar-data";
+
+const features = [selection(), dragAndDrop(), resize()] as const;
+
+function Planner({ json }: { json: CalendarDocument<Types> }) {
+    const [model] = useState(() =>
+        createCalendarModel<Types, typeof features>(json, { features }),
+    );
+    return <Calendar.Root model={model}>{/* … */}</Calendar.Root>;
+}
+```
+
+A root that creates its own model takes them as its `features` prop, read once:
+
+```tsx
+<Calendar.Root defaultEvents={events} features={features}>
+    {/* … */}
+</Calendar.Root>
+```
+
+A feature may take options (`dragAndDrop({ recurringScope: "this" })`,
+`nowIndicator({ interval: 60_000 })`); [Features](/docs/api/features) lists them.
+
+## What a feature adds
+
+A feature adds to every surface at once, so nothing has to be wired twice:
+
+- **commands** (`selection.set`, `event.set-recurrence`, `event-sources.receive`) and the
+  document fields and settings they need (`recurrence`, `businessHours`, `eventSources`);
+- **keys** on `get` and `is` (`"selected-range"`, `"business-hours-in"`, `"event-recurring"`),
+  and on the engine (`"drag-preview"`, `"now-position"`);
+- **gestures** and **keys** in the engine (a press that drags, Space that grabs);
+- **attributes** on the parts (`data-selected`, `data-dragging`, `data-business-hours`);
+- **callbacks** on the root (`onSelect`, `onEventDrop`, `onExternalDrop`);
+- **parts** in its entry (`Selection`, `DragPreview`, `ResizeHandle`, `NowIndicator`,
+  `BusinessHours`).
+
+## Typed through the model
+
+With the feature tuple as a type argument, the model's verbs accept its commands and keys, and
+nothing else: `model.run("selection.set", …)` is a type error on a model without `selection()`.
+A child component cannot infer the features through context: pass them to the hook.
+
+```tsx
+function SelectedRange() {
+    const { model } = useCalendar<Types, typeof features>();
+    const range = model.get("selected-range");
+    return range ? <p>{range.start} to {range.end}</p> : null;
+}
+```
+
+At run time the model refuses what it does not have: a command of a missing feature is
+`not_found`, a field or a setting of one is `invalid_payload` naming the feature. A feature's part
+rendered without its feature warns once and renders nothing, and a feature's callback on the root
+is a type error without it. `model.get("features")` lists what is installed.
+
+<Example id="drag-and-resize" />

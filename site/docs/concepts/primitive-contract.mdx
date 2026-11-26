@@ -1,0 +1,83 @@
+---
+title: The primitive contract
+description: What every Calendar part accepts and guarantees, render, ref, handlers, className and style, so any part composes the same way with your code.
+---
+
+Every part of `Calendar.*`, and every feature part (`Selection`, `DragPreview`, `ResizeHandle`,
+`NowIndicator`, `BusinessHours`), follows one contract, the same in every Fragiola library. Learn
+it once and every part composes the same way.
+
+## What a part accepts
+
+| prop | what it does |
+| --- | --- |
+| `render` | replaces the element: an element whose props are merged with the part's (`render={<section />}`), or `(props, state) => element`. Never `asChild` |
+| `ref` | a plain prop, merged with the part's own ref (the engine needs the element) |
+| `className` | a string, or a function of the part's state returning one |
+| `style` | an object, or a function of the part's state returning one; the part's structural keys win |
+| event handlers | composed: the part's runs first, then yours |
+| any other DOM prop | passed to the element (`aria-label`, `id`, `data-*`, …) |
+
+```tsx
+<Calendar.TimeEvent
+    segment={segment}
+    className={(state) => (state.dragging ? "event event-dragging" : "event")}
+    style={(state) => ({ opacity: state.grabbed ? 0.6 : 1 })}
+    onDoubleClick={() => openEditor(segment.eventId)}
+>
+    {title}
+</Calendar.TimeEvent>
+```
+
+## What a part guarantees
+
+- **Headless.** No CSS, no class name, no text, no `aria-label`, no date rendered as text. The
+  only inline style is structural: an event's place (`position`, the time grid's `top`, `height`,
+  `inset-inline-start` and `width` percentages, a day grid's lane and span on logical properties),
+  the lanes a day holds, a row's decorations after `--calendar-row-inset`, `pointer-events` on the
+  column layer and its events, and `touch-action: none` on draggable events.
+- **State as attributes.** Every element carries `data-calendar-part` and its state as `data-*`
+  attributes (present or absent, never `"true"` or `"false"`) and ARIA
+  ([State attributes](/docs/concepts/state-attributes)). The attributes come from the core, so
+  every framework's parts set the same ones.
+- **Roles.** The grids are `grid` > `row` > `gridcell`, each day's events a `list` of `listitem`s,
+  the decorations `aria-hidden`.
+- **No model state as a part.** A title, a date or a count is data a hook gives
+  (`useCalendarTitle`, `useDayHeader`, a `Calendar.More`'s `hiddenCount`), rendered by you.
+- **No app policy.** No editor, popover, menu, tooltip, date picker or calendars panel: an editor
+  is your component over a part hook and a command.
+
+## Children
+
+A part's children are elements, or a function of its state where it has one:
+
+```tsx
+<Calendar.More className="more">{({ hiddenCount }) => `+${hiddenCount} more`}</Calendar.More>
+
+<Calendar.Segment segment={segment}>
+    {(state) => (state.continuesBefore ? `… ${title}` : title)}
+</Calendar.Segment>
+```
+
+A collection part takes a function called per entity ([Composition](/docs/concepts/composition)).
+
+## Part hooks
+
+What a part does is also a hook with one shape, `{ state, props }`: spread `props` on any element
+of yours (it holds the role, the attributes, the ref, the handlers and the structural style).
+
+```tsx
+import { type TimeSegment, useTimeEvent } from "@fragiola/calendar-react";
+
+function EventCard({ segment }: { segment: TimeSegment }) {
+    const { state, props } = useTimeEvent(segment);
+    return (
+        <article {...props} className="card">
+            {state.allDay ? "All day" : null}
+        </article>
+    );
+}
+```
+
+[Hooks](/docs/api/hooks) lists them; [Calendar.Root](/docs/api/root#common-props) lists the
+common props.

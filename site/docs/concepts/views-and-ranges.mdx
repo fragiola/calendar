@@ -1,0 +1,97 @@
+---
+title: Views and ranges
+description: A view is a layout type over a range built around an anchor date; the view commands navigate it, and the visible and current ranges say what it shows.
+---
+
+A **view** is a layout type over a **range** of days, built around an **anchor date**. It is model
+state, not document: a server or an assistant can navigate without a screen, and the document you
+save holds the events and the settings, not where the reader was (unless you ask,
+`model.get("calendar-json", { includeView: true })`).
+
+## The five view types
+
+| type | shows | laid out as |
+| --- | --- | --- |
+| `month` | the weeks of the anchor's month (six by default, `fixedWeekCount`) | a day grid |
+| `week` | the anchor's week, from `firstDayOfWeek` | a time grid with its all-day row |
+| `day` | the anchor's day | a time grid with its all-day row |
+| `days` | `days` days from the anchor (1 to 14) | a time grid with its all-day row |
+| `list` | the anchor's month, or `duration` days from it | a list of the days that have events |
+
+`model.get("day-grid")` is the month's layout and the all-day row of the time-grid views;
+`model.get("time-grid")` is `null` for month and list views; `model.get("list")` lays out the
+visible days of any view as an agenda ([Layout](/docs/concepts/layout)).
+
+## Navigate with commands
+
+```ts
+model.run("view.set", { type: "days", days: 4 });
+model.run("view.go-to", { date: "2026-12-07" });
+model.run("view.next", {});
+model.run("view.previous", {});
+model.run("view.today", {});
+```
+
+Each step is the view's own: a month moves by a month (and anchors on its first day), a week by a
+week, a day by a day skipping hidden days, a `days` view by its number of shown days. The
+navigation buttons are the same commands: `Calendar.Previous`, `Calendar.Next`, `Calendar.Today`
+and `Calendar.ViewButton` (`view="week"`, or `view="days" days={3}`), each disabled when the model
+cannot run it.
+
+```tsx
+<Calendar.ViewButton view="month">Month</Calendar.ViewButton>
+<Calendar.ViewButton view="week">Week</Calendar.ViewButton>
+<Calendar.ViewButton view="days" days={3}>3 days</Calendar.ViewButton>
+```
+
+## The visible range and the current range
+
+`model.get("visible-range")` is every day the view shows; `model.get("current-range")` is the
+range it is about. They differ for a month: November 2026 shows six weeks from Sunday November 1st
+to Saturday December 12th, and is about November. Both are `{ start, end }` with an exclusive end.
+
+```tsx
+import { useCalendarView } from "@fragiola/calendar-react";
+
+function RangeNote() {
+    const view = useCalendarView();
+    return (
+        <p>
+            {view.type}: {view.visibleRange.start} to {view.visibleRange.end} (exclusive)
+        </p>
+    );
+}
+```
+
+`firstDayOfWeek` (default the locale's) starts the weeks, `hiddenDays` leaves weekdays out of
+every view (a work week: `[0, 6]`), and the edge days that are hidden are left out of the range.
+
+## Keep the reader inside a valid range
+
+`validRange` (`{ start?, end? }`, dates, end exclusive, either open) bounds navigation:
+`view.go-to` or `view.today` outside it is refused, and so is a step whose range would not touch
+it. Days outside it carry `data-disabled`, and a navigation button whose step is refused is
+disabled.
+
+```ts
+model.run("settings.set", {
+    settings: { validRange: { start: "2026-09-01", end: "2027-01-01" } },
+});
+model.can("view.go-to", { date: "2027-03-01" }); // false
+```
+
+## The view as props
+
+A root can take the view as controlled props, mapped onto these commands: `view` and `days`
+(`view.set`), `date` (`view.go-to`), with `onViewChange` and `onDateChange` hearing the other
+changes, or `defaultView` and `defaultDate` to start it ([Controlled state](/docs/guides/controlled-state)).
+
+```tsx
+const [date, setDate] = useState("2026-11-26");
+
+<Calendar.Root defaultEvents={events} defaultView="week" date={date} onDateChange={setDate}>
+    {/* … */}
+</Calendar.Root>
+```
+
+The [n days](/examples/n-days) example shows three, four or five days at a time.

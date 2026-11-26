@@ -1,0 +1,274 @@
+---
+title: Your first calendar
+description: A typed week view in about a hundred lines, from the JSON document to the toolbar, the time grid, the all-day row and the events.
+---
+
+This page builds a week view: a toolbar with the title and the navigation buttons, a header row,
+the all-day row, a row per slot of the day and, laid over the slots, each day's timed events. The
+package places every event and wires the keyboard; the markup, the words and the CSS are yours.
+
+<Example id="week" />
+
+<Steps>
+<Step>
+
+## Describe the data
+
+A registry types what the app keeps on its events: each event kind and the type of its `data`
+([Typed data](/docs/concepts/typed-data)). The document is plain JSON, as a server would send it:
+all-day dates are `YYYY-MM-DD`, timed values RFC 3339 date-times with their offset, and `end` is
+exclusive.
+
+```ts title="calendar-data.ts"
+import type { CalendarDocument } from "@fragiola/calendar-react";
+
+export type Types = {
+    events: { meeting: { room: string }; focus: undefined };
+    calendar: undefined;
+};
+
+export const document: CalendarDocument<Types> = {
+    version: 1,
+    events: [
+        {
+            id: "standup",
+            kind: "meeting",
+            title: "Standup",
+            start: "2026-11-24T09:00:00-05:00",
+            end: "2026-11-24T09:30:00-05:00",
+            allDay: false,
+            data: { room: "Blue" },
+        },
+        {
+            id: "deep-work",
+            kind: "focus",
+            title: "Deep work",
+            start: "2026-11-25T13:00:00-05:00",
+            end: "2026-11-25T16:00:00-05:00",
+            allDay: false,
+        },
+        {
+            id: "offsite",
+            kind: "meeting",
+            title: "Team offsite",
+            start: "2026-11-26",
+            end: "2026-11-28",
+            allDay: true,
+            data: { room: "Lisbon" },
+        },
+    ],
+    settings: { timeZone: "America/New_York", locale: "en-US" },
+    view: { type: "week", anchorDate: "2026-11-26" },
+};
+```
+
+</Step>
+<Step>
+
+## Create the model and the root
+
+`createCalendarModel` loads the document (it throws a `CalendarValidationError` on an invalid
+one) and `Calendar.Root` shows it. Keep the model in state so it lives as long as the component.
+
+```tsx title="team-week.tsx"
+import { Calendar, createCalendarModel } from "@fragiola/calendar-react";
+import { useState } from "react";
+import { document, type Types } from "./calendar-data";
+
+export function TeamWeek() {
+    const [model] = useState(() => createCalendarModel<Types>(document));
+    return (
+        <Calendar.Root model={model} className="calendar">
+            <Toolbar />
+            <WeekGrid />
+        </Calendar.Root>
+    );
+}
+```
+
+</Step>
+<Step>
+
+## Add the toolbar
+
+The title is data: `useCalendarTitle` gives `Intl` parts in the calendar's locale, which you
+join. `Calendar.Previous`, `Calendar.Today` and `Calendar.Next` are buttons that run
+`view.previous`, `view.today` and `view.next`, with `data-disabled` when the model cannot run
+them. Their labels are yours.
+
+```tsx
+import { Calendar, useCalendarTitle } from "@fragiola/calendar-react";
+
+function Toolbar() {
+    const title = useCalendarTitle();
+    return (
+        <div className="toolbar">
+            <h2>{title.map((part) => part.value).join("")}</h2>
+            <Calendar.Today>Today</Calendar.Today>
+            <Calendar.Previous aria-label="Previous week">‹</Calendar.Previous>
+            <Calendar.Next aria-label="Next week">›</Calendar.Next>
+        </div>
+    );
+}
+```
+
+</Step>
+<Step>
+
+## Assemble the time grid
+
+`Calendar.TimeGrid` is the grid (`role="grid"`). Inside it, each collection part calls your
+function per entity of the layout: `ColumnHeaders` per day, `Days` per day of the all-day row,
+`SlotRows` per slot, `Slots` per day of a slot's row, `Columns` per day, `ColumnEvents` per timed
+event of that day ([Composition](/docs/concepts/composition)).
+
+```tsx
+import {
+    Calendar,
+    type Segment,
+    type TimeSegment,
+    useCalendar,
+    useDayHeader,
+    useSlotLabel,
+} from "@fragiola/calendar-react";
+import type { Types } from "./calendar-data";
+
+const join = (parts: readonly { value: string }[]) =>
+    parts.map((part) => part.value).join("");
+
+function WeekGrid() {
+    return (
+        <Calendar.TimeGrid aria-label="Week" className="grid">
+            <Calendar.ColumnHeaders className="headers">
+                {(date) => <DayHeader date={date} />}
+            </Calendar.ColumnHeaders>
+            <Calendar.AllDayRow className="all-day">
+                <Calendar.Days>
+                    {(day) => (
+                        <Calendar.Day day={day} className="all-day-cell">
+                            <Calendar.DayEvents>
+                                {(segment) => <AllDayEvent segment={segment} />}
+                            </Calendar.DayEvents>
+                        </Calendar.Day>
+                    )}
+                </Calendar.Days>
+            </Calendar.AllDayRow>
+            <Calendar.Scroller className="scroller">
+                <div className="body">
+                    <Calendar.SlotRows>
+                        {(slot) => (
+                            <Calendar.SlotRow slot={slot} className="slot-row">
+                                <Calendar.SlotLabel className="slot-label">
+                                    {slot.time.endsWith(":00") ? (
+                                        <SlotTime time={slot.time} />
+                                    ) : null}
+                                </Calendar.SlotLabel>
+                                <Calendar.Slots>
+                                    {(column) => (
+                                        <Calendar.Slot
+                                            date={column.date}
+                                            className="slot"
+                                        />
+                                    )}
+                                </Calendar.Slots>
+                            </Calendar.SlotRow>
+                        )}
+                    </Calendar.SlotRows>
+                    <Calendar.Columns className="columns">
+                        {(column) => (
+                            <Calendar.Column column={column} className="column">
+                                <Calendar.ColumnEvents>
+                                    {(segment) => <TimedEvent segment={segment} />}
+                                </Calendar.ColumnEvents>
+                            </Calendar.Column>
+                        )}
+                    </Calendar.Columns>
+                </div>
+            </Calendar.Scroller>
+        </Calendar.TimeGrid>
+    );
+}
+
+function DayHeader({ date }: { date: string }) {
+    return (
+        <Calendar.ColumnHeader date={date} className="header">
+            {join(useDayHeader(date))}
+        </Calendar.ColumnHeader>
+    );
+}
+
+function SlotTime({ time }: { time: string }) {
+    return <span>{join(useSlotLabel(time, { hour: "numeric" }))}</span>;
+}
+```
+
+</Step>
+<Step>
+
+## Render the events
+
+An event's part places itself: a `Calendar.Segment` in its lane and over its days, a
+`Calendar.TimeEvent` at its times as percentages of its column. What it shows is yours: read the
+title from the model (an occurrence of a recurring event may have its own).
+
+```tsx
+function useTitle(occurrenceId: string, eventId: string) {
+    const { model } = useCalendar<Types>();
+    return (
+        model.get("occurrence-by", { id: occurrenceId })?.title ??
+        model.get("event-by", { id: eventId })?.title
+    );
+}
+
+function AllDayEvent({ segment }: { segment: Segment }) {
+    return (
+        <Calendar.Segment segment={segment} className="segment">
+            {useTitle(segment.occurrenceId, segment.eventId)}
+        </Calendar.Segment>
+    );
+}
+
+function TimedEvent({ segment }: { segment: TimeSegment }) {
+    return (
+        <Calendar.TimeEvent segment={segment} className="event">
+            {useTitle(segment.occurrenceId, segment.eventId)}
+        </Calendar.TimeEvent>
+    );
+}
+```
+
+</Step>
+<Step>
+
+## Style it
+
+The parts set only structural style. The rest is plain CSS on your classes and on the parts'
+state attributes ([Sizing and scrolling](/docs/getting-started/sizing)):
+
+```css title="team-week.css"
+.calendar { display: flex; flex-direction: column; height: 640px; --axis: 4rem; }
+.grid { display: flex; flex-direction: column; min-height: 0; flex: 1; }
+.headers, .all-day { display: grid; grid-template-columns: var(--axis) repeat(7, 1fr); }
+.header:first-child { grid-column-start: 2; }
+.all-day > :first-child { grid-column-start: 2; }
+.header[data-today] { font-weight: 600; }
+.scroller { flex: 1; min-height: 0; overflow: auto; }
+.body { position: relative; }
+.slot-row { display: flex; height: 1.5rem; }
+.slot-label { width: var(--axis); text-align: end; font-size: 0.75rem; }
+.slot { flex: 1; border-block-start: 1px solid #e5e7eb; }
+.columns { position: absolute; inset-block: 0; inset-inline: var(--axis) 0; display: flex; }
+.column { flex: 1; }
+.event { background: #dbeafe; border-radius: 4px; overflow: hidden; }
+.event:focus-visible, .slot:focus-visible { outline: 2px solid #2563eb; }
+```
+
+</Step>
+</Steps>
+
+## What you have
+
+A week that the arrows, Home, End and PageUp/PageDown navigate (Tab enters the grid once), whose
+events are a list in each day, and whose buttons move a week at a time. Next:
+[drag and drop](/docs/guides/drag-and-drop), [selecting ranges](/docs/guides/selecting-ranges),
+or a [month view](/docs/guides/month-view).

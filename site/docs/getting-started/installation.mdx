@@ -1,0 +1,76 @@
+---
+title: Installation
+description: Install the React package, which brings the core and re-exports it, and import each opt-in feature from its own entry.
+---
+
+The React package `@fragiola/calendar-react` depends on the core `@fragiola/calendar` (at the
+exact same version) and re-exports all of it, so an app installs and imports one package. It
+needs React 19 and has no other runtime dependency.
+
+## Install the package
+
+```bash
+pnpm add @fragiola/calendar-react
+```
+
+`react` and `react-dom` (`^19`) are peer dependencies: your app provides them. The package ships
+ES modules only, with their type declarations.
+
+## Import the parts
+
+The primitives are one namespace, `Calendar`; the hooks, the model and every core type are named
+exports of the same package:
+
+```tsx
+import {
+    Calendar,
+    createCalendarModel,
+    useCalendarTitle,
+    type CalendarEventJson,
+} from "@fragiola/calendar-react";
+```
+
+## Import a feature from its entry
+
+What not every calendar needs is an opt-in feature, each on its own entry, so a calendar that
+does not drag never ships the drag code. An entry exports the feature's factory, its parts and
+its hooks:
+
+| entry | factory | parts and hooks |
+| --- | --- | --- |
+| `@fragiola/calendar-react/selection` | `selection()` | `Selection`, `useSelection` |
+| `@fragiola/calendar-react/drag-and-drop` | `dragAndDrop()` | `DragPreview`, `useDragPreview` |
+| `@fragiola/calendar-react/resize` | `resize()` | `ResizeHandle`, `DragPreview`, `useDragPreview` |
+| `@fragiola/calendar-react/external-drop` | `externalDrop()` | |
+| `@fragiola/calendar-react/now-indicator` | `nowIndicator()` | `NowIndicator`, `useNowPosition` |
+| `@fragiola/calendar-react/constraints` | `constraints()` | `BusinessHours`, `useBusinessHours` |
+| `@fragiola/calendar-react/recurrence` | `recurrence()` | |
+| `@fragiola/calendar-react/event-sources` | `eventSources()` | |
+
+```tsx
+import { dragAndDrop, DragPreview } from "@fragiola/calendar-react/drag-and-drop";
+import { selection } from "@fragiola/calendar-react/selection";
+
+const features = [selection(), dragAndDrop()] as const;
+```
+
+[Features](/docs/concepts/features) explains how a model takes them.
+
+## Using it beside Fragiola Primitives
+
+`@fragiola/primitives-react` also exports a `Calendar`: its date picker. In a file that uses
+both, alias one of them:
+
+```tsx
+import { Calendar } from "@fragiola/calendar-react";
+import { Calendar as DatePicker } from "@fragiola/primitives-react";
+```
+
+A date the date picker gives (`{ year, month, day }`) is the calendar's `PlainDate` too, so it
+goes to `view.go-to` with no conversion:
+
+```tsx
+model.run("view.go-to", { date: { year: 2026, month: 11, day: 26 } });
+```
+
+The [team planner](/examples/team-planner) example puts the two side by side.

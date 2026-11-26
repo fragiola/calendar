@@ -1,0 +1,132 @@
+---
+title: The model and commands
+description: The calendar is immutable JSON-shaped state behind a model. Every change is a command you run, check, veto or rewrite; every question is a key.
+---
+
+A calendar's state (its events, its calendars, its settings and its view) lives in a **model**,
+`createCalendarModel(json)`. The state is plain, frozen, JSON-shaped data that only commands
+change. The model needs no DOM: it runs in Node, in a test, on a server or behind an assistant.
+The primitives read it; your app, the engine and an AI change it the same way.
+
+## Five verbs
+
+Every member of the model is one verb, bound (so it can be passed around):
+
+| verb | what it does |
+| --- | --- |
+| `model.run(command, payload)` | changes the calendar, through the middleware chain |
+| `model.can(command, payload)` | whether `run` would succeed (nothing is committed) |
+| `model.check(command, payload)` | what `run` would return (nothing is committed) |
+| `model.get(key, payload?)` | reads: `"event-by"`, `"visible-range"`, `"day-grid"`, `"commands"`, … |
+| `model.is(key, payload)` | a yes/no question: `"event-editable"`, `"date-today"`, … |
+
+Plus `model.dispatch(input)` (`run` for untrusted JSON), `model.use(middleware)` and
+`model.subscribe(listener)`. [Model](/docs/api/model) lists every key.
+
+```ts
+import { createCalendarModel } from "@fragiola/calendar-react";
+
+const model = createCalendarModel({
+    version: 1,
+    events: [
+        {
+            id: "review",
+            title: "Design review",
+            start: "2026-11-26T10:00:00-05:00",
+            end: "2026-11-26T11:00:00-05:00",
+            allDay: false,
+        },
+    ],
+    settings: { timeZone: "America/New_York" },
+});
+
+const moved = model.run("event.move", { eventId: "review", delta: { days: 1 } });
+if (moved.ok) moved.value.start; // "2026-11-27T10:00:00-05:00"
+
+model.can("event.remove", { eventId: "review" }); // true
+model.get("event-by", { id: "review" })?.title; // "Design review"
+```
+
+## Commands never throw
+
+A command is named `<entity>.<verb>` (`event.add`, `event.move`, `calendar.set-visible`,
+`settings.set`, `view.next`) and returns a `CommandResult`: `{ ok: true, value }` or
+`{ ok: false, error }` with a `code`, a `message` and the `path` in the payload. Nonsense is
+refused, never repaired: an event resized to end before it starts is `invalid_payload`, a move of
+a locked event is `refused` with the reason. Only loading an invalid document throws
+(`CalendarValidationError`, with every issue and its JSON path).
+
+```ts
+const result = model.run("event.resize", {
+    eventId: "review",
+    edge: "end",
+    to: "2026-11-27T09:00:00-05:00",
+});
+if (!result.ok) result.error.code; // "invalid_payload": it would end before it starts
+```
+
+[Commands](/docs/api/commands) lists every command with its payload, its result and an example.
+
+## Edit rules live in the commands
+
+Whether an event may change is a rule of the commands, so the pointer, the keyboard, your code and
+an assistant obey the same one: an event's flags (`editable`, `startEditable`,
+`durationEditable`, `deletable`), else its calendar's `editable`, else the settings'. A drag asks
+`model.check` for each target and shows no preview where the move is refused.
+
+```ts
+model.run("event.set-flags", { eventId: "review", startEditable: false });
+model.can("event.move", { eventId: "review", delta: { days: 1 } }); // false
+model.is("event-start-editable", { eventId: "review" }); // false
+```
+
+## Middleware
+
+`model.use` adds a function around every command, engine-issued or not. It can **veto** (return
+an error without calling `next`), **rewrite** (assign `ctx.payload`, then call `next`) or
+**observe** (call `next`, look at the result). `veto` builds the error.
+
+```ts
+import { veto } from "@fragiola/calendar-react";
+
+const stop = model.use((ctx, next) => {
+    if (ctx.command === "event.remove" && ctx.meta?.source === "assistant") {
+        return veto("the assistant may not remove events");
+    }
+    return next();
+});
+```
+
+`ctx.command` narrows `ctx.payload`, `ctx.dryRun` is true for `can` and `check` (no side effects
+then), and `ctx.meta` is what the caller passed (`run(command, payload, { meta })`). The
+[edit rules example](/examples/edit-rules) vetoes moves into the past.
+
+## Several changes as one
+
+`batch` runs commands in order, each seeing the ones before it; all of them apply, as one commit
+and one listener event, or none does.
+
+```ts
+model.run("batch", {
+    commands: [
+        { command: "view.set", payload: { type: "week" } },
+        { command: "view.go-to", payload: { date: "2026-12-07" } },
+    ],
+});
+```
+
+## Listening
+
+`model.subscribe` hears every commit: the command, its payload and result, the state before and
+after. It is where persistence, undo and a server sync start
+([Saving and restoring](/docs/guides/persistence), [Undo and redo](/docs/guides/undo-redo)).
+
+```ts
+const unsubscribe = model.subscribe((event) => {
+    console.log(event.command, event.after.events.length);
+});
+```
+
+`model.get("calendar-json")` writes the document back, ready to save and load again.
+
+<Example id="ai-commands" />
