@@ -17,5 +17,7 @@
         "tests",
         "*.config.ts",
         "vite.shared.ts"
-    ]
+    ],
+    // an unknown component in a template (a part used but not imported) is an error
+    "vueCompilerOptions": { "checkUnknownComponents": true }
 }

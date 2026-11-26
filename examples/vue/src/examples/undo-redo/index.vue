@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { createCalendarModel, typedCalendar } from "@fragiola/calendar-vue";
-import { dragAndDrop } from "@fragiola/calendar-vue/drag-and-drop";
+import { DragPreview, dragAndDrop } from "@fragiola/calendar-vue/drag-and-drop";
 import { resize } from "@fragiola/calendar-vue/resize";
 import { Redo2, Undo2 } from "@lucide/vue";
 import {

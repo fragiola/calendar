@@ -19,8 +19,8 @@ const title = useCalendarTitle();
         <Calendar.Next aria-label="Next month" :class="styles.iconButton">
             <ChevronRight aria-hidden="true" :class="styles.flip" />
         </Calendar.Next>
-        <Calendar.ViewButton view="month" :class="styles.button">
-            Month
-        </Calendar.ViewButton>
+        <Calendar.ViewButton view="month" :class="styles.button"
+            >Month</Calendar.ViewButton
+        >
     </div>
 </template>

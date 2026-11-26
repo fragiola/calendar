@@ -15,6 +15,7 @@ import * as styles from "./styles";
 const props = defineProps<{ segment: TimeSegment }>();
 const { model } = useCalendar<Types>();
 
+// the segment is a new object whenever its event changes (D11), so this re-reads the model then
 const event = computed(() =>
     model.get("event-by", { id: props.segment.eventId }),
 );

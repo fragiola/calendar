@@ -4,10 +4,10 @@ import {
     createCalendarModel,
     typedCalendar,
 } from "@fragiola/calendar-vue";
-import { dragAndDrop } from "@fragiola/calendar-vue/drag-and-drop";
+import { DragPreview, dragAndDrop } from "@fragiola/calendar-vue/drag-and-drop";
 import { resize } from "@fragiola/calendar-vue/resize";
 import { RotateCcw, Save } from "@lucide/vue";
-import { onMounted, ref, shallowRef, useTemplateRef } from "vue";
+import { ref, shallowRef, useTemplateRef, watch } from "vue";
 import { CALENDARS, day, type Types, teamWeek } from "../_kit/data";
 import { clearCalendar, restoreCalendar, saveCalendar } from "../_kit/persist";
 import AllDayEvent from "./all-day-event.vue";
@@ -74,7 +74,8 @@ function scrollToMorning(element: HTMLElement | null | undefined) {
 }
 
 const scroller = useTemplateRef<{ $el: HTMLElement }>("scroller");
-onMounted(() => scrollToMorning(scroller.value?.$el));
+// on mount, and again when Reset mounts a new root (and so a new scroller)
+watch(scroller, (part) => scrollToMorning(part?.$el), { flush: "post" });
 </script>
 
 <template>
