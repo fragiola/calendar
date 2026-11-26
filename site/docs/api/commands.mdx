@@ -579,3 +579,59 @@ Mark a range of days of a source as being fetched (`loading: true`, so `ranges-t
 model.run("event-sources.set-loading", {"sourceId":"holidays","range":{"start":"2026-11-01","end":"2026-12-01"},"loading":true});
 model.dispatch({"command":"event-sources.set-loading","payload":{"sourceId":"holidays","range":{"start":"2026-11-01","end":"2026-12-01"},"loading":true}});
 ```
+
+## Selection
+
+With the `selection()` feature installed:
+
+```ts
+import { selection } from "@fragiola/calendar/selection";
+
+const model = createCalendarModel(json, { features: [selection()] });
+```
+
+Without it, its commands are `not_found`.
+
+### `selection.set`
+
+Select a range of days (allDay, dates as YYYY-MM-DD, end exclusive) or of time (RFC 3339 date-times with their offsets). Refused outside validRange, and when selectConstraint refuses it (with constraints()). The selection is view state of the model, not part of the document.
+
+**Payload**
+
+| field | type | required | description |
+| --- | --- | --- | --- |
+| `start` | `string` | yes | the first day (YYYY-MM-DD) of an all-day range, else its first instant (RFC 3339 with its offset) |
+| `end` | `string` | yes | its end, exclusive, of the same kind as start |
+| `allDay` | `boolean` | yes |  |
+
+**Result**
+
+| field | type | required | description |
+| --- | --- | --- | --- |
+| `start` | `string` | yes | the first day (YYYY-MM-DD) of an all-day range, else its first instant (RFC 3339 with its offset) |
+| `end` | `string` | yes | its end, exclusive, of the same kind as start |
+| `allDay` | `boolean` | yes |  |
+
+```ts
+model.run("selection.set", {"start":"2026-11-26T14:00:00-03:00","end":"2026-11-26T15:30:00-03:00","allDay":false});
+model.dispatch({"command":"selection.set","payload":{"start":"2026-11-26T14:00:00-03:00","end":"2026-11-26T15:30:00-03:00","allDay":false}});
+```
+
+### `selection.clear`
+
+Clear the selected range; `cleared` says whether there was one.
+
+**Payload**
+
+No fields.
+
+**Result**
+
+| field | type | required | description |
+| --- | --- | --- | --- |
+| `cleared` | `boolean` | yes |  |
+
+```ts
+model.run("selection.clear", {});
+model.dispatch({"command":"selection.clear","payload":{}});
+```

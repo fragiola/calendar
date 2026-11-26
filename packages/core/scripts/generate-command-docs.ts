@@ -71,6 +71,7 @@ const FEATURE_SECTIONS: readonly {
         factory: "eventSources",
         title: "Event sources",
     },
+    { subpath: "selection", factory: "selection", title: "Selection" },
 ];
 
 /** The sections of the page, and the commands in each. */
@@ -157,6 +158,12 @@ const EXAMPLES: Record<string, unknown> = {
             exdates: ["2026-11-27T09:30:00-03:00"],
         },
     },
+    "selection.set": {
+        start: "2026-11-26T14:00:00-03:00",
+        end: "2026-11-26T15:30:00-03:00",
+        allDay: false,
+    },
+    "selection.clear": {},
     "event-sources.receive": {
         sourceId: "holidays",
         range: { start: "2026-11-01", end: "2026-12-01" },

@@ -10,8 +10,8 @@ import {
 } from "../../scripts/check-features.ts";
 
 // `pnpm build` runs scripts/check-features.ts over every package's built main entry: it fails when
-// one ships a feature's code. No feature exists yet (AGENTS.md D2): these pin the check itself on
-// planted builds, with a planted feature.
+// one ships a feature's code. These pin the check itself on planted builds,
+// with a planted feature.
 
 /** A planted feature, as its built factory would name its keys. */
 const SELECTION: FeatureMarkers = {
@@ -27,11 +27,16 @@ const SELECTION: FeatureMarkers = {
 const built = (files: Record<string, string>) => (name: string) => files[name];
 
 describe("the features' bundle guard", () => {
-    it("guards the model features, each its subpath and factory", () => {
+    it("guards every feature, each its subpath and factory", () => {
         expect(FEATURES).toEqual([
             { subpath: "recurrence", factory: "recurrence" },
             { subpath: "constraints", factory: "constraints" },
             { subpath: "event-sources", factory: "eventSources" },
+            { subpath: "selection", factory: "selection" },
+            { subpath: "drag-and-drop", factory: "dragAndDrop" },
+            { subpath: "resize", factory: "resize" },
+            { subpath: "external-drop", factory: "externalDrop" },
+            { subpath: "now-indicator", factory: "nowIndicator" },
         ]);
     });
 

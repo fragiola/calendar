@@ -21,15 +21,16 @@ export interface FeatureEntry {
     readonly factory: string;
 }
 
-/**
- * The features, each exported by the core's built entry of its subpath (AGENTS.md D2; the
- * interactive ones, `selection`, `drag-and-drop`, `resize`, `now-indicator` and `external-drop`,
- * join with the engine).
- */
+/** The features, each exported by the core's built entry of its subpath (AGENTS.md D2). */
 export const FEATURES: readonly FeatureEntry[] = [
     { subpath: "recurrence", factory: "recurrence" },
     { subpath: "constraints", factory: "constraints" },
     { subpath: "event-sources", factory: "eventSources" },
+    { subpath: "selection", factory: "selection" },
+    { subpath: "drag-and-drop", factory: "dragAndDrop" },
+    { subpath: "resize", factory: "resize" },
+    { subpath: "external-drop", factory: "externalDrop" },
+    { subpath: "now-indicator", factory: "nowIndicator" },
 ];
 
 /** A feature as the guard reads it: its subpath and the markers its code holds. */

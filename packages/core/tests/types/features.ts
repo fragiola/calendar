@@ -19,6 +19,10 @@ import { createCalendarModel } from "../../src/index";
 import type { eventSetRecurrence } from "../../src/recurrence/commands/event-set-recurrence";
 import { recurrence } from "../../src/recurrence/index";
 import type { FromSchema } from "../../src/schema/from-schema";
+import type {
+    selectionClear,
+    selectionSet,
+} from "../../src/selection/commands/selection-commands";
 
 const bare = createCalendarModel();
 const full = createCalendarModel(undefined, {
@@ -86,6 +90,8 @@ export type FeatureSchemasMatchTypes = [
     Check<"event-sources.receive", typeof eventSourcesReceive>,
     Check<"event-sources.invalidate", typeof eventSourcesInvalidate>,
     Check<"event-sources.set-loading", typeof eventSourcesSetLoading>,
+    Check<"selection.set", typeof selectionSet>,
+    Check<"selection.clear", typeof selectionClear>,
 ] extends [true, true][]
     ? true
     : never;

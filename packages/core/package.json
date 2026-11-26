@@ -54,6 +54,36 @@
             "import": "./dist/event-sources.js",
             "default": "./dist/event-sources.js"
         },
+        "./selection": {
+            "@fragiola/source": "./src/selection/index.ts",
+            "types": "./dist/selection.d.ts",
+            "import": "./dist/selection.js",
+            "default": "./dist/selection.js"
+        },
+        "./drag-and-drop": {
+            "@fragiola/source": "./src/drag-and-drop/index.ts",
+            "types": "./dist/drag-and-drop.d.ts",
+            "import": "./dist/drag-and-drop.js",
+            "default": "./dist/drag-and-drop.js"
+        },
+        "./resize": {
+            "@fragiola/source": "./src/resize/index.ts",
+            "types": "./dist/resize.d.ts",
+            "import": "./dist/resize.js",
+            "default": "./dist/resize.js"
+        },
+        "./external-drop": {
+            "@fragiola/source": "./src/external-drop/index.ts",
+            "types": "./dist/external-drop.d.ts",
+            "import": "./dist/external-drop.js",
+            "default": "./dist/external-drop.js"
+        },
+        "./now-indicator": {
+            "@fragiola/source": "./src/now-indicator/index.ts",
+            "types": "./dist/now-indicator.d.ts",
+            "import": "./dist/now-indicator.js",
+            "default": "./dist/now-indicator.js"
+        },
         "./package.json": "./package.json"
     },
     "files": [
@@ -84,6 +114,31 @@
                 "import": "./dist/event-sources.js",
                 "default": "./dist/event-sources.js"
             },
+            "./selection": {
+                "types": "./dist/selection.d.ts",
+                "import": "./dist/selection.js",
+                "default": "./dist/selection.js"
+            },
+            "./drag-and-drop": {
+                "types": "./dist/drag-and-drop.d.ts",
+                "import": "./dist/drag-and-drop.js",
+                "default": "./dist/drag-and-drop.js"
+            },
+            "./resize": {
+                "types": "./dist/resize.d.ts",
+                "import": "./dist/resize.js",
+                "default": "./dist/resize.js"
+            },
+            "./external-drop": {
+                "types": "./dist/external-drop.d.ts",
+                "import": "./dist/external-drop.js",
+                "default": "./dist/external-drop.js"
+            },
+            "./now-indicator": {
+                "types": "./dist/now-indicator.d.ts",
+                "import": "./dist/now-indicator.js",
+                "default": "./dist/now-indicator.js"
+            },
             "./package.json": "./package.json"
         }
     },
@@ -95,6 +150,7 @@
     },
     "devDependencies": {
         "@types/node": "26.6.6",
+        "jsdom": "31.0.1",
         "tsdown": "0.23.7",
         "typescript": "7.0.2",
         "vitest": "5.1.0"
