@@ -26,8 +26,14 @@ import {
 } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { parseArgs } from "node:util";
-import { CONTRACT_VERSION, validateExport } from "./contract.ts";
 import {
+    contractVersion,
+    contractVersionProblem,
+    findWwwContract,
+    validateExport,
+} from "./contract.ts";
+import {
+    baseProblem,
     buildExamplesConfig,
     buildManifests,
     DOCS_DIR,
@@ -49,8 +55,17 @@ if (values.base === undefined || !values.out) {
     console.error("usage: pnpm site:export --base /<slug> --out <dir>");
     process.exit(1);
 }
+const project = readProject();
 const base = normalizeBase(values.base);
 const out = resolve(values.out);
+// www's contract version where www is checked out, the pinned one in CI (no ../www there)
+const contract = contractVersion(findWwwContract());
+const refused =
+    baseProblem(base, project.slug) ?? contractVersionProblem(contract);
+if (refused !== undefined) {
+    console.error(`site export: ${refused}`);
+    process.exit(1);
+}
 
 // Only ever replace a previous export: never wipe a directory we did not write.
 if (existsSync(out) && readdirSync(out).length > 0) {
@@ -73,8 +88,6 @@ const write = (file: string, content: string) => {
     writeFileSync(file, content);
 };
 const json = (value: unknown) => `${JSON.stringify(value, null, 4)}\n`;
-
-const project = readProject();
 
 // ─── embed apps ─────────────────────────────────────────────────────────────
 // Built against the packages' dist, like any consumer: the core and every adapter.
@@ -106,5 +119,5 @@ if (problems.length > 0) {
     process.exit(1);
 }
 console.log(
-    `site export (contract v${CONTRACT_VERSION}) → ${out} (base ${base || "/"})`,
+    `site export (contract v${contract.version}, ${contract.source}) → ${out} (base ${base || "/"})`,
 );

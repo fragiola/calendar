@@ -17,6 +17,25 @@ import { connect, createServer as createNetServer } from "node:net";
 /** The port `site:dev` listens on (D1, guidelines docs/site.md: 5192 is reserved for the calendar). */
 export const DEV_PORT = 5192;
 
+/** `--port`, read: an integer from 1 to 65535, or `undefined` for anything else. */
+export function parsePort(value: string): number | undefined {
+    if (!/^\d+$/.test(value)) return undefined;
+    const port = Number(value);
+    return port >= 1 && port <= 65535 ? port : undefined;
+}
+
+/**
+ * The exit code of `site:dev` when one of its dev servers exits: its own code, or 1 when a signal
+ * ended it (a crash or a kill is a failure, never a clean `0`).
+ */
+export function exitCodeOf(
+    code: number | null,
+    signal: NodeJS.Signals | null,
+): number {
+    if (code !== null) return code;
+    return signal === null ? 0 : 1;
+}
+
 /** A dev server behind the proxy: every path under `prefix` goes to `port` on localhost. */
 export interface Upstream {
     prefix: string;
