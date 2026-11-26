@@ -87,7 +87,7 @@ describe("the E2E suites a change runs", () => {
     });
 
     it("finds the examples apps with a Playwright config, and none in a missing folder", () => {
-        expect(examplesFrameworks()).toEqual(["react", "vue"]);
+        expect(examplesFrameworks()).toEqual(["angular", "react", "vue"]);
         // a change confined to Vue runs only examples vue, among the apps there are
         expect(
             e2eSuites(
@@ -99,6 +99,18 @@ describe("the E2E suites a change runs", () => {
                 examplesFrameworks(),
             ),
         ).toEqual({ playground: false, examples: ["vue"] });
+        // and one confined to Angular (its package, its examples app) only examples angular
+        expect(
+            e2eSuites(
+                [
+                    "packages/angular/src/lib/directives/day.directive.ts",
+                    "packages/angular/selection/public-api.ts",
+                    "examples/angular/src/examples/month/index.ts",
+                    "examples/angular/src/components/ui/popover.ts",
+                ],
+                examplesFrameworks(),
+            ),
+        ).toEqual({ playground: false, examples: ["angular"] });
         expect(examplesFrameworks(join(tmpdir(), "no-such-examples"))).toEqual(
             [],
         );
