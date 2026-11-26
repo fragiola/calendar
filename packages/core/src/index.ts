@@ -36,3 +36,17 @@ export type { PlainDate, PlainDateString } from "./time/plain-date";
 export type { PlainTime, PlainTimeString } from "./time/plain-time";
 export { timedDayRange } from "./time/timed-day-range";
 export type { ZonedDateTimeFields } from "./time/zoned-date-time-fields";
+// time zones: offsets, wall clock ↔ instant, DST
+export { addDaysInZone } from "./time-zone/add-days-in-zone";
+export { formatInstant } from "./time-zone/format-instant";
+export { instantToWallClock } from "./time-zone/instant-to-wall-clock";
+export { minutesInDay } from "./time-zone/minutes-in-day";
+export { plainDateInZone } from "./time-zone/plain-date-in-zone";
+export {
+    LOCAL_TIME_ZONE,
+    resolveTimeZone,
+} from "./time-zone/resolve-time-zone";
+export { startOfDay } from "./time-zone/start-of-day";
+export { timeZoneOffset } from "./time-zone/time-zone-offset";
+export { validateTimeZone } from "./time-zone/validate-time-zone";
+export { wallClockToInstant } from "./time-zone/wall-clock-to-instant";
