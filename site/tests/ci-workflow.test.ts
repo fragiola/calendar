@@ -69,7 +69,9 @@ describe("the CI workflow", () => {
         const workflow = read(".github/workflows/ci.yml");
         for (const job of ["e2e-playground", "e2e-examples"]) {
             const body =
-                new RegExp(`\\n  ${job}:\\n((?:    .*\\n|\\n)+)`).exec(workflow)?.[1] ?? "";
+                new RegExp(`\\n  ${job}:\\n((?:    .*\\n|\\n)+)`).exec(
+                    workflow,
+                )?.[1] ?? "";
             expect(body, job).toMatch(
                 /container:\n\s+image: mcr\.microsoft\.com\/playwright:v[\d.]+-noble\n\s+options: --user 1001/,
             );

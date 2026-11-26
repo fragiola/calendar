@@ -23,7 +23,9 @@ test("logs each command a button runs, and the model JSON follows", async ({
     await open(page, "api/commands");
     await page.getByRole("button", { name: "Add lunch" }).click();
     await expect(commandNames(page).first()).toHaveText("event.add");
-    await page.getByRole("button", { name: "Move standup", exact: true }).click();
+    await page
+        .getByRole("button", { name: "Move standup", exact: true })
+        .click();
     await expect(commandNames(page).first()).toHaveText("event.move");
     // one listener: each command is logged once, also under StrictMode
     await expect(commandNames(page)).toHaveCount(2);
