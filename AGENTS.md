@@ -485,7 +485,8 @@ drag and ranges; RFC 5545 for recurrence; FullCalendar's documented default for 
   (`tests/rerender.test.tsx`; the playground's stress fixture counts renders in e2e). The rule for
   apps: a children function renders from its arguments, hooks and contexts; app state it shows
   goes through a hook or a context of the components it renders (they update on their own), not
-  through the function's closure, which is read only when the row's layout changes.
+  through the function's closure, which is read only when the row's layout changes. (Replaced by
+  Issue #9, "children identity": the closure is read again whenever the function changes.)
 
 - **Issue #8, the playground.** `apps/playground` is Tree's shell (sidebar, the five themes, the
   source panel, the Inspector of a scenario's model: its commands, `calendar-json`, every part's
@@ -550,6 +551,21 @@ drag and ranges; RFC 5545 for recurrence; FullCalendar's documented default for 
   to mark it `data-focused` and the tab stop, and to keep the day only while the same element is
   focused (another week's part of the event is another element). A pending focus resolves loosely
   in `committed()`, once the commit has removed what it removes.
+
+- **Issue #9, children identity (correctness over a shortcut).** Issue #8's `MemoCall` read the
+  children function through a ref, so app state it closed over (a highlighted event, an open
+  popover) went stale until the row's layout changed. It now follows React's contract: an
+  entity's call runs again when its layout object **or the children function** changes
+  (`utils/memo-call.tsx` compares both; `tests/rerender.test.tsx` checks a highlight follows the
+  app's state, a new function re-renders every row, a stable one only the touched rows). An inline
+  function is always current and re-renders every row of the part on each render of the component
+  that writes it; a stable function (`useCallback` with what it reads, or a function declared
+  outside the component when it reads only its arguments) keeps D11's cost. The playground's stress
+  fixture passes `useCallback`'d row and column functions, so its render counters still prove only
+  the touched rows re-render; `keyboard` and `select-to-create` (an announcement or a keystroke
+  re-renders their grid) declare their rows' and columns' functions outside the component;
+  `more-events` closes over its open day directly (its context is gone). The docs' composition and
+  performance pages say it.
 
 ## Commands
 

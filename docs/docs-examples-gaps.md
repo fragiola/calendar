@@ -30,9 +30,11 @@ say about it. Each entry names the example and why; a gap closed in a package le
 - The day-grid geometry's custom properties: `--calendar-lane-size` (default `1.5rem`),
   `--calendar-day-gap` (default `0px`) and `--calendar-row-inset` (default `0px`), set by the app
   on any ancestor; `Calendar.DayEvents` is a segment's containing block, a row its decorations'.
-- A collection part's children function is called again only for a changed layout object: app
-  state it shows goes through a hook or a context of the components it renders (AGENTS.md
-  "Issue #8, re-render cost").
+- A collection part calls its children function again for a row whose layout object changed, and
+  for every row when the function itself changed (React's contract, AGENTS.md "Issue #9, children
+  identity"): an inline function is always current; a stable one (`useCallback`, or a function
+  declared outside the component, as `keyboard` and `select-to-create` do) re-renders only the rows
+  whose layout changed.
 - `Calendar.More` is the last item of its day's events on the keyboard.
 - The time grid's layer of columns is its last row; give `Calendar.Columns` `position: absolute`
   over the slot rows (the examples' `body` wrapper is the containing block).

@@ -12,7 +12,8 @@ import {
 // The stress fixture: 2 000 events and every feature. Each week row's and each column's children
 // function counts its calls (`window.renders`); moving one event calls them again only for the
 // rows or columns it left and entered (D11: the layout keeps the others' objects, and the
-// collection parts call a children function only for a changed one).
+// collection parts call a stable children function, the fixture's `useCallback`, only for a changed
+// one).
 
 const renders = (page: Page) =>
     page.evaluate(() => ({

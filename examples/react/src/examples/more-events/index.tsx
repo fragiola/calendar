@@ -10,7 +10,7 @@ import {
     useDayHeader,
 } from "@fragiola/calendar-react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import { createContext, useContext, useState } from "react";
+import { useState } from "react";
 import { Popover } from "#/components/ui/popover";
 import {
     CALENDARS,
@@ -22,13 +22,6 @@ import {
 } from "../_kit/data";
 import { dayText, text, timesOf, titleOf } from "../_kit/format";
 import * as styles from "./styles";
-
-// The day whose popover is open: app state the days read through a context (a day's children
-// function is called again only when its layout changes, so it never closes over app state).
-const OpenDay = createContext<{
-    date: string | null;
-    setDate: (date: string | null) => void;
-}>({ date: null, setDate: () => {} });
 
 /** A busy month: the team's week, and a standup and a review every weekday of four weeks. */
 function busyMonth(): CalendarEventJson<Types>[] {
@@ -65,65 +58,71 @@ export default function MoreEvents() {
             view: { type: "month", anchorDate: day() },
         }),
     );
-    const [date, setDate] = useState<string | null>(null);
+    // the day whose popover is open: app state the children functions below close over (a new
+    // function re-renders the rows, so what they show is always current)
+    const [open, setOpen] = useState<string | null>(null);
     return (
-        <OpenDay value={{ date, setDate }}>
-            <Calendar.Root
-                model={model}
-                className={styles.root}
-                onMoreClick={(event) => setDate(event.date)}
-            >
-                <Toolbar />
-                <Calendar.DayGrid aria-label="Month" className={styles.grid}>
-                    <Calendar.ColumnHeaders className={styles.headers}>
-                        {(date) => <Weekday date={date} />}
-                    </Calendar.ColumnHeaders>
-                    <Calendar.Weeks>
-                        {(week) => (
-                            <Calendar.Week week={week} className={styles.week}>
-                                {(day) => (
-                                    <Calendar.Day
-                                        day={day}
-                                        className={styles.day}
+        <Calendar.Root
+            model={model}
+            className={styles.root}
+            onMoreClick={(event) => setOpen(event.date)}
+        >
+            <Toolbar />
+            <Calendar.DayGrid aria-label="Month" className={styles.grid}>
+                <Calendar.ColumnHeaders className={styles.headers}>
+                    {(date) => <Weekday date={date} />}
+                </Calendar.ColumnHeaders>
+                <Calendar.Weeks>
+                    {(week) => (
+                        <Calendar.Week week={week} className={styles.week}>
+                            {(day) => (
+                                <Calendar.Day day={day} className={styles.day}>
+                                    <span className={styles.dayNumber}>
+                                        {Number(day.date.slice(8))}
+                                    </span>
+                                    <Calendar.DayEvents
+                                        className={styles.dayEvents}
                                     >
-                                        <span className={styles.dayNumber}>
-                                            {Number(day.date.slice(8))}
-                                        </span>
-                                        <Calendar.DayEvents
-                                            className={styles.dayEvents}
-                                        >
-                                            {(segment) => (
-                                                <EventSegment
-                                                    segment={segment}
-                                                />
-                                            )}
-                                        </Calendar.DayEvents>
-                                        <MorePopover date={day.date} />
-                                    </Calendar.Day>
-                                )}
-                            </Calendar.Week>
-                        )}
-                    </Calendar.Weeks>
-                </Calendar.DayGrid>
-            </Calendar.Root>
-        </OpenDay>
+                                        {(segment) => (
+                                            <EventSegment segment={segment} />
+                                        )}
+                                    </Calendar.DayEvents>
+                                    <MorePopover
+                                        date={day.date}
+                                        open={open === day.date}
+                                        onClose={() => setOpen(null)}
+                                    />
+                                </Calendar.Day>
+                            )}
+                        </Calendar.Week>
+                    )}
+                </Calendar.Weeks>
+            </Calendar.DayGrid>
+        </Calendar.Root>
     );
 }
 
 // The popover of a day: its trigger is the day's "+N more" (rendered only while some events do
 // not fit). The engine's `more-click` opens it; a press on the trigger is that click, so the
 // trigger's own toggle is cancelled, and Escape or a press outside close it.
-function MorePopover({ date }: { date: string }) {
-    const open = useContext(OpenDay);
+function MorePopover({
+    date,
+    open,
+    onClose,
+}: {
+    date: string;
+    open: boolean;
+    onClose: () => void;
+}) {
     const { model } = useCalendar<Types>();
     const items =
         model.get("list").days.find((one) => one.date === date)?.items ?? [];
     return (
         <Popover.Root
-            open={open.date === date}
+            open={open}
             onOpenChange={(next, details) => {
                 if (details.reason === "trigger-press") details.cancel();
-                else if (!next) open.setDate(null);
+                else if (!next) onClose();
             }}
         >
             <Popover.Trigger

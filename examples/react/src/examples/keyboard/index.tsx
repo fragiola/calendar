@@ -4,7 +4,9 @@ import {
     Calendar,
     createCalendarModel,
     type Segment,
+    type TimeGridColumn,
     type TimeSegment,
+    type TimeSlot,
     useCalendar,
     useCalendarTitle,
     useDayHeader,
@@ -89,45 +91,9 @@ export default function Keyboard() {
                     ref={scrollToMorning}
                 >
                     <div className={styles.body}>
-                        <Calendar.SlotRows>
-                            {(slot) => (
-                                <Calendar.SlotRow
-                                    slot={slot}
-                                    className={styles.slotRow}
-                                >
-                                    <Calendar.SlotLabel
-                                        className={styles.slotLabel}
-                                    >
-                                        {slot.time.endsWith(":00") ? (
-                                            <SlotTime time={slot.time} />
-                                        ) : null}
-                                    </Calendar.SlotLabel>
-                                    <Calendar.Slots>
-                                        {(column) => (
-                                            <Calendar.Slot
-                                                date={column.date}
-                                                className={styles.slot}
-                                            />
-                                        )}
-                                    </Calendar.Slots>
-                                </Calendar.SlotRow>
-                            )}
-                        </Calendar.SlotRows>
+                        <Calendar.SlotRows>{slotRow}</Calendar.SlotRows>
                         <Calendar.Columns className={styles.columns}>
-                            {(column) => (
-                                <Calendar.Column
-                                    column={column}
-                                    className={styles.column}
-                                >
-                                    <Calendar.ColumnEvents>
-                                        {(segment) => (
-                                            <TimedEvent segment={segment} />
-                                        )}
-                                    </Calendar.ColumnEvents>
-                                    <Selection className={styles.selection} />
-                                    <DragPreview className={styles.preview} />
-                                </Calendar.Column>
-                            )}
+                            {dayColumn}
                         </Calendar.Columns>
                     </div>
                 </Calendar.Scroller>
@@ -137,6 +103,38 @@ export default function Keyboard() {
 }
 
 const FEATURES = [selection(), dragAndDrop(), resize()] as const;
+
+// The rows' and the columns' children functions read only their arguments, so they live outside
+// the component: stable, they are called again only for a row or a column whose layout changed,
+// not on every re-render of the app (an announcement, a keystroke in a field).
+function slotRow(slot: TimeSlot) {
+    return (
+        <Calendar.SlotRow slot={slot} className={styles.slotRow}>
+            <Calendar.SlotLabel className={styles.slotLabel}>
+                {slot.time.endsWith(":00") ? (
+                    <SlotTime time={slot.time} />
+                ) : null}
+            </Calendar.SlotLabel>
+            <Calendar.Slots>
+                {(column) => (
+                    <Calendar.Slot date={column.date} className={styles.slot} />
+                )}
+            </Calendar.Slots>
+        </Calendar.SlotRow>
+    );
+}
+
+function dayColumn(column: TimeGridColumn) {
+    return (
+        <Calendar.Column column={column} className={styles.column}>
+            <Calendar.ColumnEvents>
+                {(segment) => <TimedEvent segment={segment} />}
+            </Calendar.ColumnEvents>
+            <Selection className={styles.selection} />
+            <DragPreview className={styles.preview} />
+        </Calendar.Column>
+    );
+}
 
 /** Opens the time grid at 08:00 (app code: the scroll position is yours). */
 function scrollToMorning(element: HTMLElement | null) {

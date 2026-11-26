@@ -10,6 +10,8 @@ import {
     type CalendarEventJson,
     type CalendarFeatures,
     type CalendarSettingsJson,
+    type DayGridWeek,
+    type TimeGridColumn,
     useCalendar,
     useCalendarView,
     type ViewType,
@@ -19,7 +21,7 @@ import { DragPreview } from "@fragiola/calendar-react/drag-and-drop";
 import { NowIndicator } from "@fragiola/calendar-react/now-indicator";
 import { ResizeHandle } from "@fragiola/calendar-react/resize";
 import { Selection } from "@fragiola/calendar-react/selection";
-import { type ReactNode, useState } from "react";
+import { type ReactNode, useCallback, useState } from "react";
 
 /** The fixtures' "now": Thursday 2026-11-26, 12:00 in New York. */
 export const NOW = Date.parse("2026-11-26T12:00:00-05:00");
@@ -118,12 +120,9 @@ export function Toolbar() {
     );
 }
 
-function DayHeader(props: { date: string }) {
-    return (
-        <Calendar.ColumnHeader date={props.date}>
-            {props.date}
-        </Calendar.ColumnHeader>
-    );
+/** A column's header: its date (a module function, so it is stable). */
+function header(date: string) {
+    return <Calendar.ColumnHeader date={date}>{date}</Calendar.ColumnHeader>;
 }
 
 function Month(props: {
@@ -131,53 +130,49 @@ function Month(props: {
     count?: RenderCount | undefined;
 }) {
     const { parts, count } = props;
+    // stable (`useCallback`): a row is called again only when its layout changes (the stress
+    // fixture's counters prove it)
+    const renderWeek = useCallback(
+        (week: DayGridWeek) => {
+            count?.(`week ${week.id}`);
+            return (
+                <Calendar.Week week={week}>
+                    <Calendar.Days>
+                        {(day) => (
+                            <Calendar.Day day={day}>
+                                <span aria-hidden="true">
+                                    {day.date.slice(8)}
+                                </span>
+                                <Calendar.DayEvents>
+                                    {(segment) => (
+                                        <Calendar.Segment
+                                            segment={segment}
+                                            aria-label={segment.occurrenceId}
+                                        >
+                                            <Title {...segment} />
+                                            {parts.resize ? (
+                                                <ResizeHandle edge="end" />
+                                            ) : null}
+                                        </Calendar.Segment>
+                                    )}
+                                </Calendar.DayEvents>
+                                <Calendar.More>
+                                    {(state) => `+${state.hiddenCount} more`}
+                                </Calendar.More>
+                            </Calendar.Day>
+                        )}
+                    </Calendar.Days>
+                    {parts.selection ? <Selection /> : null}
+                    {parts.drag || parts.resize ? <DragPreview /> : null}
+                </Calendar.Week>
+            );
+        },
+        [parts, count],
+    );
     return (
         <Calendar.DayGrid aria-label="Month">
-            <Calendar.ColumnHeaders>
-                {(date) => <DayHeader date={date} />}
-            </Calendar.ColumnHeaders>
-            <Calendar.Weeks>
-                {(week) => {
-                    count?.(`week ${week.id}`);
-                    return (
-                        <Calendar.Week week={week}>
-                            <Calendar.Days>
-                                {(day) => (
-                                    <Calendar.Day day={day}>
-                                        <span aria-hidden="true">
-                                            {day.date.slice(8)}
-                                        </span>
-                                        <Calendar.DayEvents>
-                                            {(segment) => (
-                                                <Calendar.Segment
-                                                    segment={segment}
-                                                    aria-label={
-                                                        segment.occurrenceId
-                                                    }
-                                                >
-                                                    <Title {...segment} />
-                                                    {parts.resize ? (
-                                                        <ResizeHandle edge="end" />
-                                                    ) : null}
-                                                </Calendar.Segment>
-                                            )}
-                                        </Calendar.DayEvents>
-                                        <Calendar.More>
-                                            {(state) =>
-                                                `+${state.hiddenCount} more`
-                                            }
-                                        </Calendar.More>
-                                    </Calendar.Day>
-                                )}
-                            </Calendar.Days>
-                            {parts.selection ? <Selection /> : null}
-                            {parts.drag || parts.resize ? (
-                                <DragPreview />
-                            ) : null}
-                        </Calendar.Week>
-                    );
-                }}
-            </Calendar.Weeks>
+            <Calendar.ColumnHeaders>{header}</Calendar.ColumnHeaders>
+            <Calendar.Weeks>{renderWeek}</Calendar.Weeks>
         </Calendar.DayGrid>
     );
 }
@@ -187,11 +182,38 @@ function TimeGrid(props: {
     count?: RenderCount | undefined;
 }) {
     const { parts, count } = props;
+    // stable (`useCallback`), as the month's rows: a column is called again only when its layout
+    // changes
+    const renderColumn = useCallback(
+        (column: TimeGridColumn) => {
+            count?.(`column ${column.date}`);
+            return (
+                <Calendar.Column column={column}>
+                    {parts.businessHours ? <BusinessHours /> : null}
+                    <Calendar.ColumnEvents>
+                        {(segment) => (
+                            <Calendar.TimeEvent
+                                segment={segment}
+                                aria-label={segment.occurrenceId}
+                            >
+                                <Title {...segment} />
+                                {parts.resize ? (
+                                    <ResizeHandle edge="end" />
+                                ) : null}
+                            </Calendar.TimeEvent>
+                        )}
+                    </Calendar.ColumnEvents>
+                    {parts.selection ? <Selection /> : null}
+                    {parts.drag || parts.resize ? <DragPreview /> : null}
+                    {parts.now && column.today ? <NowIndicator /> : null}
+                </Calendar.Column>
+            );
+        },
+        [parts, count],
+    );
     return (
         <Calendar.TimeGrid aria-label="Week">
-            <Calendar.ColumnHeaders>
-                {(date) => <DayHeader date={date} />}
-            </Calendar.ColumnHeaders>
+            <Calendar.ColumnHeaders>{header}</Calendar.ColumnHeaders>
             <Calendar.AllDayRow>
                 {(day) => (
                     <Calendar.Day day={day}>
@@ -227,40 +249,7 @@ function TimeGrid(props: {
                             </Calendar.SlotRow>
                         )}
                     </Calendar.SlotRows>
-                    <Calendar.Columns>
-                        {(column) => {
-                            count?.(`column ${column.date}`);
-                            return (
-                                <Calendar.Column column={column}>
-                                    {parts.businessHours ? (
-                                        <BusinessHours />
-                                    ) : null}
-                                    <Calendar.ColumnEvents>
-                                        {(segment) => (
-                                            <Calendar.TimeEvent
-                                                segment={segment}
-                                                aria-label={
-                                                    segment.occurrenceId
-                                                }
-                                            >
-                                                <Title {...segment} />
-                                                {parts.resize ? (
-                                                    <ResizeHandle edge="end" />
-                                                ) : null}
-                                            </Calendar.TimeEvent>
-                                        )}
-                                    </Calendar.ColumnEvents>
-                                    {parts.selection ? <Selection /> : null}
-                                    {parts.drag || parts.resize ? (
-                                        <DragPreview />
-                                    ) : null}
-                                    {parts.now && column.today ? (
-                                        <NowIndicator />
-                                    ) : null}
-                                </Calendar.Column>
-                            );
-                        }}
-                    </Calendar.Columns>
+                    <Calendar.Columns>{renderColumn}</Calendar.Columns>
                 </div>
             </Calendar.Scroller>
         </Calendar.TimeGrid>

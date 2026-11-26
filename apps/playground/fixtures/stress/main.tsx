@@ -12,8 +12,9 @@ import "../../src/fixture/fixture.css";
 
 // The stress fixture: every feature and 2 000 events over the weeks around 2026-11-26 (about 70 a
 // day in the month, 40 a day in the week). Each week row's and each column's children function
-// counts its calls in `window.renders` (`week <id>`, `column <date>`): moving one event re-renders
-// only the rows or columns it touches (e2e/stress.spec.ts).
+// (stable: `useCallback` in src/fixture/calendar.tsx) counts its calls in `window.renders`
+// (`week <id>`, `column <date>`): moving one event re-renders only the rows or columns it touches
+// (e2e/stress.spec.ts).
 
 const FIRST_DAY = Date.UTC(2026, 9, 25);
 
