@@ -195,6 +195,36 @@ describe("the primitive contract", () => {
         expect(calls).toEqual(["2026-12-01"]);
     });
 
+    it("hands the element to a new ref object when the consumer swaps it, and clears the old one", () => {
+        const model = modelOf([], {
+            view: { type: "month", anchorDate: "2026-11-26" },
+        });
+        const first = React.createRef<HTMLElement>();
+        const second = React.createRef<HTMLElement>();
+        const calls: (string | null)[] = [];
+        const callback = (element: HTMLElement | null) => {
+            calls.push(element?.tagName ?? null);
+        };
+        const { rerender } = render(
+            <Calendar.Root model={model}>
+                <Calendar.Next ref={first} />
+                <Calendar.Today ref={callback} />
+            </Calendar.Root>,
+        );
+        expect(first.current?.tagName).toBe("BUTTON");
+        calls.length = 0;
+        rerender(
+            <Calendar.Root model={model}>
+                <Calendar.Next ref={second} />
+                <Calendar.Today ref={(element) => callback(element)} />
+            </Calendar.Root>,
+        );
+        expect(first.current).toBeNull();
+        expect(second.current?.tagName).toBe("BUTTON");
+        // a new inline callback ref does not detach and re-attach the element
+        expect(calls).toEqual([]);
+    });
+
     it("resolves className and style functions against the state", () => {
         const model = modelOf([], {
             view: { type: "month", anchorDate: "2026-11-26" },
