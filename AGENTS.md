@@ -24,8 +24,8 @@ the core**.
 | `site` | `site`, private | the site export (fragiola.com/calendar, contract v1.7): `project.json`, `examples.json`, `export.ts`, `contract.ts`, `dev.ts`, `dev-proxy.ts`, `sources.ts`, the docs (`site/docs`), and the repository's script tests (Issue #9) | |
 
 `packages/core`, `packages/react`, `packages/vue`, `packages/angular`, `apps/playground`,
-`examples/shared`, `examples/react`, `examples/vue` and `site` exist; the Angular examples come with
-Issue #15.
+`examples/shared`, `examples/react`, `examples/vue`, `examples/angular` and `site` exist: v1 is
+complete in its three frameworks (Epic #16).
 
 ## Non-negotiable rules
 
@@ -452,8 +452,8 @@ drag and ranges; RFC 5545 for recurrence; FullCalendar's documented default for 
   model's features takes a type annotation (`CalendarEngineEventOf<"select">`), as Tree's.
 - **Issue #7, package check.** `ADAPTERS` lists React: its tarball pins the core exactly and
   exports every feature subpath; the smoke app (Vite + React, strict, no `skipLibCheck`) takes its
-  pins from `examples/react` once it exists, the adapter's own until then (react 19.3.1, vite
-  8.3.8: `../primitives`'). The bundle guard already reads every package's main entry.
+  pins from `examples/react` (react 19.3.1, vite 8.3.8: `../primitives`'; the fallback to the
+  adapter's own pins is gone since Issue #15). The bundle guard already reads every package's main entry.
 
 - **Issue #8, accessibility (D12 settled).** axe (`@axe-core/playwright`) reports no violation on
   the month, week, day and list views (the playground's `a11y.spec.ts`). The time grid's lists of
@@ -568,7 +568,7 @@ drag and ranges; RFC 5545 for recurrence; FullCalendar's documented default for 
   `--port 5192`, `DEV_PORT`), `dev-proxy.ts`, `sources.ts`; `site/examples.json` names the levels
   (`basics`, `interaction`, `data`, `apps`: the shared categories, checked equal) and the five themes
   in switcher order, whose titles, swatches and CSS come from `examples/shared`. `project.json`:
-  `frameworks: ["react", "vue"]` (Vue since Issue #12), no `registry`, no `create`, eight keywords. Not registered in
+  `frameworks: ["react", "vue", "angular"]` (Vue since Issue #12, Angular since Issue #15), no `registry`, no `create`, eight keywords. Not registered in
   `../www/projects.json` and no `Trigger www build` job (after the user validates the library).
 - **Issue #9, the docs.** Dockable's IA: Getting started (5), Concepts (12, with a glossary),
   Guides (24: the Epic's list plus "+N more", controlled state and performance), API: primitives
@@ -652,6 +652,53 @@ drag and ranges; RFC 5545 for recurrence; FullCalendar's documented default for 
   `WeekNumber` rendered without it warns once. The playground's `?weeks=1` renders them (axe in
   `a11y.spec.ts`), and the shared `locale-and-week-numbers` spec checks the numbering.
 
+- **Issue #15, the Angular examples.** `examples/angular` (`examples-angular`) follows Tree's
+  Angular app (Vite + `@analogjs/vite-plugin-angular`, zoneless: no zone.js, the embed bootstrapped
+  with `provideZonelessChangeDetection()`): every example id as `src/examples/<id>/index.ts`, a
+  standalone component with an inline template, its default export; `styles.ts` is Vue's (the
+  Angular package's types, "read by the components": compared), React's framework-free siblings and
+  `_kit/` copied with the package's name changed (compared). The model is the example component's
+  own field, so its template reads it directly; a sibling component sits on the part's element as
+  an attribute (`[weekDayHeader]`, `<div weekToolbar>`), so no element of Angular's comes between
+  the calendar's parts (a `first:` class still matches), and reads the calendar through the
+  injection functions. A look that is a function of a part's state reads the directive's state
+  signal: `#event="calendarSegment" [class]="event.state() && styles.segment(event.state()!)"`
+  (`undefined` until its input is set). Text sits next to its tags. Pins: TypeScript 6.0.3 (this
+  app and the package only), Angular 22.2.6, `@angular/build` 22.2.7, Analog 2.9.7 (the package's),
+  rxjs 7.8.2, `@lucide/angular` 1.75.0 (lucide-react's version); the rest as `examples/react`.
+- **Issue #15, the Angular kit.** `src/components` holds Fragiola UI's pieces the examples import
+  as standalone directives and components on native elements (no headless library: Angular Aria
+  and the CDK have neither this select nor this date picker), with the React kit's classes and
+  `data-slot`s and Base UI's state attributes: `button[kitButton]`, `input[kitInput]`
+  (`[(value)]`), `[kitField]` and its parts, `ng-template[kitDialog]` (`[(open)]`: renders its
+  parts into a `data-slot="dialog-portal"` element appended to `<body>` only while open, which the
+  embed's overlay promotion watches; focus to `[autofocus]` or the first tabbable, Tab kept inside,
+  Escape and a press outside close), `[kitPopover]` with `kitPopoverTrigger` and
+  `kit-popover-content` (moved to `<body>` while open and placed against the trigger;
+  `(openChange)` tells `{ open, reason }`, Base UI's reasons), `[kitSelect]` (a select-only
+  combobox, its listbox placed fixed under the trigger, inside the dialog), `button[kitCheckbox]`,
+  `[kitSegmentedControl]` (an APG radio group with its measured indicator) and `kit-date-picker`
+  (the date picker over `{ year, month, day }`). The families, `cn` and the theme are copies
+  (`tests/vendored.test.ts`); `tests/kit.test.ts` renders each piece in a zoneless TestBed. A
+  group item's `value` is `input("")`, not `input.required`: the group reads a sibling's value
+  before its inputs are set (NG0950).
+- **Issue #15, "+N more" pressed while open.** The kit's popover trigger toggles, as Base UI's; the
+  more-events example ignores a close whose reason is `trigger-press` (React cancels it), so the
+  engine's `more-click` keeps the popover open, as the shared spec checks. No adapter change.
+- **Issue #15, the suite, the site and CI.** Angular is in `COMPLETE_FRAMEWORKS`: every shared spec
+  runs unchanged against the Angular embed, none skipped, and no spec needed an adapter fix or a
+  neutral rewrite. `project.json` lists `angular`; every docs page with framework code has a
+  `<Framework name="angular">` variant after its Vue one, and `api/angular.mdx` ("Angular
+  primitives") maps React's props to directives, inputs, outputs and templates, and lists every
+  directive (main entry and features), the root's inputs and outputs and the injection functions
+  (`docs-reference.test.ts`, "the Angular reference"; a neutral snippet that names one adapter
+  names all three). The CI examples matrix finds `examples/angular` by its `playwright.config.ts`;
+  `Changes` selects only it for a change confined to `packages/angular` or `examples/angular`
+  (`e2e-suites.test.ts`); `ci-workflow.test.ts` sees its Playwright pin. `check:package`'s smoke
+  apps take every pin from their examples app. Measured locally (4 workers): the playground's 47
+  tests in 39 s, examples react's 235 in 1.3 min, examples vue's 235 in 1.0 min, examples
+  angular's 235 in 1.2 min.
+
 ## Commands
 
 | command | does |
@@ -661,8 +708,8 @@ drag and ranges; RFC 5545 for recurrence; FullCalendar's documented default for 
 | `pnpm check:layout` | the source layout check (`scripts/check-layout.ts`, from Dockable): every tracked name kebab-case, a package's `src/` root holds only its entries |
 | `pnpm check:commands` | builds the core, then `packages/core/scripts/generate-command-docs.ts --check`: fails when `site/docs/api/commands.mdx` drifts from the command catalogue (`pnpm --filter @fragiola/calendar generate:commands` rewrites it) |
 | `pnpm check:fix` | Biome check with auto-fix |
-| `pnpm typecheck` | `pnpm -r typecheck` (TypeScript 7, no emit; `packages/vue`: `vue-tsc` on TypeScript 6.0.3, its `.vue` type fixtures included; `packages/angular`: `ngc` strict templates on TypeScript 6.0.3, its tests included) |
-| `pnpm test` | Vitest projects: `core (TZ=UTC)` and `core (TZ=America/Sao_Paulo)` (the core's suite twice, host zone forced, same expectations; node, jsdom per file with a docblock), `react` (jsdom + Testing Library over a fake layout, `TZ=UTC`; a server render in node), `vue` (jsdom + `@vue/test-utils` over the same fake layout, templates compiled at runtime by Vue's full build; a server render in node), `playground` (its catalog and scenarios), `examples-shared` (metadata, themes, manifest, loaders), `examples-react` (copyable imports, styles, kit, themes), `angular` (jsdom + a zoneless TestBed with Analog's plugin over the same fake layout, `TZ=UTC`; a server render through `@angular/platform-server` in node), `examples-vue` (the same contract for the Vue examples, styles and kit equal to React's, the copied theme, the Vue kit in jsdom), `site` (the export's contract, the docs reference, frameworks, the dev proxy, and the repository's script tests) |
+| `pnpm typecheck` | `pnpm -r typecheck` (TypeScript 7, no emit; `packages/vue`: `vue-tsc` on TypeScript 6.0.3, its `.vue` type fixtures included; `packages/angular`: `ngc` strict templates on TypeScript 6.0.3, its tests included; `examples/angular`: `ngc` strict templates on TypeScript 6.0.3, the adapter's sources included) |
+| `pnpm test` | Vitest projects: `core (TZ=UTC)` and `core (TZ=America/Sao_Paulo)` (the core's suite twice, host zone forced, same expectations; node, jsdom per file with a docblock), `react` (jsdom + Testing Library over a fake layout, `TZ=UTC`; a server render in node), `vue` (jsdom + `@vue/test-utils` over the same fake layout, templates compiled at runtime by Vue's full build; a server render in node), `playground` (its catalog and scenarios), `examples-shared` (metadata, themes, manifest, loaders), `examples-react` (copyable imports, styles, kit, themes), `angular` (jsdom + a zoneless TestBed with Analog's plugin over the same fake layout, `TZ=UTC`; a server render through `@angular/platform-server` in node), `examples-vue` (the same contract for the Vue examples, styles and kit equal to React's, the copied theme, the Vue kit in jsdom), `examples-angular` (the same contract for the Angular examples, styles equal to Vue's, kit and theme equal to React's, the Angular kit in a zoneless TestBed), `site` (the export's contract, the docs reference, frameworks, the dev proxy, and the repository's script tests) |
 | `pnpm build` | `pnpm -r build` (tsdown), then `scripts/check-dts.ts` (no `any` in the built declarations) and `scripts/check-features.ts` (the bundle guard) |
 | `pnpm size` | the bundle size of every entry point (raw, gzip, min + gzip): a report, after `pnpm build` |
 | `pnpm check:package` | builds the packages, packs them with pnpm, checks the packed `exports` are the repo's without the source condition (only `types`/`import`/`default`, targets in `dist`), runs `publint --strict` and `attw --profile esm-only` on the tarballs, fails on a package neither the core nor in `ADAPTERS`, and runs each adapter's pin check and smoke app (`scripts/check-package.ts`) |
@@ -673,7 +720,8 @@ drag and ranges; RFC 5545 for recurrence; FullCalendar's documented default for 
 | `pnpm --filter examples-react dev` | the embed alone (port 5192, `PORT`; `?id=<slug>&theme=<name>`) |
 | `pnpm --filter examples-react vendor` | re-vendors Fragiola UI (`FRAGIOLA_REGISTRY`) |
 | `pnpm --filter examples-vue dev` | the Vue embed alone (port 5192, `PORT`; `?id=<slug>&theme=<name>`) |
-| `pnpm site:export --base /calendar --out <dir>` | builds the packages and every framework's embed of `project.json` (`<base>/embed/<framework>/`: React, Vue), writes `project.json`, `docs/`, `examples.json` and the manifest, then validates the output against `../www/CONTRACT.md` v1.7 (`site/contract.ts`) and exits non-zero on any problem; it only deletes `--out` when it holds a previous export |
+| `pnpm --filter examples-angular dev` | the Angular embed alone (port 5192, `PORT`; `?id=<slug>&theme=<name>`) |
+| `pnpm site:export --base /calendar --out <dir>` | builds the packages and every framework's embed of `project.json` (`<base>/embed/<framework>/`: React, Vue, Angular), writes `project.json`, `docs/`, `examples.json` and the manifest, then validates the output against `../www/CONTRACT.md` v1.7 (`site/contract.ts`) and exits non-zero on any problem; it only deletes `--out` when it holds a previous export |
 | `pnpm site:dev [--base /calendar] [--port 5192]` | every framework's embed dev server (hot reload, the packages' sources) behind one Node proxy (`site/dev-proxy.ts`) on port 5192, which `www` in dev proxies under `/calendar/embed/**`; each embed serves its `manifest.json` |
 
 ## CI
@@ -726,6 +774,10 @@ examples/shared/    examples-shared      src/meta/<slug>.ts, src/themes/, src/em
                                          (finder, manifest, loaders), e2e/ (every spec), tests/
 examples/react/     examples-react       src/examples/<slug>/ and _kit/, src/components (vendored Fragiola UI),
                                          src/embed/ (main, overlay promotion), scripts/vendor-fragiola.ts, tests/
+examples/angular/   examples-angular     src/examples/<slug>/ (index.ts, sibling components, Vue's styles.ts) and _kit/
+                                         (React's), src/components (the Angular kit, standalone directives and
+                                         components), src/styles and src/lib/cn.ts (copied), src/embed/ (main,
+                                         zoneless, overlay promotion), tests/
 examples/vue/       examples-vue         src/examples/<slug>/ (index.vue, sibling SFCs, React's styles.ts) and _kit/
                                          (React's), src/components (the Vue kit over Reka UI), src/styles and
                                          src/lib/cn.ts (copied), src/embed/ (main, overlay promotion), tests/
@@ -1043,5 +1095,5 @@ directive binds its React primitive's part.
   entry and the `internal` entry, and a source map naming an entry point's `<subpath>/` folder.
   `check:package`'s Angular smoke app: a zoneless Vite + Analog app of standalone components
   (`CALENDAR`, every feature's directives, the typed root, `[(view)]`, `(rangeSelect)`), checked by
-  `ngc` strict templates, built and loaded through its dev server; its pins examples/angular's once
-  it exists, the adapter's until then.
+  `ngc` strict templates, built and loaded through its dev server; every pin examples/angular's
+  (Issue #15: every adapter has its examples app, so a pin missing from it fails).

@@ -58,6 +58,10 @@ in sidebar order; the site export contract calls a category a `level`).
    `data-calendar-part`, `data-date`, `data-time`, roles, accessible names and test ids, so every
    framework's embed runs it unchanged. The specs run on a fixed clock (Thursday 2026-11-26, 12:00
    in New York), so "this week" is the week of 2026-11-22.
+4. Write it in Vue and in Angular (`examples/vue/src/examples/README.md`,
+   `examples/angular/src/examples/README.md`): every framework is complete
+   (`COMPLETE_FRAMEWORKS`), so a React example without its counterparts fails their
+   `tests/examples.test.ts` and its spec fails for them.
 
 ## Anatomy of an example
 
