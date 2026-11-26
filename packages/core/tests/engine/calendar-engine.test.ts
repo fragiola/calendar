@@ -147,6 +147,23 @@ describe("the roving focus (D12)", () => {
         expect(focusedKey()).toBe("day 2026-12-17");
     });
 
+    it("lands PageDown on a shown day of the month when the target is hidden", () => {
+        m = mount({
+            view: { type: "month", anchorDate: "2026-11-26" },
+            settings: { hiddenDays: [0, 6] },
+        });
+        m.engine.run("focus", { date: "2026-11-26" });
+        // 2026-12-26 is a Saturday: the next shown day of December
+        m.key("PageDown");
+        expect(m.model.get("current-range").start).toBe("2026-12-01");
+        expect(focusedKey()).toBe("day 2026-12-28");
+        // 2027-01-31 is a Sunday whose next shown day leaves January: the previous one
+        m.engine.run("focus", { date: "2026-12-31" });
+        m.key("PageDown");
+        expect(m.model.get("current-range").start).toBe("2027-01-01");
+        expect(focusedKey()).toBe("day 2027-01-29");
+    });
+
     it("stays where it is when validRange refuses the navigation", () => {
         m = mount({
             view: { type: "month", anchorDate: "2026-11-26" },

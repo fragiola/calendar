@@ -40,6 +40,87 @@ describe("the structural touch-action (D18)", () => {
     });
 });
 
+describe("gestures that cannot get stuck (D14)", () => {
+    it("ends a keyboard grab when its event is removed", () => {
+        const m = mount({
+            events: [
+                allDay("a", "2026-11-26", "2026-11-27"),
+                allDay("b", "2026-11-24", "2026-11-25"),
+            ],
+            view: month,
+            features: [dragAndDrop()],
+        });
+        m.engine.run("focus", { occurrenceId: "a" });
+        m.key(" ");
+        m.key("ArrowRight");
+        expect(m.engine.is("gesture-active")).toBe(true);
+        m.model.run("event.remove", { eventId: "a" });
+        expect(m.engine.is("gesture-active")).toBe(false);
+        expect(m.engine.get("drag-preview")).toBeNull();
+        expect(m.events).toContainEqual({
+            type: "announce",
+            announcement: { kind: "drag-cancel", occurrenceId: "a" },
+        });
+        m.engine.run("focus", { occurrenceId: "b" });
+        m.key(" ");
+        expect(m.engine.is("event-grabbed", { occurrenceId: "b" })).toBe(true);
+    });
+
+    it("closes a press no feature claims when it is released outside the root", () => {
+        const m = mount({
+            events: [allDay("a", "2026-11-26", "2026-11-27")],
+            view: month,
+            features: [dragAndDrop()],
+        });
+        m.pointer(
+            "pointerdown",
+            m.dayPoint("2026-11-24"),
+            m.element("day 2026-11-24"),
+        );
+        expect(m.engine.is("gesture-active")).toBe(true);
+        m.pointer("pointerup", { x: 2000, y: 2000 }, document.body);
+        expect(m.engine.is("gesture-active")).toBe(false);
+        m.engine.run("focus", { occurrenceId: "a" });
+        m.key(" ");
+        expect(m.engine.is("event-grabbed", { occurrenceId: "a" })).toBe(true);
+    });
+
+    it("measures again when the page scrolls during a drag", () => {
+        const m = mount({
+            events: [allDay("a", "2026-11-26", "2026-11-27")],
+            view: month,
+            features: [dragAndDrop()],
+        });
+        const event = m.element("event a 2026-11-26");
+        const start = m.center("event a 2026-11-26");
+        const at = m.dayPoint("2026-11-28");
+        m.pointer("pointerdown", start, event);
+        m.pointer("pointermove", at, event);
+        expect(m.engine.get("drag-preview")).toMatchObject({
+            start: "2026-11-28",
+        });
+        // the page scrolls a row (100 px): every box moves up under the still pointer
+        for (const element of [m.root, ...m.root.querySelectorAll("*")]) {
+            const box = element.getBoundingClientRect.bind(element);
+            element.getBoundingClientRect = () => {
+                const r = box();
+                return {
+                    ...r,
+                    y: r.y - 100,
+                    top: r.top - 100,
+                    bottom: r.bottom - 100,
+                } as DOMRect;
+            };
+        }
+        document.dispatchEvent(new Event("scroll"));
+        expect(m.engine.get("drag-preview")).toMatchObject({
+            start: "2026-12-05",
+        });
+        m.pointer("pointerup", at, event);
+        expect(m.model.get("event-by", { id: "a" })?.start).toBe("2026-12-05");
+    });
+});
+
 describe("a pointer drag (D14)", () => {
     it("starts past the threshold, previews as view state and drops one event.move", () => {
         const m = mount({

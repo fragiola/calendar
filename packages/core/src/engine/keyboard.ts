@@ -58,9 +58,22 @@ function nextShown(
     );
 }
 
-function months(date: string, count: number): string {
+/** The same day `count` months on, moved to a shown day of that month when it is hidden. */
+function months(
+    date: string,
+    count: number,
+    hidden: readonly Weekday[],
+): string {
     const parsed = parsePlainDate(date);
-    return parsed.ok ? formatPlainDate(addMonths(parsed.value, count)) : date;
+    if (!parsed.ok) return date;
+    const target = addMonths(parsed.value, count);
+    const day = toEpochDay(target);
+    const later = fromEpochDay(skipHidden(day, 1, hidden));
+    const shown =
+        later.month === target.month
+            ? later
+            : fromEpochDay(skipHidden(day, -1, hidden));
+    return formatPlainDate(shown);
 }
 
 function withDate(cell: CellPosition, date: string): CellPosition {
@@ -148,7 +161,11 @@ export function keyTarget(
             const forward = event.key === "PageDown" ? 1 : -1;
             if (month) {
                 return to(
-                    months(cell.date, forward * (event.shiftKey ? 12 : 1)),
+                    months(
+                        cell.date,
+                        forward * (event.shiftKey ? 12 : 1),
+                        grid.hiddenDays,
+                    ),
                 );
             }
             if (event.shiftKey) return to(shift(cell.date, forward * 7));

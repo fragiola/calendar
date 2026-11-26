@@ -275,6 +275,7 @@ class Engine<T extends CalendarTypes, F extends CalendarFeatures> {
             }
             if (this.keyGesture?.active?.() === false) {
                 this.keyGesture = undefined;
+                this.notify({ gesture: true });
             }
         });
         this.scheduleMidnight();
@@ -875,7 +876,13 @@ class Engine<T extends CalendarTypes, F extends CalendarFeatures> {
             const navigated = this.model.run("view.go-to", {
                 date: target.cell.date,
             });
-            if (!navigated.ok || !this.shown(target.cell)) return true;
+            if (!navigated.ok) return true;
+            if (!this.shown(target.cell)) {
+                // focus stays in the grid: on the view's tab stop, never lost to the page
+                const stop = this.tabStop();
+                if (stop) this.focusOn(stop);
+                return true;
+            }
         }
         this.focusOn(target.cell);
         return true;
@@ -1025,6 +1032,20 @@ class Engine<T extends CalendarTypes, F extends CalendarFeatures> {
                 },
             ],
             [doc, "dragend", (event) => this.nativeDrag(event as DragEvent)],
+            // a press without a gesture captures no pointer: its release outside the root is
+            // heard here, or the press would stay open and keep the features' keys off
+            [
+                doc,
+                "pointerup",
+                (event) => this.pointerOutside(event as PointerEvent),
+            ],
+            [
+                doc,
+                "pointercancel",
+                (event) => this.pointerOutside(event as PointerEvent),
+            ],
+            // the page or an outer container scrolled: the measured boxes moved under the press
+            [doc, "scroll", (event) => this.scrolledOutside(event), true],
             [
                 doc,
                 "keydown",
@@ -1143,6 +1164,33 @@ class Engine<T extends CalendarTypes, F extends CalendarFeatures> {
         // boxes are cached for one press only: outside it the page may scroll or reflow freely
         if (!this.press) this.geometry = undefined;
         return pointAt(this.measuredGeometry(), clientX, clientY, this.axis());
+    }
+
+    private outsideRoot(target: EventTarget | null): boolean {
+        const root = this.rootElement;
+        return (
+            root !== undefined &&
+            !(
+                target !== null &&
+                "nodeType" in target &&
+                root.contains(target as Node)
+            )
+        );
+    }
+
+    private pointerOutside(event: PointerEvent): void {
+        const press = this.press;
+        if (
+            press &&
+            press.pointerId === event.pointerId &&
+            this.outsideRoot(event.target)
+        ) {
+            this.cancelPress();
+        }
+    }
+
+    private scrolledOutside(event: Event): void {
+        if (this.press && this.outsideRoot(event.target)) this.scrolled();
     }
 
     private scrolled(): void {

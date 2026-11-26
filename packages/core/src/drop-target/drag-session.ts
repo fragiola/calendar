@@ -323,7 +323,18 @@ export class DragSession {
                 end();
                 this.cancelled();
             },
-            active: () => !done,
+            active: () => {
+                // the grabbed occurrence went away (removed, or no longer shown): the grab ends
+                // with it, or it would outlive its event with no focus to hear Escape
+                if (
+                    !done &&
+                    host.occurrence(occurrence.occurrenceId) === undefined
+                ) {
+                    end();
+                    this.cancelled();
+                }
+                return !done;
+            },
             keydown: (event) => {
                 if (done) return false;
                 const rtl = host.direction() === "rtl";
