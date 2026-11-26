@@ -19,9 +19,9 @@ import {
     readProject,
 } from "../sources.ts";
 
-// The export handles any number of frameworks (the calendar ships React; Vue and Angular come with
-// their Epics): one manifest and one embed per framework of project.json, each from its own app. A
-// fake Vue app (two examples) stands in for a second one.
+// The export handles any number of frameworks (the calendar ships React, Vue and Angular): one
+// manifest and one embed per framework of project.json, each from its own app. A fake Vue app (two
+// examples) stands in for a framework that ships a subset.
 
 let dirs: string[] = [];
 afterEach(() => {
@@ -54,7 +54,11 @@ const appOf = (vue: ExamplesApp) => (framework: Framework) =>
 describe("the frameworks of project.json", () => {
     it("are known frameworks; an unknown one throws", () => {
         // another framework is one more app and one more name
-        expect(frameworksOf(readProject())).toEqual(["react", "vue"]);
+        expect(frameworksOf(readProject())).toEqual([
+            "react",
+            "vue",
+            "angular",
+        ]);
         expect(frameworksOf({ frameworks: ["react", "vue"] })).toEqual([
             "react",
             "vue",
@@ -65,7 +69,9 @@ describe("the frameworks of project.json", () => {
     });
 
     it("each get an embed under <base>/embed/<framework>/ and <out>/embed/<framework>", () => {
-        expect(embedBuilds(["react", "vue"], "/calendar", "/out")).toEqual([
+        expect(
+            embedBuilds(["react", "vue", "angular"], "/calendar", "/out"),
+        ).toEqual([
             {
                 framework: "react",
                 package: "examples-react",
@@ -77,6 +83,12 @@ describe("the frameworks of project.json", () => {
                 package: "examples-vue",
                 base: "/calendar/embed/vue/",
                 dir: "/out/embed/vue",
+            },
+            {
+                framework: "angular",
+                package: "examples-angular",
+                base: "/calendar/embed/angular/",
+                dir: "/out/embed/angular",
             },
         ]);
     });
@@ -92,6 +104,22 @@ describe("the frameworks of project.json", () => {
         expect(vue?.examples[0]?.files).toEqual(["month/index.vue"]);
         expect(vue?.examples[0]?.packages).toEqual(["@fragiola/calendar-vue"]);
         expect(manifests.get("react")?.examples.length ?? 0).toBeGreaterThan(2);
+    });
+
+    it("give Angular every React example, its index.ts first, with the Angular packages", async () => {
+        const manifests = await buildManifests(
+            ["react", "angular"],
+            examplesApp,
+        );
+        const react = manifests.get("react")?.examples ?? [];
+        const angular = manifests.get("angular")?.examples ?? [];
+        expect(angular.map((e) => e.id)).toEqual(react.map((e) => e.id));
+        for (const example of angular) {
+            expect(example.files[0]).toBe(`${example.id}/index.ts`);
+            expect(example.packages).toContain("@fragiola/calendar-angular");
+            expect(example.packages).not.toContain("@fragiola/calendar");
+        }
+        expect(angular.flatMap((e) => e.packages)).toContain("@lucide/angular");
     });
 
     it("validate as an export with several frameworks, each embed checked on its own", async () => {

@@ -135,7 +135,7 @@ describe("project.json", () => {
             contract: 1,
             slug: "calendar",
             title: "Calendar",
-            frameworks: ["react", "vue"],
+            frameworks: ["react", "vue", "angular"],
             defaultFramework: "react",
             repository: "https://github.com/fragiola/calendar",
         });
