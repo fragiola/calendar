@@ -53,6 +53,7 @@ import {
     type Queries,
     type QueryArgs,
 } from "../state/queries";
+import { registerClock } from "./model-clock";
 
 /** Options of {@link createCalendarModel}. */
 export interface CalendarModelOptions<
@@ -687,5 +688,6 @@ export function createCalendarModel<
     }
     const model = new Model<T, F>(loaded.state, ids, now, features);
     registerFeatures(model, features);
+    registerClock(model, now);
     return model;
 }

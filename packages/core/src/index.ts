@@ -87,8 +87,60 @@ export type {
     ValidationIssue,
     ValidationResult,
 } from "./document/validation-issue";
+// the engine: one view on screen (D11–D14, D16)
+export type {
+    CalendarEngineAdapter,
+    PartName,
+    PartPayloadMap,
+    ViewChange,
+} from "./engine/adapter";
+export {
+    type CalendarEngine,
+    type CalendarEngineOptions,
+    createCalendarEngine,
+} from "./engine/calendar-engine";
+export type {
+    EngineHost,
+    ResizeObserverConstructor,
+} from "./engine/engine-host";
+export type {
+    Announcement,
+    CalendarEngineEvent,
+    CalendarEngineEventType,
+} from "./engine/events";
+export type {
+    CellPosition,
+    EventPosition,
+    FocusPosition,
+    GridPoint,
+} from "./engine/grid-point";
+export type { KeyTarget } from "./engine/keyboard";
+export type {
+    DragPreview,
+    PreviewSegments,
+    PreviewTimes,
+} from "./engine/preview";
+export type {
+    EngineGetKey,
+    EngineGetMap,
+    EngineIsKey,
+    EngineIsMap,
+    EngineRunKey,
+    EngineRunMap,
+    ExternalEventDraft,
+    FocusTarget,
+    NowPosition,
+} from "./engine/verbs";
 // the feature registry (`architecture/features.md`): for feature authors
 export { defineFeature } from "./features/define-feature";
+export type {
+    FeatureEngine,
+    FeatureEngineHost,
+    FeatureGesture,
+    FeatureModel,
+    MutablePartAttributes,
+    PressTarget,
+} from "./features/engine-types";
 export { FEATURE_KEYS, type FeatureName } from "./features/keys";
 export type {
     AnyCalendarFeature,
@@ -99,6 +151,9 @@ export type {
     CalendarStateOf,
     EditRequest,
     EditWrite,
+    EngineGetKeyOf,
+    EngineIsKeyOf,
+    EngineRunKeyOf,
     EventChange,
     FeatureCommand,
     FeatureDocument,

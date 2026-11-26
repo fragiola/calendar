@@ -1,7 +1,7 @@
 // The model loads and runs in plain Node (D21, `model-api.md`): no DOM, no jsdom, no global
 // window or document, the clock injected.
 import { expect, it } from "vitest";
-import { createCalendarModel } from "../../src/index";
+import { createCalendarEngine, createCalendarModel } from "../../src/index";
 import { NOW } from "../fixture";
 
 it("loads, runs commands and lays out in plain Node", () => {
@@ -35,4 +35,16 @@ it("loads, runs commands and lays out in plain Node", () => {
     expect(model.get("day-grid")?.weeks).toHaveLength(1);
     expect(model.get("list").days).toHaveLength(1);
     expect(model.run("view.next", {}).ok).toBe(true);
+});
+
+it("creates an engine in plain Node: no DOM until a root is attached, no global timer", () => {
+    const model = createCalendarModel(undefined, { now: () => NOW });
+    const engine = createCalendarEngine(model);
+    expect(engine.get("tab-stop")).toEqual({ kind: "day", date: "2026-11-26" });
+    expect(engine.get("direction")).toBe("ltr");
+    expect(engine.run("measure")).toEqual({
+        ok: true,
+        value: { maxLanes: null },
+    });
+    engine.destroy();
 });

@@ -2,8 +2,8 @@
 // `createCalendarModel` (or a root's `features` prop), made by a factory exported from the
 // feature's own entry (`@fragiola/calendar/recurrence` → `recurrence()`). Every part is optional;
 // the core composes them once, when the model is created (`registry.ts`). Features talk to each
-// other only through keys. The engine's hook points (keys, presses, gestures) join with the engine
-// (Issue #5).
+// other only through keys. A feature's part of each engine (keys, presses, gestures) is its
+// `engine` (`engine-types.ts`).
 import type {
     CommandDefinition,
     Failure,
@@ -16,6 +16,7 @@ import type { ValidationIssue } from "../document/validation-issue";
 import type { Occurrence, OccurrenceWindow } from "../layout/occurrence";
 import type { CalendarState } from "../state/calendar-state";
 import type { Draft, DraftState } from "../state/draft";
+import type { FeatureEngine, FeatureEngineHost } from "./engine-types";
 import type { FeatureName, OwnedBy } from "./keys";
 
 export type { FeatureName } from "./keys";
@@ -224,6 +225,8 @@ export interface CalendarFeature<
     ): PartAttributes | undefined;
     /** the attributes the root gets, from the state alone */
     rootAttributes?(state: FeatureState): PartAttributes | undefined;
+    /** its part of each engine on the model (`createCalendarEngine`) */
+    engine?(host: FeatureEngineHost): FeatureEngine;
     /** the state slice's type, for `model.state` (never set) */
     readonly "~state"?: S;
 }
@@ -286,7 +289,13 @@ export type CalendarStateOf<
 > = CalendarState<T> & FeatureStateOf<F>;
 
 type Allowed<
-    Kind extends "commands" | "get" | "is",
+    Kind extends
+        | "commands"
+        | "get"
+        | "is"
+        | "engineRun"
+        | "engineGet"
+        | "engineIs",
     All extends string,
     F extends CalendarFeatures,
 > =
@@ -310,6 +319,24 @@ export type ModelIsKeyOf<
     F extends CalendarFeatures,
     All extends string,
 > = Allowed<"is", All, F>;
+
+/** The engine actions of an engine whose model has the features `F`: the core's and theirs. */
+export type EngineRunKeyOf<
+    F extends CalendarFeatures,
+    All extends string,
+> = Allowed<"engineRun", All, F>;
+
+/** The `engine.get` keys of an engine whose model has the features `F`. */
+export type EngineGetKeyOf<
+    F extends CalendarFeatures,
+    All extends string,
+> = Allowed<"engineGet", All, F>;
+
+/** The `engine.is` keys of an engine whose model has the features `F`. */
+export type EngineIsKeyOf<
+    F extends CalendarFeatures,
+    All extends string,
+> = Allowed<"engineIs", All, F>;
 
 /** An installed feature as `model.get("features")` lists it. */
 export interface CalendarFeatureInfo {

@@ -189,6 +189,18 @@ describe("core package guard", () => {
         expect(
             writes.filter((property) => !STRUCTURAL_PROPERTIES.has(property)),
         ).toEqual([]);
+        // and through setProperty / removeProperty, `touch-action` alone
+        const named = existsSync(file)
+            ? [
+                  ...readFileSync(file, "utf8").matchAll(
+                      /\.style\.(?:setProperty|removeProperty)\(\s*"([^"]+)"/g,
+                  ),
+              ].map(([, property]) => property)
+            : [];
+        expect(named.length).toBeGreaterThan(0);
+        expect(named.filter((property) => property !== "touch-action")).toEqual(
+            [],
+        );
     });
 
     it("has no ported code: no file names an upstream origin (Provenance)", () => {

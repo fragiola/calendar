@@ -5,16 +5,19 @@
 // that is not installed (a `not_found` result, a document issue naming the feature) and to type the
 // verbs from the installed features; the code of a feature lives only in its own entry
 // (`@fragiola/calendar/<feature>`), which nothing in the main entry imports. Each feature's Issue
-// fills its row (D2: #4 recurrence, constraints, event sources; #5 the interactive ones).
+// fills its row (D2: #4 recurrence, constraints, event sources; #5 the interactive ones, whose
+// engine keys are here too).
 
 /** Every feature's keys and fields. */
 export const FEATURE_KEYS = Object.freeze({
     selection: {
-        commands: [],
-        get: [],
+        // a range set or cleared (the engine's pointer and keyboard selection runs them)
+        commands: ["selection.set", "selection.clear"],
+        get: ["selected-range"],
         is: [],
         engineRun: [],
-        engineGet: [],
+        // the range a pointer or Shift + arrows is selecting, before it is set
+        engineGet: ["selection-preview"],
         engineIs: [],
         fields: [],
         eventFields: [],
@@ -27,8 +30,9 @@ export const FEATURE_KEYS = Object.freeze({
         get: [],
         is: [],
         engineRun: [],
-        engineGet: [],
-        engineIs: [],
+        // the moved occurrence where it would land (D14), shared with `externalDrop()`
+        engineGet: ["drag-preview"],
+        engineIs: ["event-dragging", "event-grabbed"],
         fields: [],
         eventFields: [],
         payloadFields: [],
@@ -40,8 +44,8 @@ export const FEATURE_KEYS = Object.freeze({
         get: [],
         is: [],
         engineRun: [],
-        engineGet: [],
-        engineIs: [],
+        engineGet: ["resize-preview"],
+        engineIs: ["event-resizing"],
         fields: [],
         eventFields: [],
         payloadFields: [],
@@ -69,7 +73,8 @@ export const FEATURE_KEYS = Object.freeze({
         get: [],
         is: [],
         engineRun: [],
-        engineGet: [],
+        // the current time's place in the time grid, from the model's clock
+        engineGet: ["now-position"],
         engineIs: [],
         fields: [],
         eventFields: [],
@@ -99,7 +104,12 @@ export const FEATURE_KEYS = Object.freeze({
         commands: [],
         get: [],
         is: [],
-        engineRun: [],
+        // an app-driven pointer drag from outside the calendar (D14)
+        engineRun: [
+            "external-drag-start",
+            "external-drag-move",
+            "external-drag-end",
+        ],
         engineGet: [],
         engineIs: [],
         fields: [],
