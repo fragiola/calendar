@@ -1,12 +1,117 @@
 // The public entry of `@fragiola/calendar`: the framework-free core. Every opt-in feature has an
 // entry of its own (`@fragiola/calendar/<feature>`) that this one never imports.
 
-// validation
+// layout (D11) and part attributes (D17)
+export type { EventAttributesPayload } from "./attributes/event-attributes";
+export type { EventPermissions } from "./commands/edit-rules";
+export {
+    type BatchEntry,
+    type BatchStep,
+    type CalendarUpdatePayload,
+    type CommandContext,
+    type CommandContextBase,
+    type CommandContextGetMap,
+    type CommandError,
+    type CommandErrorCode,
+    type CommandEvent,
+    type CommandInfo,
+    type CommandListener,
+    type CommandMap,
+    type CommandName,
+    type CommandResult,
+    type DateInput,
+    type EditScope,
+    type EventAddPayload,
+    type EventMovePayload,
+    type EventResizePayload,
+    type EventSetDataPayload,
+    type EventSetFlagsPayload,
+    type EventTimesResult,
+    type EventUpdatePayload,
+    type Middleware,
+    type MoveDelta,
+    type NoPayload,
+    type OccurrenceTarget,
+    type PayloadOf,
+    type ResultOf,
+    type RunOptions,
+    type SettingsPatch,
+    type ViewResult,
+    veto,
+} from "./commands/types";
+// the document (D3)
+export type {
+    CalendarDocument,
+    CalendarEventInit,
+    CalendarEventJson,
+    CalendarInfoJson,
+    CalendarSettingsJson,
+    EventFlags,
+    RecurrenceJson,
+    ValidRangeJson,
+    ViewJson,
+    ViewType,
+} from "./document/calendar-document";
+export type {
+    CalendarEvent,
+    CalendarEventOf,
+    CalendarInfo,
+    CalendarInfoOf,
+} from "./document/calendar-event";
+export { calendarSchema } from "./document/calendar-schema";
+export {
+    type CalendarSettings,
+    DEFAULT_SETTINGS,
+} from "./document/calendar-settings";
+export type {
+    AnyTypes,
+    CalendarDataOf,
+    CalendarTypes,
+    DataField,
+    EventDataOf,
+    KindOf,
+} from "./document/calendar-types";
+export { CalendarValidationError } from "./document/calendar-validation-error";
+export type { CreateId } from "./document/id-source";
+export {
+    type ValidateCalendarOptions,
+    validateCalendar,
+} from "./document/validate-calendar";
 export type {
     ValidationIssue,
     ValidationResult,
 } from "./document/validation-issue";
-
+// the feature registry (`architecture/features.md`): for feature authors
+export { defineFeature } from "./features/define-feature";
+export { FEATURE_KEYS, type FeatureName } from "./features/keys";
+export type {
+    AnyCalendarFeature,
+    AnyFeatures,
+    CalendarFeature,
+    CalendarFeatureInfo,
+    CalendarFeatures,
+    CalendarStateOf,
+    EditRequest,
+    EditWrite,
+    EventChange,
+    FeatureDocument,
+    FeatureState,
+    PartAttributes,
+} from "./features/types";
+export type {
+    DayCell,
+    DayGrid,
+    DayGridWeek,
+    Segment,
+} from "./layout/day-grid";
+export type { ListDay, ListItem, ListLayout } from "./layout/list";
+export type { Occurrence, OccurrenceWindow } from "./layout/occurrence";
+export type {
+    TimeGrid,
+    TimeGridColumn,
+    TimeSegment,
+    TimeSlot,
+} from "./layout/time-grid";
 // locale: weeks, week numbers, `Intl` parts
 export type { FormatOptions } from "./locale/date-time-format";
 export { formatDateParts } from "./locale/format-date-parts";
@@ -22,6 +127,27 @@ export {
     type WeekRules,
     weekOfYear,
 } from "./locale/week-of-year";
+// the model and its bus (D8, D20)
+export {
+    type CalendarModel,
+    type CalendarModelOptions,
+    createCalendarModel,
+    type DispatchOptions,
+} from "./model/calendar-model";
+export type { JsonSchema, JsonValue } from "./schema/json-schema";
+export type { CalendarState, ViewState } from "./state/calendar-state";
+export type { Draft, DraftState } from "./state/draft";
+export type {
+    DateRangeJson,
+    ModelGetKey,
+    ModelGetMap,
+    ModelGetPayload,
+    ModelGetResult,
+    ModelIsKey,
+    ModelIsMap,
+    ModelIsPayload,
+    QueryArgs,
+} from "./state/queries";
 // time: plain dates and times, instants, RFC 3339
 export { addDays } from "./time/add-days";
 export { addMinutes } from "./time/add-minutes";
