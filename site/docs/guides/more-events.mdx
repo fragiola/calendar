@@ -169,7 +169,9 @@ function MorePopover(props: { date: string; open: boolean; onClose: () => void }
 
 With Fragiola UI's popover (on Reka UI), `Calendar.More` is the trigger it is anchored to
 (`as-child`). The popover's `open` is the app's: the trigger's own toggle asks to open it, which
-the engine's event already did, and only a close is heard:
+the engine's event already did, and only a close is heard. Reka UI gives the toggle no reason, so a
+press on an open popover's "+N more" would close it: the More's own click, which runs after the
+trigger's, opens it again in the same tick:
 
 ```vue title="busy-month.vue"
 <script setup lang="ts">
@@ -201,6 +203,7 @@ const open = ref<string | null>(null);
                             <MorePopover
                                 :date="day.date"
                                 :open="open === day.date"
+                                @open="open = day.date"
                                 @close="open = null"
                             />
                         </Calendar.Day>
@@ -218,7 +221,7 @@ import { Calendar, useCalendar } from "@fragiola/calendar-vue";
 import { Popover } from "#/components/ui/popover";
 
 const props = defineProps<{ date: string; open: boolean }>();
-const emit = defineEmits<{ close: [] }>();
+const emit = defineEmits<{ open: []; close: [] }>();
 const { model } = useCalendar();
 
 /** The day's events, read as the open popover renders. */
@@ -230,7 +233,7 @@ function items() {
 <template>
     <Popover.Root :open="open" @update:open="(next) => !next && emit('close')">
         <Popover.Trigger as-child>
-            <Calendar.More v-slot="{ hiddenCount }" class="more">
+            <Calendar.More v-slot="{ hiddenCount }" class="more" @click="emit('open')">
                 +{{ hiddenCount }} more
             </Calendar.More>
         </Popover.Trigger>
