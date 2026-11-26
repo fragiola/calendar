@@ -36,7 +36,17 @@ export default defineConfig(({ command }) => ({
     // The stage is rendered by React: the pre-paint script sets only the scheme on <html>.
     plugins: [react(), tailwindcss(), prePaintTheme()],
     resolve: examplesResolve(command),
-    server: { port, strictPort: true },
+    // the examples are loaded lazily: scan them at startup, so a dependency first met when one
+    // opens (Fragiola UI's) is never optimized mid-session, which reloads with two Reacts
+    optimizeDeps: {
+        entries: [
+            "index.html",
+            "fixtures/*/index.html",
+            "../../examples/react/src/examples/*/index.tsx",
+            "src/scenarios/*/*.tsx",
+        ],
+    },
+    server: { port, strictPort: true, watch: { ignored: ["**/.e2e/**"] } },
     preview: { port, strictPort: true },
     build: {
         rollupOptions: {

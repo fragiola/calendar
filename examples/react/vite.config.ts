@@ -39,5 +39,10 @@ export default defineConfig(({ command }) => ({
     plugins: [react(), tailwindcss(), prePaintTheme(), devManifest()],
     resolve: examplesResolve(command),
     build: outDir ? { outDir, emptyOutDir: true } : {},
-    server: { port: Number(process.env.PORT ?? 5192), strictPort: true },
+    server: {
+        port: Number(process.env.PORT ?? 5192),
+        strictPort: true,
+        // the e2e builds land in .e2e/: a change there is no source change
+        watch: { ignored: ["**/.e2e/**"] },
+    },
 }));
