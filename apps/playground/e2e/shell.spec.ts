@@ -39,6 +39,8 @@ test("lists the examples, the scenarios and the fixtures, and opens an example",
 });
 
 test("every example renders in the stage", async ({ page }) => {
+    // 25 navigations of the dev server, each compiling its example on first load
+    test.slow();
     await page.goto("/");
     const hrefs = await sidebar(page)
         .getByRole("link")
