@@ -30,6 +30,9 @@ function declared(theme: string): Set<string> {
 
 const sources = walk(EXAMPLES).filter((file) => /\.(ts|tsx)$/.test(file));
 
+/** A colour written in an example instead of a palette role or a theme token. */
+const FIXED_COLOUR =
+    /\b(?:bg|text|border|ring|outline|fill|stroke|from|to|via)-(?:black|white|(?:slate|gray|zinc|neutral|stone|red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose)-\d{2,3})\b|#[0-9a-f]{3,8}\b|\b(?:rgba?|hsla?|oklch|oklab|lab|lch|hwb)\(/i;
 describe("the examples' themes", () => {
     it("are imported by the embed's stylesheet after the palettes", () => {
         const css = readFileSync(
@@ -62,21 +65,30 @@ describe("the examples' themes", () => {
     });
 
     it("write no fixed colour: palette roles and theme tokens only", () => {
-        const fixed =
-            /\b(?:bg|text|border|ring|outline|fill|stroke|from|to|via)-(?:black|white|(?:slate|gray|zinc|neutral|stone|red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose)-\d{2,3})\b|#[0-9a-f]{3,8}\b|\brgb\(|\bhsl\(|\boklch\(/i;
         for (const file of sources) {
             const source = readFileSync(file, "utf-8");
             expect(
-                fixed.exec(source)?.[0],
+                FIXED_COLOUR.exec(source)?.[0],
                 relative(EXAMPLES, file),
             ).toBeUndefined();
         }
     });
 
     it("finds a fixed colour, written any way", () => {
-        const fixed = /\bbg-blue-500\b|#fff\b/;
-        expect(fixed.test('"bg-blue-500"')).toBe(true);
-        expect(fixed.test('"#fff"')).toBe(true);
+        for (const written of [
+            '"bg-blue-500"',
+            '"text-white"',
+            '"#fff"',
+            '"bg-[#0af]"',
+            "rgba(0, 0, 0, 0.5)",
+            "hsla(0 0% 0%)",
+            "oklch(0.5 0.1 200)",
+            "lab(50% 0 0)",
+            "lch(50% 0 0)",
+        ]) {
+            expect(FIXED_COLOUR.test(written), written).toBe(true);
+        }
+        expect(FIXED_COLOUR.test('"bg-palette-accent/10"')).toBe(false);
     });
 
     it("are each known to the pre-paint script, which reads their list", () => {

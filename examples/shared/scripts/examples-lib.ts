@@ -4,7 +4,7 @@
 // imports. What the code panel shows is exactly this list.
 
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
-import { dirname, join, relative, resolve } from "node:path";
+import { dirname, join, relative, resolve, sep } from "node:path";
 import { pathToFileURL } from "node:url";
 import {
     ENTRY_FILES,
@@ -218,7 +218,7 @@ export function collectFiles(
                         `${relative(app.root, file)}: cannot resolve "${specifier}"`,
                     );
                 }
-                if (!target.startsWith(app.examplesDir)) {
+                if (!target.startsWith(`${app.examplesDir}${sep}`)) {
                     throw new Error(
                         `${relative(app.root, file)}: "${specifier}" leaves examples/`,
                     );
