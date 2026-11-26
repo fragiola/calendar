@@ -15,7 +15,6 @@ import type {
     FeatureEngineHost,
     FeatureGesture,
     FeatureModel,
-    MutablePartAttributes,
     PressTarget,
 } from "../features/engine-types";
 import { type FeatureKeyKind, requiresFeature } from "../features/keys";
@@ -35,22 +34,13 @@ import { clockOf } from "../model/model-clock";
 import type { QueryArgs } from "../state/queries";
 import { fromEpochDay } from "../time/epoch-day";
 import { formatPlainDate } from "../time/format-plain-date";
-import { minutesOfDay } from "../time/minutes-of-day";
-import { parseDateTime } from "../time/parse-date-time";
-import { parsePlainTime } from "../time/parse-plain-time";
-import { instantToWallClock } from "../time-zone/instant-to-wall-clock";
 import { resolveTimeZone } from "../time-zone/resolve-time-zone";
 import { startOfDay } from "../time-zone/start-of-day";
 import { todayOf } from "../view/today";
 import type { CalendarEngineAdapter, PartName, ViewChange } from "./adapter";
 import { type EngineHost, resolveHost } from "./engine-host";
 import type { CalendarEngineEvent } from "./events";
-import {
-    type CellPosition,
-    cellKey,
-    type FocusPosition,
-    type GridPoint,
-} from "./grid-point";
+import type { CellPosition, FocusPosition, GridPoint } from "./grid-point";
 import {
     type Box,
     type GridGeometry,
@@ -59,6 +49,17 @@ import {
     timePoint,
 } from "./hit-test";
 import { type GridCells, keyTarget } from "./keyboard";
+import { attributesOf } from "./part-attributes";
+import {
+    cellOfOccurrence,
+    defaultTabStop,
+    gridCellsOf,
+    isShown,
+    keyOfPosition,
+    minutesOf,
+    occurrenceOf,
+    positionOfPart,
+} from "./positions";
 import { type PreviewTimes, previewSegments } from "./preview";
 import {
     clearEventTouchAction,
@@ -198,11 +199,6 @@ function boxOf(element: Element): Box {
         right: rect.right,
         bottom: rect.bottom,
     };
-}
-
-function minutesOf(value: string, fallback: number): number {
-    const time = parsePlainTime(value);
-    return time.ok ? minutesOfDay(time.value) : fallback;
 }
 
 class Engine<T extends CalendarTypes, F extends CalendarFeatures> {
@@ -482,24 +478,11 @@ class Engine<T extends CalendarTypes, F extends CalendarFeatures> {
     }
 
     private gridCells(): GridCells {
-        const dayGrid = this.model.get("day-grid") as DayGrid | null;
-        const timeGrid = this.timeGrid();
-        return {
-            view: this.model.state.view.type,
-            rtl: this.direction() === "rtl",
-            rows: (dayGrid?.weeks ?? []).map((week) =>
-                week.days.map((day) => day.date),
-            ),
-            columns: (timeGrid?.columns ?? []).map((column) => column.date),
-            slots: (timeGrid?.slots ?? []).map((slot) => slot.time),
-            hiddenDays: this.settings().hiddenDays,
-        };
+        return gridCellsOf(this.erased(), this.direction() === "rtl");
     }
 
     private occurrence(occurrenceId: string): Occurrence | undefined {
-        return this.model.get("occurrence-by", { id: occurrenceId }) as
-            | Occurrence
-            | undefined;
+        return occurrenceOf(this.erased(), occurrenceId);
     }
 
     /** The cell an occurrence starts in, in the current view. */
@@ -507,22 +490,11 @@ class Engine<T extends CalendarTypes, F extends CalendarFeatures> {
         readonly start: string;
         readonly allDay: boolean;
     }): CellPosition | null {
-        if (occurrence.allDay) return { kind: "day", date: occurrence.start };
-        const at = parseDateTime(occurrence.start);
-        if (!at.ok) return null;
-        const wall = instantToWallClock(at.value.instant, this.timeZone());
-        const date = formatPlainDate(wall);
-        const timeGrid = this.timeGrid();
-        if (!timeGrid) return { kind: "day", date };
-        const settings = this.settings();
-        const min = minutesOf(settings.slotMinTime, 0);
-        const minutes = wall.hour * 60 + wall.minute;
-        const index = Math.floor((minutes - min) / settings.slotDuration);
-        const slot =
-            timeGrid.slots[
-                Math.min(Math.max(index, 0), timeGrid.slots.length - 1)
-            ];
-        return slot ? { kind: "slot", date, time: slot.time } : null;
+        return cellOfOccurrence(this.erased(), occurrence);
+    }
+
+    private erased(): CalendarModel {
+        return this.model as unknown as CalendarModel;
     }
 
     /** The occurrences shown in a cell, in their order there (lane, then top). */
@@ -567,51 +539,19 @@ class Engine<T extends CalendarTypes, F extends CalendarFeatures> {
 
     /** Whether a position is shown by the current view. */
     private shown(position: FocusPosition): boolean {
-        if (position.kind === "event") {
-            return (
-                this.model.get("occurrences") as readonly Occurrence[]
-            ).some(
-                (occurrence) =>
-                    occurrence.occurrenceId === position.occurrenceId,
-            );
-        }
-        const grid = this.gridCells();
-        if (position.kind === "slot") {
-            return (
-                grid.columns.includes(position.date) &&
-                grid.slots.includes(position.time)
-            );
-        }
-        return grid.rows.some((dates) => dates.includes(position.date));
+        return isShown(this.erased(), position);
     }
 
     private tabStop(): FocusPosition | null {
         if (this.focusPosition && this.shown(this.focusPosition)) {
             return this.focusPosition;
         }
-        const grid = this.gridCells();
-        const today = formatPlainDate(fromEpochDay(this.todayNow()));
-        if (grid.view === "list") return null;
-        if (grid.columns.length > 0) {
-            const date = grid.columns.includes(today) ? today : grid.columns[0];
-            const time = grid.slots[0];
-            return date !== undefined && time !== undefined
-                ? { kind: "slot", date, time }
-                : null;
-        }
-        const dates = grid.rows.flat();
-        if (dates.length === 0) return null;
-        if (dates.includes(today)) return { kind: "day", date: today };
-        const current = this.model.get("current-range") as { start: string };
-        const date = dates.includes(current.start) ? current.start : dates[0];
-        return date === undefined ? null : { kind: "day", date };
+        return defaultTabStop(this.erased(), this.todayNow());
     }
 
     /** The key of a position's element. */
     private keyOfPosition(position: FocusPosition): string {
-        return position.kind === "event"
-            ? `event ${position.occurrenceId} ${position.cell.date}`
-            : cellKey(position);
+        return keyOfPosition(position);
     }
 
     private elementOf(
@@ -673,27 +613,11 @@ class Engine<T extends CalendarTypes, F extends CalendarFeatures> {
     private positionOf(
         registration: Pick<Registration, "part" | "payload">,
     ): FocusPosition | null {
-        const { part, payload } = registration;
-        const date = String(payload.date);
-        if (part === "day") return { kind: "day", date };
-        if (part === "slot") {
-            return { kind: "slot", date, time: String(payload.time) };
-        }
-        if (part !== "event") return null;
-        const occurrenceId = String(payload.occurrenceId);
-        const occurrence = this.occurrence(occurrenceId);
-        let cell = occurrence ? this.cellOf(occurrence) : null;
-        if (!cell || cell.date !== date) {
-            cell =
-                cell?.kind === "slot"
-                    ? { kind: "slot", date, time: this.firstSlot() ?? "00:00" }
-                    : { kind: "day", date };
-        }
-        return { kind: "event", occurrenceId, cell };
-    }
-
-    private firstSlot(): string | undefined {
-        return this.timeGrid()?.slots[0]?.time;
+        return positionOfPart(
+            this.erased(),
+            registration.part,
+            registration.payload,
+        );
     }
 
     private focusAction(
@@ -1637,117 +1561,13 @@ class Engine<T extends CalendarTypes, F extends CalendarFeatures> {
         part: PartName,
         payload: Readonly<Record<string, unknown>>,
     ): PartAttributes {
-        const into: MutablePartAttributes = { "data-calendar-part": part };
-        const model = this.model;
-        const date =
-            typeof payload.date === "string" ? payload.date : undefined;
-        const listView = model.state.view.type === "list";
-        switch (part) {
-            case "root":
-                Object.assign(into, model.get("root-attributes"));
-                break;
-            case "day-grid":
-            case "time-grid":
-                into.role = "grid";
-                break;
-            case "week":
-            case "column":
-                into.role = "row";
-                if (part === "column" && date) {
-                    Object.assign(
-                        into,
-                        model.get("day-attributes-by", { date }),
-                    );
-                }
-                break;
-            case "day":
-            case "slot": {
-                Object.assign(
-                    into,
-                    part === "day"
-                        ? model.get("day-attributes-by", { date: date ?? "" })
-                        : model.get("slot-attributes-by", {
-                              date: date ?? "",
-                              time: String(payload.time),
-                          }),
-                );
-                into.role = "gridcell";
-                this.focusAttributes(part, payload, into);
-                break;
-            }
-            case "day-events":
-            case "list-day":
-                into.role = "list";
-                if (date) into["data-date"] = date;
-                break;
-            case "column-header":
-                into.role = "columnheader";
-                if (date) {
-                    Object.assign(
-                        into,
-                        model.get("day-attributes-by", { date }),
-                    );
-                }
-                break;
-            case "event": {
-                const occurrenceId = String(payload.occurrenceId);
-                Object.assign(
-                    into,
-                    model.get("event-attributes-by", {
-                        occurrenceId,
-                        continuesBefore: payload.continuesBefore === true,
-                        continuesAfter: payload.continuesAfter === true,
-                    }),
-                );
-                const occurrence = this.occurrence(occurrenceId);
-                const inTimeGrid =
-                    occurrence?.allDay === false &&
-                    model.state.view.type !== "month" &&
-                    !listView;
-                if (!inTimeGrid) into.role = "listitem";
-                if (listView) into.tabindex = "0";
-                else this.focusAttributes(part, payload, into);
-                break;
-            }
-            case "resize-handle":
-                into["data-occurrence-id"] = String(payload.occurrenceId);
-                into["data-edge"] = String(payload.edge);
-                break;
-            case "more":
-            case "business-hours":
-                if (date) into["data-date"] = date;
-                break;
-            case "slot-label":
-                into["data-time"] = String(payload.time);
-                break;
-            default:
-                break;
-        }
-        for (const feature of this.parts) {
-            feature.attributes?.(part, payload, into);
-        }
-        return into;
-    }
-
-    private focusAttributes(
-        part: PartName,
-        payload: Readonly<Record<string, unknown>>,
-        into: MutablePartAttributes,
-    ): void {
-        const stop = this.tabStop();
-        const position = this.positionOf({ part, payload });
-        const same =
-            stop !== null &&
-            position !== null &&
-            this.keyOfPosition(stop) === this.keyOfPosition(position);
-        into.tabindex = same ? "0" : "-1";
-        const focused = this.focusPosition;
-        into["data-focused"] =
-            focused !== null &&
-            position !== null &&
-            this.keyOfPosition(focused) === this.keyOfPosition(position)
-                ? ""
-                : undefined;
+        return attributesOf(
+            this.erased(),
+            part,
+            payload,
+            { tabStop: this.tabStop(), focused: this.focusPosition },
+            this.parts,
+        );
     }
 
     // ---------------------------------------------------------------------------------------------

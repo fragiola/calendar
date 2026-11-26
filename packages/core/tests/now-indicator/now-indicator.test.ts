@@ -21,6 +21,7 @@ describe("nowIndicator()", () => {
             top: 0.375,
         });
         expect(m.engine.adapter.attributes("now-indicator", {})).toEqual({
+            "aria-hidden": "true",
             "data-calendar-part": "now-indicator",
             "data-date": "2026-11-26",
             "data-time": "09:00",

@@ -3,7 +3,7 @@
 // midnight refresh from the injected clock, `dayMaxEvents: "auto"` from measured sizes, and
 // hit-testing.
 import { afterEach, describe, expect, it } from "vitest";
-import { createCalendarEngine } from "../../src/index";
+import { createCalendarEngine, partAttributes } from "../../src/index";
 import { allDay, modelOf, timed } from "../fixture";
 import { type Mounted, mount, unmountAll } from "./harness";
 
@@ -497,9 +497,167 @@ describe("attributes (D17)", () => {
             occurrenceId: "t",
             date: "2026-11-26",
         });
-        expect(event.role).toBeUndefined();
         expect(event["data-event-id"]).toBe("t");
         // no drag feature: no touch-action written
         expect(m.element("event t 2026-11-26").style.touchAction).toBe("");
+    });
+
+    it("gives a time grid rows of slots, a gridcell per day, and each column's events as a list", () => {
+        const m = mount({
+            events: [
+                timed("t", "09:00", "10:00"),
+                allDay("a", "2026-11-26", "2026-11-27"),
+            ],
+            view: { type: "week", anchorDate: "2026-11-26" },
+        });
+        const { attributes } = m.engine.adapter;
+        const day = { date: "2026-11-26" };
+        // the header row and the all-day row come first; then a row per slot, its label a rowheader
+        expect(attributes("column-headers", {})).toEqual({
+            "data-calendar-part": "column-headers",
+            role: "row",
+        });
+        expect(attributes("column-header", day)).toMatchObject({
+            role: "columnheader",
+            "data-date": "2026-11-26",
+        });
+        expect(attributes("all-day-row", { weekId: "2026-11-22" })).toEqual({
+            "data-calendar-part": "all-day-row",
+            role: "row",
+        });
+        expect(attributes("day", day)).toMatchObject({ role: "gridcell" });
+        expect(attributes("slot-row", { time: "09:00" })).toEqual({
+            "data-calendar-part": "slot-row",
+            "data-time": "09:00",
+            role: "row",
+        });
+        expect(attributes("slot-label", { time: "09:00" })).toEqual({
+            "data-calendar-part": "slot-label",
+            "data-time": "09:00",
+            role: "rowheader",
+        });
+        // the column is a positioned layer with no role; its events are a list of list items
+        const column = attributes("column", day);
+        expect(column.role).toBeUndefined();
+        expect(column).toMatchObject({
+            "data-calendar-part": "column",
+            "data-date": "2026-11-26",
+            "data-today": "",
+        });
+        expect(attributes("column-events", day)).toEqual({
+            "data-calendar-part": "column-events",
+            "data-date": "2026-11-26",
+            role: "list",
+        });
+        expect(
+            attributes("event", { occurrenceId: "t", date: "2026-11-26" }),
+        ).toMatchObject({
+            "data-calendar-part": "time-event",
+            role: "listitem",
+            tabindex: "-1",
+        });
+        expect(
+            attributes("event", { occurrenceId: "a", date: "2026-11-26" }),
+        ).toMatchObject({ "data-calendar-part": "segment", role: "listitem" });
+        // decorations are hidden from assistive technology
+        expect(attributes("selection", {})["aria-hidden"]).toBe("true");
+        expect(
+            attributes("resize-handle", {
+                occurrenceId: "t",
+                date: "2026-11-26",
+                edge: "end",
+            })["aria-hidden"],
+        ).toBe("true");
+    });
+
+    it("names a month's and a list's events, and gives week numbers a rowheader", () => {
+        const m = mount({
+            events: [timed("t", "09:00", "10:00")],
+            view: { type: "month", anchorDate: "2026-11-26" },
+        });
+        const { attributes } = m.engine.adapter;
+        expect(
+            attributes("event", { occurrenceId: "t", date: "2026-11-26" }),
+        ).toMatchObject({ "data-calendar-part": "segment", role: "listitem" });
+        expect(attributes("week", { weekId: "2026-11-22" }).role).toBe("row");
+        expect(attributes("week-number", { weekId: "2026-11-22" }).role).toBe(
+            "rowheader",
+        );
+        m.model.run("view.set", { type: "list" });
+        expect(
+            attributes("event", { occurrenceId: "t", date: "2026-11-26" }),
+        ).toMatchObject({
+            "data-calendar-part": "list-event",
+            role: "listitem",
+            tabindex: "0",
+        });
+        expect(attributes("list-day", { date: "2026-11-26" })).toEqual({
+            "data-calendar-part": "list-day",
+            "data-date": "2026-11-26",
+            role: "list",
+        });
+    });
+
+    it("marks the navigation buttons by what their command can do", () => {
+        const m = mount({
+            settings: {
+                validRange: { start: "2026-11-01", end: "2026-12-01" },
+            },
+            view: { type: "month", anchorDate: "2026-11-26" },
+        });
+        const { attributes } = m.engine.adapter;
+        expect(attributes("previous", {})).toEqual({
+            "data-calendar-part": "previous",
+            "data-disabled": "",
+        });
+        expect(attributes("next", {})["data-disabled"]).toBe("");
+        expect(attributes("today", {})["data-disabled"]).toBeUndefined();
+        expect(attributes("view-button", { type: "month" })).toEqual({
+            "data-calendar-part": "view-button",
+            "aria-pressed": "true",
+            "data-pressed": "",
+        });
+        expect(attributes("view-button", { type: "week" })).toEqual({
+            "data-calendar-part": "view-button",
+            "aria-pressed": "false",
+        });
+        expect(
+            attributes("view-button", { type: "days", days: 3 })[
+                "aria-pressed"
+            ],
+        ).toBe("false");
+    });
+});
+
+describe("partAttributes (before an engine)", () => {
+    it("gives what the engine gives while nothing is focused, the tab stop on today", () => {
+        const model = modelOf(
+            [timed("t", "09:00", "10:00")],
+            {},
+            {
+                view: { type: "week", anchorDate: "2026-11-26" },
+            },
+        );
+        const engine = createCalendarEngine(model);
+        const parts = [
+            ["root", {}],
+            ["time-grid", {}],
+            ["slot-row", { time: "00:00" }],
+            ["slot", { date: "2026-11-26", time: "00:00" }],
+            ["slot", { date: "2026-11-25", time: "00:00" }],
+            ["column", { date: "2026-11-26" }],
+            ["event", { occurrenceId: "t", date: "2026-11-26" }],
+            ["view-button", { type: "week" }],
+        ] as const;
+        for (const [part, payload] of parts) {
+            expect(partAttributes(model, part, payload as never)).toEqual(
+                engine.adapter.attributes(part, payload as never),
+            );
+        }
+        expect(
+            partAttributes(model, "slot", { date: "2026-11-26", time: "00:00" })
+                .tabindex,
+        ).toBe("0");
+        engine.destroy();
     });
 });

@@ -115,6 +115,7 @@ export type {
     GridPoint,
 } from "./engine/grid-point";
 export type { KeyTarget } from "./engine/keyboard";
+export { partAttributes } from "./engine/part-attributes";
 export type {
     DragPreview,
     PreviewSegments,
