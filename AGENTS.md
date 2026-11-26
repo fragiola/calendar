@@ -17,7 +17,7 @@ the core**.
 
 | package | name | contains | depends on |
 |---|---|---|---|
-| `packages/core` | `@fragiola/calendar` | the calendar document (v1) and its JSON Schemas, the date and time-zone engine (`Intl` only), the model and its command bus (commands with JSON Schemas, `get`/`is` queries, middleware, events), the views, ranges and layout, the feature registry and every opt-in feature on its own subpath (D2), and the engine (keyboard, gestures, measurement). Today: the date and time-zone engine (`time/`, `time-zone/`, `locale/`, Issue #2) and the model (`schema/`, `document/`, `state/`, `commands/`, `view/`, `layout/`, `attributes/`, `features/`, `model/`, `format/`, Issue #3; formatting keys, Issue #4) and the model features `recurrence/`, `constraints/`, `event-sources/` (Issue #4), each on its subpath | DOM only, zero runtime deps |
+| `packages/core` | `@fragiola/calendar` | the calendar document (v1) and its JSON Schemas, the date and time-zone engine (`Intl` only), the model and its command bus (commands with JSON Schemas, `get`/`is` queries, middleware, events), the views, ranges and layout, the feature registry and every opt-in feature on its own subpath (D2), and the engine (keyboard, gestures, measurement). Today: the date and time-zone engine (`time/`, `time-zone/`, `locale/`, Issue #2) and the model (`schema/`, `document/`, `state/`, `commands/`, `view/`, `layout/`, `attributes/`, `features/`, `model/`, `format/`, Issue #3; formatting keys, Issue #4) and the model features `recurrence/`, `constraints/`, `event-sources/` (Issue #4), the engine (`engine/`) and the interactive features `selection/`, `drag-and-drop/`, `resize/`, `external-drop/`, `now-indicator/` with their shared `drop-target/` (Issue #5), each feature on its subpath | DOM only, zero runtime deps |
 | `packages/react` | `@fragiola/calendar-react` | the `Calendar.*` primitives and hooks over the core, and the core re-exported (React Epic) | the core (`workspace:*`, published as the exact version); peer `react`, `react-dom` (^19) |
 | `packages/vue` | `@fragiola/calendar-vue` | the same primitives in Vue (Vue Epic) | the core; peer `vue` (^3.5) |
 | `packages/angular` | `@fragiola/calendar-angular` | the same primitives as Angular directives (Angular Epic) | the core; peer `@angular/core` |
@@ -320,6 +320,75 @@ drag and ranges; RFC 5545 for recurrence; FullCalendar's documented default for 
   replaces it. `invalidate` forgets fetched ranges (events stay until the next receive);
   `set-loading` marks or clears a loading range. Removing a source from the settings removes its
   events and its state. `is("event-source-loading", { sourceId? })` (none: any source).
+
+- **Issue #5, engine.** `createCalendarEngine(model, { host?, longPressDelay?, dragThreshold?,
+  autoScroll? })` (an options object, `host` inside it, rather than a second positional `host`):
+  the engine's surface is `run`, `can`, `check`, `get`, `is`, `subscribe`, `destroy`, `adapter`
+  (Tree's and Flow's; `tests/types/engine.ts` pins both surfaces as types, the engine test at
+  runtime). `EngineHost` (`setTimeout`, `clearTimeout`, `requestAnimationFrame`,
+  `cancelAnimationFrame`, `ResizeObserver`, `getComputedStyle`) defaults to the root's
+  `defaultView`, read at attach; any member can be injected, and with injected timers the
+  midnight refresh runs before a root is attached. The model's clock reaches the engine through a
+  module `WeakMap` (`model/model-clock.ts`, like `featuresOf`), never the model's surface.
+- **Issue #5, keys.** Engine actions `focus` (`{ date, time? }` or `{ occurrenceId, date? }`,
+  navigating with `view.go-to` when not shown), `cancel-gesture`, `measure`; `get` keys `focused`,
+  `tab-stop`, `day-grid` (with the measured `maxLanes`), `max-lanes`, `direction`, `point-at`;
+  `is("gesture-active")`. Features: `selection-preview` (selection), `drag-preview`,
+  `event-dragging`, `event-grabbed` (drag and drop; external drops preview through it),
+  `resize-preview`, `event-resizing` (resize), `external-drag-start` / `-move` / `-end` (external
+  drop), `now-position` (now indicator: an engine key, since the line moves with the engine's tick
+  and a server render has no "now"). Engine events: `event-click`, `date-click`, `more-click`,
+  `select`, `drop`, `external-drop`, `today-change`, `announce` (data, no text).
+- **Issue #5, adapter.** `engine.adapter`: `attachRoot`, `detachRoot`, `register(part, payload,
+  element | null)` (root's children: `day-grid`, `week`, `day`, `day-events`, `more`, `time-grid`,
+  `column`, `slot`, `scroller`, `column-header`, `event { occurrenceId, date }` where `date` is the
+  cell it starts in, `resize-handle { occurrenceId, date, edge }`, `list-day`, `now-indicator`,
+  `drag-preview`, …), `attributes(part, payload)` (`data-calendar-part`, the model's attributes,
+  the engine's `role`, `tabindex`, `data-focused`, the features' `data-selected`,
+  `data-dragging`, `data-grabbed`, `data-resizing`), `committed()` (measure, pending focus),
+  `subscribe` / `getSnapshot` (view changes). The engine writes `tabIndex` on the roving elements
+  it focuses (Tree's) and `touch-action: none` on events while a drag feature is installed.
+- **Issue #5, roles.** Day grid: `grid` > `row` (week) > `gridcell` (day) > `list` (`day-events`) >
+  `listitem` (events); time grid: `grid` > `row` per column > `gridcell` per slot, timed events
+  get no role (the column is the DOM's container). The time grid's column-major DOM is a known
+  compromise with APG's row-major grid; the React Epic settles it with real assistive technology
+  (`aria-owns` rows, or rowgroups), so the adapters can still follow the record.
+- **Issue #5, focus.** One tab stop: the focus position if shown, else today, else the current
+  range's first day (time grids: the first slot of today's or the first column). Keys follow D12
+  as the date picker's: Home/End are the week's first and last days whatever the direction;
+  PageUp/PageDown in time grids run `view.next` / `view.previous` and keep the column index;
+  Shift + PageUp/PageDown move a year (month) or a week. Keys with Ctrl, Alt or Meta, and Tab, stay
+  the browser's. Enter on a focused event is `event-click` (keyboard). A tap on a day or slot
+  moves the roving focus. Focus follows a dropped event: the engine waits for its new element's
+  registration (or `committed()`).
+- **Issue #5, gestures.** The key chain: a keyboard gesture's keys (Escape always cancels it) →
+  the features' `keydown` (Space grabs, Shift + arrows select) → the core's keys → the features'
+  `laterKeydown`; no key gesture starts while a pointer press is under way. A press captures the
+  pointer only when a feature returned a gesture; it activates past `threshold` (default
+  `dragThreshold`, 5 px; 0 at once), a touch after `longPressDelay` unless its event is focused,
+  and a touch that moves first is abandoned (the browser's scroll). A tap is a release within
+  3 px with no active gesture and no long press. Escape (anywhere in the document),
+  `pointercancel`, `lostpointercapture`, a mouse move with no button (a missed release), a new
+  press, `cancel-gesture` and a detach end it with no command. Hit boxes are cached for one
+  press, dropped on a scroll inside the root. Autoscroll moves the registered `scroller` (40 px
+  edges, 12 px a frame at most).
+- **Issue #5, drops.** A pointer move between time points is whole days on the display zone's
+  wall clock plus the instant minutes between the points, so a drag across a DST change lands
+  where the pointer is; between days, whole days. Resize moves the edge the same way. Each new
+  target is asked with `model.check` (a refused one shows no preview and its release runs
+  nothing); a drop where the drag started runs nothing. A keyboard grab's arrows move by a day
+  (month Up/Down by a week, time grid Up/Down by `snapDuration`), Shift + arrows (resize) move the
+  end; Enter runs one command (`event.move`, `event.resize`, or a `batch` of both). Recurring
+  drops add `occurrenceId` and `recurringScope` only with `recurrence()` installed. Previews are
+  laid out by the core's own layouts on the moved event alone (`engine/preview.ts`).
+- **Issue #5, features.** `selection({ selectMinDistance })`: `selection.set` (refused outside
+  `validRange` and by `selectConstraint`) / `selection.clear` (`{ cleared }`), model state
+  `selection` (not document), a click selects its cell (FullCalendar's default) and is a
+  `date-click` too. `externalDrop({ accept?, draft? })`: a native drop's content is unreadable
+  until the drop, so a native drag shows no preview; on drop the app's `draft` makes the event, or
+  the `external-drop` event hands the `DataTransfer` to the app. `nowIndicator({ interval })`
+  ticks on the interval's boundaries (minimum 1 s). `drop-target/` holds the drag session shared
+  by drag and drop, resize and external drop (`host.shared("drag-session")`), with no entry.
 
 ## Commands
 
