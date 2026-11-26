@@ -3,7 +3,7 @@ import * as React from "react";
 import { DayContext, useCalendarContext, useRequired } from "../context";
 import { useCalendarValue, usePart } from "../hooks/internal";
 import { LANE_SIZE } from "../hooks/use-segment";
-import { MemoCall, useLatest } from "../utils/memo-call";
+import { MemoCall } from "../utils/memo-call";
 import { type DivPrimitiveProps, useRenderElement } from "../utils/use-render";
 
 export interface DayEventsState {
@@ -24,7 +24,7 @@ export interface DayEventsProps extends DivPrimitiveProps<DayEventsState> {
  * (`flex: 1`).
  */
 export function DayEvents(props: DayEventsProps) {
-    const render = useLatest(props.children);
+    const render = props.children;
     const { children, ...rest } = props;
     const context = useCalendarContext("DayEvents");
     const { day, column, week } = useRequired(

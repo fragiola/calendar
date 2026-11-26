@@ -1,7 +1,7 @@
 import type { DayGridWeek } from "@fragiola/calendar";
 import * as React from "react";
 import { useDayGrid } from "../hooks/use-day-grid";
-import { MemoCall, useLatest } from "../utils/memo-call";
+import { MemoCall } from "../utils/memo-call";
 
 export interface WeeksProps {
     /** called per row of the month (`<Calendar.Week week={week}>`) */
@@ -10,7 +10,7 @@ export interface WeeksProps {
 
 /** The month's rows: calls `children` per week, in order (it renders no element of its own). */
 export function Weeks(props: WeeksProps) {
-    const render = useLatest(props.children);
+    const render = props.children;
     const grid = useDayGrid();
     return (
         <>

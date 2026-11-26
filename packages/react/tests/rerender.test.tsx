@@ -1,9 +1,11 @@
 // Moving one event re-renders only the rows and columns it touches (D11: the layout keeps the other
-// rows' objects). The collection parts call their children function again only for an entity whose
-// layout object changed, and read the function through a ref: an app's new inline function (a
-// re-render of the app) does not re-render the unchanged rows either.
-import { act, render } from "@testing-library/react";
-import type * as React from "react";
+// rows' objects), when the children function is stable. React's contract: a collection part calls
+// its children function again for an entity whose layout object changed, and for every entity when
+// the function itself changed, so app state the function closes over is never stale.
+
+import type { DayGridWeek } from "@fragiola/calendar";
+import { act, render, screen } from "@testing-library/react";
+import * as React from "react";
 import { describe, expect, it } from "vitest";
 import { Calendar } from "../src";
 import { allDay, modelOf, timed } from "./calendar";
@@ -25,30 +27,31 @@ function counter() {
     };
 }
 
-/** A month whose rows count their renders. */
+/** A month whose rows count their renders, its children function stable (`useCallback`). */
 function Month(props: { tag: number; count: (id: string) => void }) {
+    const { count } = props;
+    const row = React.useCallback(
+        (week: DayGridWeek) => {
+            count(week.id);
+            return (
+                <Calendar.Week week={week}>
+                    {(day) => (
+                        <Calendar.Day day={day}>
+                            <Calendar.DayEvents>
+                                {(segment) => (
+                                    <Calendar.Segment segment={segment} />
+                                )}
+                            </Calendar.DayEvents>
+                        </Calendar.Day>
+                    )}
+                </Calendar.Week>
+            );
+        },
+        [count],
+    );
     return (
         <Calendar.DayGrid data-tag={props.tag}>
-            <Calendar.Weeks>
-                {(week) => {
-                    props.count(week.id);
-                    return (
-                        <Calendar.Week week={week}>
-                            {(day) => (
-                                <Calendar.Day day={day}>
-                                    <Calendar.DayEvents>
-                                        {(segment) => (
-                                            <Calendar.Segment
-                                                segment={segment}
-                                            />
-                                        )}
-                                    </Calendar.DayEvents>
-                                </Calendar.Day>
-                            )}
-                        </Calendar.Week>
-                    );
-                }}
-            </Calendar.Weeks>
+            <Calendar.Weeks>{row}</Calendar.Weeks>
         </Calendar.DayGrid>
     );
 }
@@ -77,9 +80,89 @@ describe("re-rendering what changed", () => {
         // the row it left and the row it entered
         expect(weeks.changed(before)).toEqual(["2026-11-01", "2026-11-08"]);
         before = weeks.snapshot();
-        // the app renders again, with a new children function: no row changed
+        // the app renders again, with the same children function: no row changed
         rerender(app(2));
         expect(weeks.changed(before)).toEqual([]);
+    });
+
+    it("calls a new children function again for every row, so the state it shows is current", () => {
+        const model = modelOf(
+            [
+                allDay("a", "2026-11-03", "2026-11-04"),
+                allDay("b", "2026-11-17", "2026-11-18"),
+            ],
+            { view: { type: "month", anchorDate: "2026-11-26" } },
+        );
+        // an app highlights one event: the inline children function closes over it
+        const app = (highlighted: string): React.ReactElement => (
+            <Calendar.Root model={model}>
+                <Calendar.DayGrid>
+                    <Calendar.Weeks>
+                        {(week) => (
+                            <Calendar.Week week={week}>
+                                {(day) => (
+                                    <Calendar.Day day={day}>
+                                        <Calendar.DayEvents>
+                                            {(segment) => (
+                                                <Calendar.Segment
+                                                    segment={segment}
+                                                    data-testid={
+                                                        segment.eventId
+                                                    }
+                                                    data-highlighted={
+                                                        segment.eventId ===
+                                                        highlighted
+                                                            ? ""
+                                                            : undefined
+                                                    }
+                                                />
+                                            )}
+                                        </Calendar.DayEvents>
+                                    </Calendar.Day>
+                                )}
+                            </Calendar.Week>
+                        )}
+                    </Calendar.Weeks>
+                </Calendar.DayGrid>
+            </Calendar.Root>
+        );
+        const { rerender } = render(app("a"));
+        expect(screen.getByTestId("a").hasAttribute("data-highlighted")).toBe(
+            true,
+        );
+        expect(screen.getByTestId("b").hasAttribute("data-highlighted")).toBe(
+            false,
+        );
+        rerender(app("b"));
+        expect(screen.getByTestId("a").hasAttribute("data-highlighted")).toBe(
+            false,
+        );
+        expect(screen.getByTestId("b").hasAttribute("data-highlighted")).toBe(
+            true,
+        );
+    });
+
+    it("re-renders every row when the children function changes", () => {
+        const model = modelOf([allDay("a", "2026-11-03", "2026-11-04")], {
+            view: { type: "month", anchorDate: "2026-11-26" },
+        });
+        const weeks = counter();
+        const app = (tag: number): React.ReactElement => (
+            <Calendar.Root model={model}>
+                <Calendar.DayGrid>
+                    <Calendar.Weeks>
+                        {(week) => {
+                            weeks.count(week.id);
+                            return <Calendar.Week week={week} data-tag={tag} />;
+                        }}
+                    </Calendar.Weeks>
+                </Calendar.DayGrid>
+            </Calendar.Root>
+        );
+        const { rerender } = render(app(1));
+        const before = weeks.snapshot();
+        rerender(app(2));
+        expect(weeks.changed(before)).toHaveLength(6);
     });
 
     it("re-renders the time-grid column an event moves in, not the others", () => {

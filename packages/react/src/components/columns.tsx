@@ -3,7 +3,7 @@ import * as React from "react";
 import { useCalendarContext } from "../context";
 import { usePart } from "../hooks/internal";
 import { useTimeGrid } from "../hooks/use-time-grid";
-import { MemoCall, useLatest } from "../utils/memo-call";
+import { MemoCall } from "../utils/memo-call";
 import { type DivPrimitiveProps, useRenderElement } from "../utils/use-render";
 
 export type ColumnsState = Record<never, never>;
@@ -19,7 +19,7 @@ export interface ColumnsProps extends DivPrimitiveProps<ColumnsState> {
  * of its own). Presses go through it to the slots; its events take their own.
  */
 export function Columns(props: ColumnsProps) {
-    const render = useLatest(props.children);
+    const render = props.children;
     const { children, ...rest } = props;
     const context = useCalendarContext("Columns");
     const part = usePart(context, "columns", {});

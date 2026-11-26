@@ -1,7 +1,7 @@
 import type { DayCell, DayGridWeek } from "@fragiola/calendar";
 import * as React from "react";
 import { useRequired, WeekContext } from "../context";
-import { MemoCall, useLatest } from "../utils/memo-call";
+import { MemoCall } from "../utils/memo-call";
 
 export interface DaysProps {
     /** called per day of the row (`<Calendar.Day day={day}>`) */
@@ -10,7 +10,7 @@ export interface DaysProps {
 
 /** The days of the enclosing row: calls `children` per day (it renders no element of its own). */
 export function Days(props: DaysProps) {
-    const render = useLatest(props.children);
+    const render = props.children;
     const { week } = useRequired(
         WeekContext,
         "Days",

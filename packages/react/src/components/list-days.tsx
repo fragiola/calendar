@@ -1,7 +1,7 @@
 import type { ListDay } from "@fragiola/calendar";
 import * as React from "react";
 import { useListLayout } from "../hooks/use-list-layout";
-import { MemoCall, useLatest } from "../utils/memo-call";
+import { MemoCall } from "../utils/memo-call";
 
 export interface ListDaysProps {
     /**
@@ -13,7 +13,7 @@ export interface ListDaysProps {
 
 /** A list view's days with events, in order (it renders no element of its own). */
 export function ListDays(props: ListDaysProps) {
-    const render = useLatest(props.children);
+    const render = props.children;
     const layout = useListLayout();
     return (
         <>
