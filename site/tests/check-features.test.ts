@@ -1,3 +1,6 @@
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
     FEATURES,
@@ -7,6 +10,7 @@ import {
     mapSources,
     markersOf,
     ownedNames,
+    sharedEntriesOf,
 } from "../../scripts/check-features.ts";
 
 // `pnpm build` runs scripts/check-features.ts over every package's built main entry: it fails when
@@ -149,5 +153,58 @@ describe("the features' bundle guard", () => {
 
     it("finds no main entry where nothing was built", () => {
         expect(mainEntryOf("/nowhere", "@fragiola/calendar")).toBeUndefined();
+    });
+
+    it("fails an Angular bundle whose source map names a source of a feature's entry point folder", () => {
+        const read = built({
+            "fragiola-calendar-angular-internal.mjs": "export const s = 1;",
+        });
+        const maps = built({
+            "fragiola-calendar-angular-internal.mjs": JSON.stringify({
+                sources: [
+                    "../../internal/utils/part.ts",
+                    "../../selection/directives/selection.directive.ts",
+                ],
+            }),
+        });
+        expect(
+            featureLeaks(
+                "fragiola-calendar-angular-internal.mjs",
+                read,
+                [SELECTION],
+                maps,
+            ),
+        ).toEqual([
+            "fragiola-calendar-angular-internal.mjs: selection's ../../selection/directives/selection.directive.ts",
+        ]);
+    });
+
+    it("guards an Angular package's internal entry with its main entry: every app ships both", () => {
+        const dist = mkdtempSync(join(tmpdir(), "calendar-guard-"));
+        try {
+            mkdirSync(join(dist, "fesm2022"));
+            writeFileSync(
+                join(dist, "fesm2022/fragiola-calendar-angular.mjs"),
+                "",
+            );
+            expect(sharedEntriesOf(dist, "@fragiola/calendar-angular")).toEqual(
+                ["fesm2022/fragiola-calendar-angular.mjs"],
+            );
+            writeFileSync(
+                join(dist, "fesm2022/fragiola-calendar-angular-internal.mjs"),
+                "",
+            );
+            expect(sharedEntriesOf(dist, "@fragiola/calendar-angular")).toEqual(
+                [
+                    "fesm2022/fragiola-calendar-angular.mjs",
+                    "fesm2022/fragiola-calendar-angular-internal.mjs",
+                ],
+            );
+            expect(sharedEntriesOf("/nowhere", "@fragiola/calendar")).toEqual(
+                [],
+            );
+        } finally {
+            rmSync(dist, { recursive: true, force: true });
+        }
     });
 });

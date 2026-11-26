@@ -1,13 +1,15 @@
 // The features' bundle guard: a feature not imported is not in the app's bundle. Fails when the
 // main entry of a package (`packages/*/dist/index.js`, or ng-packagr's
-// `dist/fesm2022/<package>.mjs`), or a chunk it imports, holds a feature's code: one of the markers
+// `dist/fesm2022/<package>.mjs`, with the `internal` entry every Angular entry imports:
+// `<package>-internal.mjs`), or a chunk it imports, holds a feature's code: one of the markers
 // a feature names (its command, `get` and `is` keys, read from the built feature itself) or an
 // import of a feature's entry point (`@fragiola/calendar…/selection`). Run by `pnpm build`, after
 // the packages built. From Data Grid (fragiola/data-grid, scripts/check-features.ts, its string
 // markers: where Data Grid and Tree drift, the calendar follows Data Grid), same author and
 // licence. The core names every feature's keys in its `FEATURE_KEYS` table (Tree's, to refuse an
 // uninstalled feature's names), so those names are no marker; a source of the feature's folder
-// (`src/<subpath>/`) named by a built file's source map is one too (Tree's check).
+// (`src/<subpath>/`, or an Angular entry point's `<subpath>/`) named by a built file's source map
+// is one too (Tree's check).
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -157,8 +159,9 @@ export function featureLeaks(
             if (importsSubpath(source, subpath)) {
                 leaks.push(`${name}: imports the ${subpath} entry`);
             }
+            const folder = new RegExp(`(?:^|/)${subpath}/`);
             for (const path of sources) {
-                if (path.includes(`src/${subpath}/`)) {
+                if (folder.test(path)) {
                     leaks.push(`${name}: ${subpath}'s ${path}`);
                 }
             }
@@ -187,6 +190,20 @@ export function mainEntryOf(
     return existsSync(join(dist, fesm)) ? fesm : undefined;
 }
 
+/**
+ * What every app of a package ships, relative to its `dist`: its main entry, and an Angular
+ * package's `internal` entry (ng-packagr's `fesm2022/<package>-internal.mjs`), which the main
+ * entry imports by its specifier (no chunk of its own, so the walk would not reach it).
+ */
+export function sharedEntriesOf(dist: string, packageName: string): string[] {
+    const main = mainEntryOf(dist, packageName);
+    if (main === undefined) return [];
+    const internal = main.replace(/\.mjs$/, "-internal.mjs");
+    return main.endsWith(".mjs") && existsSync(join(dist, internal))
+        ? [main, internal]
+        : [main];
+}
+
 async function main() {
     const features = await builtMarkers(FEATURES);
     const problems: string[] = [];
@@ -198,19 +215,23 @@ async function main() {
                 name: string;
             }
         ).name;
-        const entry = existsSync(dist) ? mainEntryOf(dist, name) : undefined;
-        if (!entry) {
+        const entries = existsSync(dist) ? sharedEntriesOf(dist, name) : [];
+        if (entries.length === 0) {
             problems.push(`packages/${pkg}: no built main entry`);
             continue;
         }
-        const folder = join(dist, entry.includes("/") ? "fesm2022" : "");
-        const read = (file: string) => {
-            const path = join(folder, file.replace(/^fesm2022\//, ""));
-            return existsSync(path) ? readFileSync(path, "utf8") : undefined;
-        };
-        const readMap = (file: string) => read(`${file}.map`);
-        for (const leak of featureLeaks(entry, read, features, readMap)) {
-            problems.push(`packages/${pkg}/dist/${leak}`);
+        for (const entry of entries) {
+            const folder = join(dist, entry.includes("/") ? "fesm2022" : "");
+            const read = (file: string) => {
+                const path = join(folder, file.replace(/^fesm2022\//, ""));
+                return existsSync(path)
+                    ? readFileSync(path, "utf8")
+                    : undefined;
+            };
+            const readMap = (file: string) => read(`${file}.map`);
+            for (const leak of featureLeaks(entry, read, features, readMap)) {
+                problems.push(`packages/${pkg}/dist/${leak}`);
+            }
         }
     }
     if (problems.length > 0) {
