@@ -1,6 +1,7 @@
 import * as React from "react";
 import { useCalendarContext } from "../context";
 import { useCalendarValue, usePart } from "../hooks/internal";
+import { MemoCall, useLatest } from "../utils/memo-call";
 import { type DivPrimitiveProps, useRenderElement } from "../utils/use-render";
 
 export interface ColumnHeadersState {
@@ -19,6 +20,7 @@ export interface ColumnHeadersProps
 
 /** The grid's header row (`role="row"`): a header per day (time grid) or weekday (month). */
 export function ColumnHeaders(props: ColumnHeadersProps) {
+    const render = useLatest(props.children);
     const { children, ...rest } = props;
     const context = useCalendarContext("ColumnHeaders");
     const { model, engine } = context;
@@ -40,7 +42,7 @@ export function ColumnHeaders(props: ColumnHeadersProps) {
         props: {
             ...part.props,
             children: dates.map((date) => (
-                <React.Fragment key={date}>{children(date)}</React.Fragment>
+                <MemoCall key={date} render={render} args={[date]} />
             )),
         },
     });

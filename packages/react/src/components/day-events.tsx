@@ -1,7 +1,9 @@
 import type { Segment } from "@fragiola/calendar";
 import * as React from "react";
 import { DayContext, useCalendarContext, useRequired } from "../context";
-import { usePart } from "../hooks/internal";
+import { useCalendarValue, usePart } from "../hooks/internal";
+import { LANE_SIZE } from "../hooks/use-segment";
+import { MemoCall, useLatest } from "../utils/memo-call";
 import { type DivPrimitiveProps, useRenderElement } from "../utils/use-render";
 
 export interface DayEventsState {
@@ -15,11 +17,14 @@ export interface DayEventsProps extends DivPrimitiveProps<DayEventsState> {
 }
 
 /**
- * A day's events (`role="list"`): the segments that start in it, in lane order. A multi-day
- * segment starts in its first day of the row and spans `segment.span` columns: place it from its
- * state. `dayMaxEvents: "auto"` measures this element.
+ * A day's events (`role="list"`): the segments that start in it, in lane order. It is their
+ * containing block (`position: relative`) and holds the row's lanes (`min-block-size`, the row's
+ * `lanes` times `--calendar-lane-size`), so every day of a row is as tall. With
+ * `dayMaxEvents: "auto"` the engine measures it: it holds no lanes then, give it the day's room
+ * (`flex: 1`).
  */
 export function DayEvents(props: DayEventsProps) {
+    const render = useLatest(props.children);
     const { children, ...rest } = props;
     const context = useCalendarContext("DayEvents");
     const { day, column, week } = useRequired(
@@ -28,6 +33,10 @@ export function DayEvents(props: DayEventsProps) {
         "Calendar.Day",
     );
     const part = usePart(context, "day-events", { date: day.date });
+    const auto = useCalendarValue(
+        context,
+        () => context.model.state.settings.dayMaxEvents === "auto",
+    );
     const segments = React.useMemo(
         () => week.segments.filter((segment) => segment.startColumn === column),
         [week, column],
@@ -39,9 +48,15 @@ export function DayEvents(props: DayEventsProps) {
             ...part.props,
             children: segments.map((segment) => (
                 <React.Fragment key={segment.occurrenceId}>
-                    {children(segment)}
+                    <MemoCall render={render} args={[segment]} />
                 </React.Fragment>
             )),
         },
+        style: auto
+            ? { position: "relative" }
+            : {
+                  position: "relative",
+                  minBlockSize: `calc(${week.lanes} * ${LANE_SIZE})`,
+              },
     });
 }

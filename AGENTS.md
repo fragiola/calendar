@@ -399,12 +399,9 @@ drag and ranges; RFC 5545 for recurrence; FullCalendar's documented default for 
   Up/Down between them, Escape back (D12, unchanged). Week numbers are `rowheader`s. An
   occurrence's element is named where it shows: `segment` (a day grid), `time-event`,
   `list-event`; all are `listitem`s. Decorations (`selection`, `drag-preview`, `now-indicator`,
-  `business-hours`, `resize-handle`) are `aria-hidden`. Known compromise: the column layers' lists
-  sit in the `grid` beside its rows (not in a cell), which ARIA's required-children rule does not
-  allow (an axe check reports it); keeping each list in a cell would make an event's box depend
-  on the slot height in CSS. Checked against screen readers in #8's e2e and manual pass; the
-  alternative, if they misread it, is `aria-owns` from each slot cell to the events starting in
-  it.
+  `business-hours`, `resize-handle`) are `aria-hidden`. (Issue #8 replaced the known compromise
+  of the column layers' lists beside the rows: the layer is now the grid's last `row` and each
+  column its day's `gridcell`; see "Issue #8, accessibility".)
 - **Issue #7, core keys for the adapter.** `partAttributes(model, part, payload)`: a part's
   attributes before an engine (the server render, the first client render), the tab stop where
   the model puts it (`engine/positions.ts` holds the focus positions both read). New parts:
@@ -457,6 +454,38 @@ drag and ranges; RFC 5545 for recurrence; FullCalendar's documented default for 
   exports every feature subpath; the smoke app (Vite + React, strict, no `skipLibCheck`) takes its
   pins from `examples/react` once it exists, the adapter's own until then (react 19.3.1, vite
   8.3.8: `../primitives`'). The bundle guard already reads every package's main entry.
+
+- **Issue #8, accessibility (D12 settled).** axe (`@axe-core/playwright`) reports no violation on
+  the month, week, day and list views (the playground's `a11y.spec.ts`). The time grid's lists of
+  timed events were beside the grid's rows (ARIA's required children): the layer of columns
+  (`columns`) is now the grid's last `row`, each column (`column`) its day's `gridcell` holding
+  the day's `list` of `listitem`s. The column cells are not in the roving focus (the slots are);
+  Enter on a slot still moves into the events starting in it. No API change.
+- **Issue #8, "+N more" on the keyboard.** A day's `more` link is the last item of its events:
+  Down from the day's last event focuses it, Enter on a day whose events are all hidden focuses
+  it, Up goes back to the last event (or the day), Escape returns to the day, Enter is its
+  `more-click` (Space clicks it). It keeps `tabindex="-1"` (outside the roving focus).
+- **Issue #8, day-grid geometry (D18).** `Segment` places itself from the layout as `TimeEvent`
+  does: `position: absolute` in its day's `DayEvents` (`position: relative`, the containing block),
+  `inset-block-start` its `lane` times `--calendar-lane-size` (default `1.5rem`), `block-size` one
+  lane, `inline-size` its `span` days plus `span - 1` times `--calendar-day-gap` (default `0px`: the
+  space between two days' event areas), `inset-inline-start: 0` (logical: right to left needs
+  nothing). `DayEvents` holds the row's `lanes` (`min-block-size`), except with
+  `dayMaxEvents: "auto"` (the engine measures it: the app gives it the day's room). A row
+  (`Week`, `AllDayRow`) is `position: relative`, the containing block of its `Selection` and
+  `DragPreview`, placed over their days after `--calendar-row-inset` (the row's space before its
+  first day: a week number, a label). The custom properties are the app's to set; the adapter
+  only reads them.
+- **Issue #8, re-render cost (D11).** Each collection part (`Weeks`, `Days`, `SlotRows`, `Slots`,
+  `Columns`, `ColumnEvents`, `DayEvents`, `ListDays`, `ListDay`, `ColumnHeaders`) calls the app's
+  children function through `MemoCall` (`utils/memo-call.tsx`): memoized on the layout objects it
+  passes (a week row, a day and its row, a slot, a column, a segment, a list day or item), with the
+  function read through a ref, so a new inline function (a re-render of the app) re-renders no
+  unchanged row. Moving an event re-renders the rows or columns it touches
+  (`tests/rerender.test.tsx`; the playground's stress fixture counts renders in e2e). The rule for
+  apps: a children function renders from its arguments, hooks and contexts; app state it shows
+  goes through a hook or a context of the components it renders (they update on their own), not
+  through the function's closure, which is read only when the row's layout changes.
 
 ## Commands
 
@@ -595,7 +624,9 @@ one namespace (`Calendar.*`), `render` (an element or `(props, state) => element
 `asChild`), `ref` a plain prop merged with the part's, handlers composed internal first,
 `className` / `style` a value or a function of the state, structural inline style only
 (`position`, the time grid's `top` / `height` / `inset-inline-start` / `width` percentages from
-the layout's fractions, `pointer-events` on the column layer and its events), state as `data-*`
+the layout's fractions, a day grid's segment lanes and spans on logical properties from
+`--calendar-lane-size` / `--calendar-day-gap`, the lanes a day's events hold, a row's decorations
+after `--calendar-row-inset`, `pointer-events` on the column layer and its events), state as `data-*`
 (present or absent) and ARIA only, every attribute from the core (`engine.adapter.attributes` /
 `partAttributes`), no text, no `aria-label`, no class names. A collection part calls a children
 function per entity and renders no element of its own (`Weeks`, `Days`, `SlotRows`, `Slots`,
@@ -610,13 +641,13 @@ function per entity and renders no element of its own (`Weeks`, `Days`, `SlotRow
 | `DayGrid` | `day-grid` | grid | nodes |
 | `ColumnHeaders` / `ColumnHeader` (`date`) | `column-headers` / `column-header` | row / columnheader | `(date)` / nodes or `(state)` |
 | `Weeks` | — | — | `(week)` |
-| `Week` (`week`) | `week` | row | `(day)` or nodes |
+| `Week` (`week`) | `week` (`position: relative`) | row | `(day)` or nodes |
 | `WeekNumber` | `week-number` | rowheader | nodes or `(state)` |
 | `Days` | — | — | `(day, week)` |
 | `Day` (`day`) | `day` (`data-date`, `data-today`, …) | gridcell (roving) | nodes or `(day, segments)` |
-| `DayEvents` | `day-events` | list | `(segment)` |
-| `Segment` (`segment`) | `segment` | listitem (roving) | nodes or `(state)` |
-| `More` | `more` | button (`tabindex=-1`) | nodes or `(state)`; rendered while `hiddenCount > 0` |
+| `DayEvents` | `day-events` (holds the row's lanes) | list | `(segment)` |
+| `Segment` (`segment`) | `segment` (placed in its lane, over its days) | listitem (roving) | nodes or `(state)` |
+| `More` | `more` | button (`tabindex=-1`, the last item of the day's events) | nodes or `(state)`; rendered while `hiddenCount > 0` |
 | `TimeGrid` | `time-grid` | grid | nodes |
 | `AllDayRow` | `all-day-row` | row | `(day)` or nodes |
 | `Scroller` | `scroller` | | nodes |
@@ -625,8 +656,8 @@ function per entity and renders no element of its own (`Weeks`, `Days`, `SlotRow
 | `SlotLabel` | `slot-label` | rowheader | nodes or `(state)` |
 | `Slots` | — | — | `(column)` |
 | `Slot` (`date`) | `slot` (`data-date`, `data-time`, …) | gridcell (roving) | nodes or `(state)` |
-| `Columns` | `columns` | | `(column)` |
-| `Column` (`column`) | `column` (`data-date`, …) | | nodes |
+| `Columns` | `columns` | row (the grid's last) | `(column)` |
+| `Column` (`column`) | `column` (`data-date`, …) | gridcell (not roving) | nodes |
 | `ColumnEvents` | `column-events` | list | `(segment)` |
 | `TimeEvent` (`segment`) | `time-event` | listitem (roving) | nodes or `(state)` |
 | `List` / `ListDays` | `list` / — | / — | nodes or `(state)` / `(day)` |

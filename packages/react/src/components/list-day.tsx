@@ -2,6 +2,7 @@ import type { ListDay as ListDayLayout, ListItem } from "@fragiola/calendar";
 import * as React from "react";
 import { ListDayContext, useCalendarContext } from "../context";
 import { usePart } from "../hooks/internal";
+import { MemoCall, useLatest } from "../utils/memo-call";
 import { type DivPrimitiveProps, useRenderElement } from "../utils/use-render";
 
 export interface ListDayState {
@@ -19,6 +20,7 @@ export interface ListDayProps extends DivPrimitiveProps<ListDayState> {
 
 /** A list view's day (`role="list"`, `data-date`): its events. Its heading is the app's, before it. */
 export function ListDay(props: ListDayProps) {
+    const render = useLatest(props.children);
     const { day, children, ...rest } = props;
     const context = useCalendarContext("ListDay");
     const part = usePart(context, "list-day", { date: day.date });
@@ -30,7 +32,7 @@ export function ListDay(props: ListDayProps) {
             ...part.props,
             children: day.items.map((item) => (
                 <React.Fragment key={item.occurrenceId}>
-                    {children(item)}
+                    <MemoCall render={render} args={[item]} />
                 </React.Fragment>
             )),
         },

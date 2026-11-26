@@ -2,6 +2,7 @@ import type { TimeSegment } from "@fragiola/calendar";
 import * as React from "react";
 import { ColumnContext, useCalendarContext, useRequired } from "../context";
 import { usePart } from "../hooks/internal";
+import { MemoCall, useLatest } from "../utils/memo-call";
 import { type DivPrimitiveProps, useRenderElement } from "../utils/use-render";
 
 export interface ColumnEventsState {
@@ -20,6 +21,7 @@ export interface ColumnEventsProps
  * the events that start in it, Up and Down move between them.
  */
 export function ColumnEvents(props: ColumnEventsProps) {
+    const render = useLatest(props.children);
     const { children, ...rest } = props;
     const context = useCalendarContext("ColumnEvents");
     const { column } = useRequired(
@@ -35,7 +37,7 @@ export function ColumnEvents(props: ColumnEventsProps) {
             ...part.props,
             children: column.segments.map((segment) => (
                 <React.Fragment key={segment.occurrenceId}>
-                    {children(segment)}
+                    <MemoCall render={render} args={[segment]} />
                 </React.Fragment>
             )),
         },
