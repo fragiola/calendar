@@ -6,6 +6,22 @@ export type {
     ValidationIssue,
     ValidationResult,
 } from "./document/validation-issue";
+
+// locale: weeks, week numbers, `Intl` parts
+export type { FormatOptions } from "./locale/date-time-format";
+export { formatDateParts } from "./locale/format-date-parts";
+export { formatDateRangeParts } from "./locale/format-date-range-parts";
+export { formatInstantParts } from "./locale/format-instant-parts";
+export { formatTimeParts } from "./locale/format-time-parts";
+export { isWeekend } from "./locale/is-weekend";
+export { isoWeekOfYear } from "./locale/iso-week-of-year";
+export { validateLocale } from "./locale/validate-locale";
+export { ISO_WEEK, type WeekInfo, weekInfo } from "./locale/week-info";
+export {
+    type WeekOfYear,
+    type WeekRules,
+    weekOfYear,
+} from "./locale/week-of-year";
 // time: plain dates and times, instants, RFC 3339
 export { addDays } from "./time/add-days";
 export { addMinutes } from "./time/add-minutes";
