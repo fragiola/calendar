@@ -4,7 +4,9 @@ import {
     type FeatureMarkers,
     featureLeaks,
     mainEntryOf,
+    mapSources,
     markersOf,
+    ownedNames,
 } from "../../scripts/check-features.ts";
 
 // `pnpm build` runs scripts/check-features.ts over every package's built main entry: it fails when
@@ -73,6 +75,48 @@ describe("the features' bundle guard", () => {
             "selection.js": 'export const keys = ["selection.set"];',
         });
         expect(featureLeaks("index.js", read, [SELECTION])).toEqual([]);
+    });
+
+    it("leaves out the names the core's FEATURE_KEYS table owns, and reads a list of commands", () => {
+        const owned = ownedNames({
+            recurrence: {
+                commands: ["recurrence.split"],
+                get: [],
+                is: ["event-recurring"],
+            },
+        });
+        expect(
+            markersOf(
+                {
+                    commands: [
+                        { name: "recurrence.split" },
+                        { name: "recurrence.own" },
+                    ],
+                    get: { "occurrences-by": () => 1 },
+                    is: { "event-recurring": () => true },
+                },
+                owned,
+            ),
+        ).toEqual(["recurrence.own", "occurrences-by"]);
+    });
+
+    it("fails a main entry whose source map names a source of a feature's folder", () => {
+        const read = built({
+            "index.js": 'import { s } from "./shared-1.js";\nexport { s };',
+            "shared-1.js": "export const s = 1;",
+        });
+        const maps = built({
+            "shared-1.js": JSON.stringify({
+                sources: [
+                    "../src/model/calendar-model.ts",
+                    "../src/selection/selection.ts",
+                ],
+            }),
+        });
+        expect(featureLeaks("index.js", read, [SELECTION], maps)).toEqual([
+            "shared-1.js: selection's ../src/selection/selection.ts",
+        ]);
+        expect(mapSources(undefined)).toEqual([]);
     });
 
     it("finds no main entry where nothing was built", () => {

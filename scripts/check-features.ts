@@ -5,7 +5,9 @@
 // import of a feature's entry point (`@fragiola/calendar…/selection`). Run by `pnpm build`, after
 // the packages built. From Data Grid (fragiola/data-grid, scripts/check-features.ts, its string
 // markers: where Data Grid and Tree drift, the calendar follows Data Grid), same author and
-// licence.
+// licence. The core names every feature's keys in its `FEATURE_KEYS` table (Tree's, to refuse an
+// uninstalled feature's names), so those names are no marker; a source of the feature's folder
+// (`src/<subpath>/`) named by a built file's source map is one too (Tree's check).
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -32,23 +34,69 @@ export interface FeatureMarkers {
     readonly markers: readonly string[];
 }
 
-/** What a built feature names: its commands, its `get` and `is` keys. */
-export function markersOf(feature: {
-    readonly commands?: object;
-    readonly queries?: object;
-    readonly questions?: object;
-}): string[] {
+/**
+ * What a built feature names: its commands, its `get` and `is` keys (a list of definitions or a
+ * map), less the names the core owns in its table (`owned`: in the main entry by design).
+ */
+export function markersOf(
+    feature: {
+        readonly commands?: object;
+        readonly queries?: object;
+        readonly questions?: object;
+        readonly get?: object;
+        readonly is?: object;
+    },
+    owned: ReadonlySet<string> = new Set(),
+): string[] {
+    const commands = Array.isArray(feature.commands)
+        ? feature.commands.map((command: { name: string }) => command.name)
+        : Object.keys(feature.commands ?? {});
     return [
-        ...Object.keys(feature.commands ?? {}),
+        ...commands,
         ...Object.keys(feature.queries ?? {}),
         ...Object.keys(feature.questions ?? {}),
-    ];
+        ...Object.keys(feature.get ?? {}),
+        ...Object.keys(feature.is ?? {}),
+    ].filter((marker) => !owned.has(marker));
+}
+
+/** The names the core's `FEATURE_KEYS` table lists: its commands, `get` and `is` keys. */
+export function ownedNames(table: object): Set<string> {
+    const names = new Set<string>();
+    for (const keys of Object.values(table) as Record<string, string[]>[]) {
+        for (const kind of [
+            "commands",
+            "get",
+            "is",
+            "engineRun",
+            "engineGet",
+            "engineIs",
+        ]) {
+            for (const name of keys[kind] ?? []) names.add(name);
+        }
+    }
+    return names;
+}
+
+/** The sources a built file's source map names, as written there (`../src/selection/state.ts`). */
+export function mapSources(map: string | undefined): string[] {
+    if (map === undefined) return [];
+    const parsed = JSON.parse(map) as { sources?: unknown };
+    return Array.isArray(parsed.sources)
+        ? parsed.sources.filter(
+              (source): source is string => typeof source === "string",
+          )
+        : [];
 }
 
 /** Each feature's markers, from the core's build (`packages/core/dist/<subpath>.js`). */
 async function builtMarkers(
     features: readonly FeatureEntry[],
 ): Promise<FeatureMarkers[]> {
+    const core = (await import(
+        pathToFileURL(join(root, "packages", "core", "dist", "index.js")).href
+    )) as { FEATURE_KEYS?: object };
+    const owned = ownedNames(core.FEATURE_KEYS ?? {});
     return Promise.all(
         features.map(async ({ subpath, factory }) => {
             const entry = join(
@@ -66,7 +114,7 @@ async function builtMarkers(
             if (typeof make !== "function") {
                 throw new Error(`${entry} exports no ${factory}()`);
             }
-            return { subpath, markers: markersOf(make()) };
+            return { subpath, markers: markersOf(make(), owned) };
         }),
     );
 }
@@ -79,14 +127,16 @@ function importsSubpath(source: string, subpath: string): boolean {
 }
 
 /**
- * The feature code a main entry holds, through the chunks it imports: one line per marker or
- * feature import found, with the file it is in. `read` gives a built file's source by its name,
- * relative to the entry's folder (`undefined` for none).
+ * The feature code a main entry holds, through the chunks it imports: one line per marker,
+ * feature source or feature import found, with the file it is in. `read` gives a built file's
+ * source by its name, relative to the entry's folder, and `readMap` its source map (`undefined`
+ * for none).
  */
 export function featureLeaks(
     main: string,
     read: (name: string) => string | undefined,
     features: readonly FeatureMarkers[],
+    readMap: (name: string) => string | undefined = () => undefined,
 ): string[] {
     const leaks: string[] = [];
     const seen = new Set<string>();
@@ -95,9 +145,17 @@ export function featureLeaks(
         seen.add(name);
         const source = read(name);
         if (source === undefined) return;
+        const sources = mapSources(readMap(name)).map((path) =>
+            path.replaceAll("\\", "/"),
+        );
         for (const { subpath, markers } of features) {
             if (importsSubpath(source, subpath)) {
                 leaks.push(`${name}: imports the ${subpath} entry`);
+            }
+            for (const path of sources) {
+                if (path.includes(`src/${subpath}/`)) {
+                    leaks.push(`${name}: ${subpath}'s ${path}`);
+                }
             }
             for (const marker of markers) {
                 if (
@@ -145,7 +203,8 @@ async function main() {
             const path = join(folder, file.replace(/^fesm2022\//, ""));
             return existsSync(path) ? readFileSync(path, "utf8") : undefined;
         };
-        for (const leak of featureLeaks(entry, read, features)) {
+        const readMap = (file: string) => read(`${file}.map`);
+        for (const leak of featureLeaks(entry, read, features, readMap)) {
             problems.push(`packages/${pkg}/dist/${leak}`);
         }
     }
