@@ -1,8 +1,9 @@
 // The core's non-negotiable rules (AGENTS.md, D21), each one a test: no framework import, zero
-// runtime dependencies, no global DOM, crypto or timers, nothing only Node has, no `any` in the
-// exported declarations, no CSS class names, no `.style` outside `src/engine/structural-style.ts`,
-// and no ported code (nothing is copied from FullCalendar, Schedule-X or SVAR: Provenance). Shaped
-// like Flow's (fragiola/flow, packages/core/tests/guard.test.ts), same author and licence.
+// runtime dependencies, no global DOM, crypto or timers, no `Date` (D4: strict parsers only),
+// nothing only Node has, no `any` in the exported declarations, no CSS class names, no `.style`
+// outside `src/engine/structural-style.ts`, and no ported code (nothing is copied from
+// FullCalendar, Schedule-X or SVAR: Provenance). Shaped like Flow's (fragiola/flow,
+// packages/core/tests/guard.test.ts), same author and licence.
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
@@ -55,6 +56,14 @@ const GLOBAL_CRYPTO = /(?<![.\w$])crypto\b(?!\s*\??:)/;
 /** Timers come from the root's `defaultView` through the injected host (D16), never the globals. */
 const GLOBAL_TIMER =
     /(?<![.\w$])(setTimeout|clearTimeout|setInterval|clearInterval)\b(?!\s*\??:)/;
+
+/**
+ * `Date` objects and string parsing: dates are parsed by the time domain's strict parsers (D4), and
+ * `Intl` formats epoch milliseconds directly, so the core never builds a `Date` (whose string
+ * parsing and local-time getters depend on the engine and the host zone).
+ */
+const DATE_PARSING =
+    /(?<![.\w$])(?:new\s+Date\b|Date\s*\(|Date\.parse\b)|\.(?:getTimezoneOffset|getHours|getDate|getDay|getMonth|getFullYear|getMinutes|setHours|setDate|setMonth|setFullYear)\s*\(/;
 
 /** Node's own modules and globals: the core runs in a browser too. */
 const NODE_ONLY =
@@ -143,6 +152,10 @@ describe("core package guard", () => {
 
     it("never schedules through the global timers (the engine's host gives them)", () => {
         expect(offendersOf(GLOBAL_TIMER)).toEqual([]);
+    });
+
+    it("never builds a Date nor parses a string with it (D4)", () => {
+        expect(offendersOf(DATE_PARSING)).toEqual([]);
     });
 
     it("uses nothing only Node has", () => {
@@ -281,6 +294,24 @@ describe("the guard's own patterns", () => {
             ),
         ).toBe(false);
         expect(hits(GLOBAL_TIMER, "interface Host { setTimeout: Timer }")).toBe(
+            false,
+        );
+    });
+
+    it("fails a planted Date, string parsing or local-time getter, not Date.now", () => {
+        for (const code of [
+            'new Date("2026-11-26T09:30:00-03:00")',
+            "new Date(ms)",
+            "Date.parse(text)",
+            "Date()",
+            "at.getHours()",
+            "at.getTimezoneOffset()",
+        ]) {
+            expect(hits(DATE_PARSING, code), code).toBe(true);
+        }
+        expect(hits(DATE_PARSING, "const now = Date.now();")).toBe(false);
+        expect(hits(DATE_PARSING, "const d = toDate(x);")).toBe(false);
+        expect(hits(DATE_PARSING, "// new Date(text) is never used")).toBe(
             false,
         );
     });

@@ -7,5 +7,8 @@ export default defineProject({
         // with a `// @vitest-environment jsdom` docblock.
         environment: "node",
         include: ["tests/**/*.test.ts"],
+        // the host zone is forced, so no result depends on the machine's (D4); the root config
+        // runs this project once per zone of HOST_TIME_ZONES
+        env: { TZ: "UTC" },
     },
 });
