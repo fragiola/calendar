@@ -174,6 +174,10 @@ export interface CommandMap<T extends CalendarTypes = AnyTypes> {
         payload: EventSetFlagsPayload;
         result: EventIdResult;
     };
+    "event.set-all": {
+        payload: { events: CalendarEventJson<T>[] };
+        result: { eventIds: string[]; removedEventIds: string[] };
+    };
     "calendar.add": {
         payload: CalendarInfoJson<T>;
         result: { calendarId: string };

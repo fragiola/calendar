@@ -1,0 +1,59 @@
+---
+title: Calendar.ListEvent
+description: An event of a list view's day, a list item and a tab stop of its own, that you fill with its title, its times and its calendar's colour.
+---
+
+`Calendar.ListEvent` is one occurrence in a list view's day: a `div` with `role="listitem"`, its
+ids and its state as `data-*`. What it shows (its title, its times, its calendar's colour) is
+yours: the title is model data you read, the times are `Intl` parts you format.
+
+## Behaviour
+
+- A `listitem` of its day's `list`, and a tab stop of its own (`tabindex="0"`): Tab moves
+  from event to event.
+- Enter on it is `event-click` (`onEventClick`), as a press is.
+- Its accessible name is yours: its content, or an `aria-label`.
+
+## Usage
+
+```tsx
+import { Calendar, type ListItem, useCalendar } from "@fragiola/calendar-react";
+
+export function Item(props: { item: ListItem }) {
+    const { model } = useCalendar();
+    const occurrence = model.get("occurrence-by", { id: props.item.occurrenceId });
+    // a renamed occurrence of a recurring event has its own title
+    const title = occurrence?.title ?? model.get("event-by", { id: props.item.eventId })?.title;
+    return (
+        <Calendar.ListEvent
+            item={props.item}
+            className={({ calendarId }) => `event event-${calendarId ?? "none"}`}
+        >
+            <span className="event-time">{props.item.allDay ? "All day" : occurrence?.start}</span>
+            <span className="event-title">{title}</span>
+        </Calendar.ListEvent>
+    );
+}
+```
+
+The state (`ListEventState`, on the [hooks page](/docs/api/hooks), with the item and the
+`EventState` flags) styles it; `useListEvent` gives the same props for an element of your own.
+
+## Attributes
+
+| attribute | value |
+| --- | --- |
+| `data-calendar-part` | `data-calendar-part="list-event"` |
+| `data-event-id`, `data-occurrence-id`, `data-calendar-id` | its event, its occurrence, its calendar |
+| `data-all-day`, `data-continues-before`, `data-continues-after` | present when on |
+| `role`, `tabindex` | `listitem`, `0` |
+
+## Props
+
+`ListEventProps` takes the [common props](/docs/api/root#common-props) and any `div` attribute,
+and:
+
+| prop | type | description |
+| --- | --- | --- |
+| `item` | `ListItem` | the occurrence, from `Calendar.ListDay`'s children function |
+| `children` | `ReactNode`, or `(state: ListEventState) => ReactNode` | the event's content (its title is model data: render it yourself), or a function of the state |

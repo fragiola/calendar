@@ -1,0 +1,103 @@
+---
+title: Model and engine
+description: The model holds the calendar and runs in plain Node; the engine is one calendar on screen, with its focus, gestures, previews and measurements.
+---
+
+Two objects split the work. The **model** is the calendar: its document, its view, its rules and
+its layouts, with no DOM. The **engine** is one calendar on screen: it listens to the root
+element's pointers and keys, keeps the focus, runs the gestures, previews a drag, measures the
+days and tells your app what happened. Both answer the same five verbs, `run`, `can`, `check`,
+`get` and `is`.
+
+## The model
+
+What can be known without a screen is the model's: the events, the visible range, the layout of a
+month or a week (`model.get("day-grid")`, `model.get("time-grid")`, `model.get("list")`), the
+titles as `Intl` parts. A server can navigate it and an assistant can move events with it. Its
+clock is injectable, so "today" is the same in a test as in production
+([Dates and time zones](/docs/concepts/dates-and-time-zones)).
+
+```ts
+import { createCalendarModel } from "@fragiola/calendar-react";
+
+const model = createCalendarModel(json, {
+    now: () => Date.parse("2026-11-26T12:00:00-05:00"),
+});
+model.run("view.set", { type: "month" });
+model.get("visible-range"); // { start: "2026-11-01", end: "2026-12-13" }: six weeks, Sunday first
+```
+
+## The engine
+
+`Calendar.Root` creates the engine (`createCalendarEngine(model, options)`) when it mounts, in a
+layout effect, attaches its element and destroys it on unmount. The parts register their elements
+with it; you never do. Before it exists (the server render, the first client render) every part
+reads its attributes and its layout from the model, so the server's HTML is the client's first
+render.
+
+What only a screen has is the engine's: the focused date or event (`engine.get("focused")`), the
+drag preview (`engine.get("drag-preview")`), the lanes that fit a day
+(`engine.get("max-lanes")`), the reading direction. Its actions move the focus or cancel a
+gesture:
+
+```tsx
+import { useCalendar } from "@fragiola/calendar-react";
+
+function GoToToday() {
+    const { model, engine } = useCalendar();
+    return (
+        <button
+            type="button"
+            onClick={() => engine.run("focus", { date: model.get("today") })}
+        >
+            Focus today
+        </button>
+    );
+}
+```
+
+`useCalendar` gives both anywhere inside the root. The engine it returns is there from the first
+render: before the root is mounted an action is refused and a read is empty.
+
+## What the engine tells you
+
+The engine's events are the root's callbacks: `onEventClick` (a tap, or Enter on an event),
+`onDateClick` (a day or a slot), `onMoreClick` (a "+N more" link), `onTodayChange` (midnight),
+`onAnnounce` (data for your live region), and with their features `onSelect`, `onEventDrop` and
+`onExternalDrop`. A drop has already run its command when you hear it; a selection is a range for
+your app to act on.
+
+```tsx
+<Calendar.Root
+    model={model}
+    onEventClick={({ eventId }) => openEditor(eventId)}
+    onDateClick={({ date, time }) => console.log("pressed", date, time)}
+>
+    {/* … */}
+</Calendar.Root>
+```
+
+## Outside the root
+
+A toolbar or a test outside the root reaches both through a calendar ref, `useCalendarRef` in a
+component or `createCalendarRef` in a module:
+
+```tsx
+import { Calendar, useCalendarRef } from "@fragiola/calendar-react";
+
+function Planner() {
+    const calendar = useCalendarRef();
+    return (
+        <>
+            <button type="button" onClick={() => calendar.current?.model.run("view.today", {})}>
+                Today
+            </button>
+            <Calendar.Root calendarRef={calendar} defaultEvents={[]}>
+                {/* … */}
+            </Calendar.Root>
+        </>
+    );
+}
+```
+
+[Engine](/docs/api/engine) lists every action, key and event.

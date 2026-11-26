@@ -1,0 +1,81 @@
+---
+title: ResizeHandle
+description: A handle that resizes its event from its start or its end with resize(), inside a segment or a timed event, placed at the edge by you.
+---
+
+`ResizeHandle` resizes the event it is in, from one edge, with the `resize()` feature from
+`@fragiola/calendar-react/resize`. Put it inside a `Calendar.Segment` (a day-grid event: its days)
+or a `Calendar.TimeEvent` (a timed event: its times). It renders a `div` with `data-edge`; where it
+sits on the event, its size and its cursor are yours.
+
+## Behaviour
+
+- A press and drag on it moves the edge: by days in a day grid, by `snapDuration` steps in a time
+  grid; the event's other edge stays. A resize to nothing (`end <= start`) is refused, as are the
+  edges the edit rules forbid (`durationEditable`, or `startEditable` for the start edge).
+- The drag previews through `DragPreview` and runs one `event.resize` on release (the `drop`
+  engine event, `onEventDrop`, with `kind: "resize"`).
+- It is `aria-hidden`: from the keyboard, Shift + arrows resize a grabbed event (Shift + Up/Down in
+  a time grid, Shift + Left/Right in a day grid).
+- Without `resize()` in the model's features it renders nothing and warns once.
+
+## Usage
+
+```tsx
+import { Calendar, type TimeSegment } from "@fragiola/calendar-react";
+import { ResizeHandle } from "@fragiola/calendar-react/resize";
+
+export function ResizableEvent(props: { segment: TimeSegment }) {
+    return (
+        <Calendar.TimeEvent segment={props.segment} className="event">
+            <ResizeHandle edge="start" className="handle handle-top" />
+            <span className="event-title">{props.segment.eventId}</span>
+            <ResizeHandle edge="end" className="handle handle-bottom" />
+        </Calendar.TimeEvent>
+    );
+}
+```
+
+```css
+.handle {
+    position: absolute;
+    inset-inline: 0;
+    block-size: 6px;
+    cursor: ns-resize;
+}
+.handle-top {
+    inset-block-start: 0;
+}
+.handle-bottom {
+    inset-block-end: 0;
+}
+```
+
+See [Resizing events](/docs/guides/resizing).
+
+## Attributes
+
+| attribute | value |
+| --- | --- |
+| `data-calendar-part` | `data-calendar-part="resize-handle"` |
+| `data-edge` | `start` or `end` |
+| `data-occurrence-id` | its event's occurrence |
+| `aria-hidden` | `true` |
+
+## Props
+
+`ResizeHandleProps` takes the [common props](/docs/api/root#common-props) and any `div`
+attribute, and:
+
+| prop | type | description |
+| --- | --- | --- |
+| `edge` | `"start"` or `"end"` | the edge it moves: the event's `start` or its `end` |
+| `children` | `ReactNode` | what it shows (a grip) |
+
+## State
+
+`ResizeHandleState`:
+
+| field | type | description |
+| --- | --- | --- |
+| `edge` | `"start"` or `"end"` | the edge it moves |

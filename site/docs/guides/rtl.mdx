@@ -1,0 +1,75 @@
+---
+title: Right-to-left calendars
+description: Lay a calendar out right to left with one dir attribute, and write styles with logical properties so one stylesheet serves both directions.
+---
+
+Direction is not a setting: the calendar reads it from the DOM. Put `dir="rtl"` on the root (or
+any ancestor) and the engine reads the root's computed `direction` when it attaches. The columns
+run from the right, the arrow keys follow the reading order, a drag follows the pointer, and the
+structural style the parts write uses logical properties only. Your stylesheet does the same, and
+the translations are yours.
+
+<Example id="rtl" />
+
+## Setting the direction
+
+```tsx
+import { Calendar, createCalendarModel } from "@fragiola/calendar-react";
+import { useState } from "react";
+
+export function ArabicWeek() {
+    const [model] = useState(() =>
+        createCalendarModel({
+            version: 1,
+            events: [],
+            calendars: [],
+            settings: { locale: "ar", firstDayOfWeek: 6 },
+            view: { type: "week", anchorDate: "2026-11-26" },
+        }),
+    );
+    return (
+        <Calendar.Root model={model} dir="rtl" lang="ar">
+            {/* the time grid, as in a left-to-right week */}
+        </Calendar.Root>
+    );
+}
+```
+
+`engine.get("direction")` answers `"ltr"` or `"rtl"`, the way the keys and the hit-testing read
+it. The dates come as `Intl` parts in `ar`, so the headers read in Arabic without any formatting
+code of yours.
+
+## What the direction changes
+
+| | left to right | right to left |
+| --- | --- | --- |
+| ArrowRight | the next day | the previous day |
+| ArrowLeft | the previous day | the next day |
+| Home / End | the week's first / last day | the same days (the date picker's rule) |
+| a drag | follows the pointer | follows the pointer |
+| a timed event | `inset-inline-start` from its overlap column | the same property, mirrored by the browser |
+
+Up and Down, PageUp and PageDown do not depend on the direction.
+
+## Styling with logical properties
+
+The parts place themselves with logical properties (`inset-inline-start`, `inline-size`,
+`inset-block-start`), so a segment over three days spans the right three days in both
+directions. Write your own styles the same way: `margin-inline-start` rather than `margin-left`,
+`border-inline-start` rather than `border-left`. In Tailwind, that is `ms-*`, `ps-*`, `start-*`,
+`border-s`; an icon that points (a chevron) flips with `rtl:-scale-x-100`.
+
+```css
+.calendar-axis {
+    inline-size: 4rem;
+    border-inline-end: 1px solid var(--line);
+}
+.calendar-event {
+    border-inline-start: 3px solid var(--event-stripe);
+    padding-inline: 0.375rem;
+}
+```
+
+The day-grid geometry's custom properties (`--calendar-row-inset`, `--calendar-day-gap`) are
+logical too: the inset is the space before a row's first day, on the right in a right-to-left
+calendar. See [Layout](/docs/concepts/layout).

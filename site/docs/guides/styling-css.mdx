@@ -1,0 +1,130 @@
+---
+title: Styling with plain CSS
+description: Style every part of the calendar with plain CSS, selecting parts by data-calendar-part and states by data attributes and ARIA.
+---
+
+The calendar ships no CSS and no class names. Every element a part renders carries
+`data-calendar-part`, its state as `data-*` attributes (present or absent) and its ARIA, so a
+plain stylesheet can reach all of it. The only inline style a part writes is structural: where an
+event sits, how far it spans. Colours, sizes, fonts, borders and motion are yours.
+
+## Selecting parts and states
+
+```css title="calendar.css"
+[data-calendar-part="day-grid"] {
+    display: grid;
+    grid-template-rows: auto repeat(6, minmax(0, 1fr));
+}
+[data-calendar-part="week"] {
+    display: grid;
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+}
+[data-calendar-part="day"] {
+    border-inline-start: 1px solid var(--line);
+    padding: 0.25rem;
+}
+[data-calendar-part="day"][data-outside] {
+    color: var(--muted);
+}
+[data-calendar-part="day"][data-today] {
+    background: var(--today-bg);
+}
+[data-calendar-part="day"][data-selected] {
+    background: var(--selected-bg);
+}
+[data-calendar-part="segment"] {
+    border-radius: 4px;
+    background: var(--event-bg);
+}
+[data-calendar-part="segment"][data-continues-before] {
+    border-start-start-radius: 0;
+    border-end-start-radius: 0;
+}
+[data-calendar-part="segment"][data-dragging] {
+    opacity: 0.4;
+}
+[data-calendar-part="day"]:focus-visible,
+[data-calendar-part="segment"]:focus-visible {
+    outline: 2px solid var(--ring);
+}
+```
+
+Every attribute and every part name is listed in
+[State attributes](/docs/concepts/state-attributes). An event's calendar (category) is
+`data-calendar-id`, so a colour per calendar is one rule each:
+
+```css
+[data-calendar-part="time-event"][data-calendar-id="ada"] {
+    --event-bg: oklch(0.9 0.06 250);
+}
+```
+
+## What the parts write inline
+
+Positions come from the core's layout, so the parts write them, on logical properties:
+
+| part | inline style |
+| --- | --- |
+| `Calendar.Week`, `Calendar.AllDayRow` | `position: relative`: the containing block of their `Selection` and `DragPreview` |
+| `Calendar.DayEvents` | `position: relative`, and the lanes its row needs as `min-block-size` |
+| `Calendar.Segment` | `position: absolute`, its lane as `inset-block-start`, its days as `inline-size` |
+| `Calendar.TimeEvent` | `position: absolute`, `top` and `height` from its times, `inset-inline-start` and `width` from its overlap columns (percentages) |
+| `Calendar.Columns` | `pointer-events: none`, so the slots under it take the pointer; its events take it back |
+
+A style you pass never beats those keys: the structural ones win. Everything else is yours.
+
+## The day-grid geometry
+
+A segment's size reads three custom properties that you set on any ancestor:
+
+```css
+.calendar {
+    --calendar-lane-size: 1.5rem; /* the height of one all-day lane */
+    --calendar-day-gap: 1px; /* the space between two days' event areas */
+    --calendar-row-inset: 3rem; /* a row's space before its first day: a week number, an axis */
+}
+```
+
+See [Layout](/docs/concepts/layout) for how the lanes and the containing blocks fit.
+
+## The time grid
+
+The time grid's slots are rows of cells; its events lie in a layer of columns over them. Give the
+layer `position: absolute` over the slot rows, inside a wrapper that is its containing block, and
+size the slots yourself: the events place themselves as fractions of their column.
+
+```css
+.time-body {
+    position: relative;
+}
+[data-calendar-part="slot-row"] {
+    display: flex;
+    block-size: 2.25rem;
+}
+[data-calendar-part="columns"] {
+    position: absolute;
+    inset-block: 0;
+    inset-inline: 4rem 0; /* after the time axis */
+    display: flex;
+}
+[data-calendar-part="column"] {
+    position: relative;
+    flex: 1;
+}
+```
+
+## A class per part
+
+When you prefer classes, every part takes `className` (a string or a function of its state) and
+`style` (an object or a function of its state):
+
+```tsx
+<Calendar.Segment
+    segment={segment}
+    className={(state) => (state.grabbed ? "event event--grabbed" : "event")}
+/>
+```
+
+[Styling with Tailwind](/docs/guides/styling-tailwind) uses the same props with utility classes,
+and [Theming](/docs/guides/theming) shows themes that change the calendar's shapes as well as its
+colours.

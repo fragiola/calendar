@@ -5,7 +5,7 @@ import { describe, expect, it } from "vitest";
 const root = join(import.meta.dirname, "../..");
 const read = (path: string) => readFileSync(join(root, path), "utf8");
 
-/** The apps whose Playwright version the E2E image follows (none exist yet: the React Epic). */
+/** The apps whose Playwright version the E2E image follows (Vue's and Angular's join with them). */
 const PLAYWRIGHT_APPS = [
     "apps/playground",
     "examples/shared",
@@ -62,9 +62,24 @@ function workflowProblems(
     return problems;
 }
 
-// The E2E jobs (from the React Epic) run in Playwright's image instead of installing the browsers:
-// its browsers are the ones of its version, so the tag follows @playwright/test.
+// The E2E jobs run in Playwright's image instead of installing the browsers: its browsers are the
+// ones of its version, so the tag follows @playwright/test.
 describe("the CI workflow", () => {
+    it("runs the playground's and the examples' E2E jobs in Playwright's image, as user 1001", () => {
+        const workflow = read(".github/workflows/ci.yml");
+        for (const job of ["e2e-playground", "e2e-examples"]) {
+            const body =
+                new RegExp(`\\n  ${job}:\\n((?:    .*\\n|\\n)+)`).exec(
+                    workflow,
+                )?.[1] ?? "";
+            expect(body, job).toMatch(
+                /container:\n\s+image: mcr\.microsoft\.com\/playwright:v[\d.]+-noble\n\s+options: --user 1001/,
+            );
+            expect(body, job).toContain("needs: changes");
+        }
+        expect(playwrightVersions()).toEqual(new Set(["1.65.1"]));
+    });
+
     it("installs no browser, and any Playwright image is the apps' version", () => {
         expect(
             workflowProblems(
@@ -104,5 +119,20 @@ describe("the CI workflow", () => {
         expect(on).toContain("pull_request:");
         expect(on).toContain("workflow_dispatch:");
         expect(on).not.toContain("push:");
+    });
+
+    it("exports the site the way www builds it, and triggers no www build yet", () => {
+        const workflow = read(".github/workflows/ci.yml");
+        const job =
+            /\n {2}site-export:\n((?: {4}.*\n|\n)+)/.exec(
+                `${workflow}\n`,
+            )?.[1] ?? "";
+        expect(job).toContain("name: Site export");
+        expect(job).toContain(
+            'pnpm site:export --base /calendar --out "$RUNNER_TEMP/site-export"',
+        );
+        expect(workflow).not.toContain("trigger-www-build");
+        expect(workflow).not.toContain("repository_dispatch");
+        expect(workflow).not.toContain("WWW_DISPATCH_TOKEN");
     });
 });

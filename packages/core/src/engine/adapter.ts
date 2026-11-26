@@ -5,6 +5,7 @@
 // Events with capture, keys, focus, native drags) and decides.
 
 import type { NoPayload } from "../commands/types";
+import type { ViewType } from "../document/calendar-document";
 import type { PartAttributes } from "../features/types";
 import type { CalendarModel } from "../model/calendar-model";
 
@@ -13,8 +14,10 @@ export interface PartPayloadMap {
     root: NoPayload;
     /** a month view's grid, or a time-grid view's all-day row container */
     "day-grid": NoPayload;
-    /** a day-grid row (`DayGridWeek.id`) */
+    /** a month's row (`DayGridWeek.id`) */
     week: { weekId: string };
+    /** a time grid's all-day row: its day grid's one row (`DayGridWeek.id`) */
+    "all-day-row": { weekId: string };
     /** a day of a day grid (a month day, an all-day cell) */
     day: { date: string };
     /** the events' container of a day (`dayMaxEvents: "auto"` measures it) */
@@ -23,12 +26,20 @@ export interface PartPayloadMap {
     more: { date: string };
     "week-number": { weekId: string };
     "time-grid": NoPayload;
-    /** a time-grid column (a day) */
+    /** the row of column headers (a time grid's days, a month's weekdays) */
+    "column-headers": NoPayload;
+    /** a time grid's row of slots at one time, a slot per day */
+    "slot-row": { time: string };
+    /** the positioned layer of a time grid's columns */
+    columns: NoPayload;
+    /** a time-grid column (a day): the positioned layer its timed events, previews and indicators are in */
     column: { date: string };
+    /** a column's timed events (a list) */
+    "column-events": { date: string };
     /** a time-grid slot */
     slot: { date: string; time: string };
+    /** a slot row's label (its row header) */
     "slot-label": { time: string };
-    "time-axis": NoPayload;
     /** the element that scrolls the time grid (autoscroll) */
     scroller: NoPayload;
     "column-header": { date: string };
@@ -54,6 +65,14 @@ export interface PartPayloadMap {
     "drag-preview": NoPayload;
     selection: NoPayload;
     "business-hours": { date: string };
+    /** the button that runs `view.previous` */
+    previous: NoPayload;
+    /** the button that runs `view.next` */
+    next: NoPayload;
+    /** the button that runs `view.today` */
+    today: NoPayload;
+    /** a button that runs `view.set` (`aria-pressed` when it is the view shown) */
+    "view-button": { type: ViewType; days?: number };
 }
 
 /** A part's name. */
@@ -90,9 +109,10 @@ export interface CalendarEngineAdapter {
         element: HTMLElement | null,
     ): void;
     /**
-     * a part's attributes: `data-calendar-part`, the model's (`data-date`, `data-today`, …), the
-     * engine's (`role`, `tabindex`, `data-focused`) and the features' (`data-selected`,
-     * `data-dragging`, `data-grabbed`, `data-resizing`)
+     * a part's attributes: `data-calendar-part` (an `event` is named where it shows: `segment`,
+     * `time-event` or `list-event`), the model's (`data-date`, `data-today`, …), the engine's
+     * (`role`, `tabindex`, `data-focused`) and the features' (`data-selected`, `data-dragging`,
+     * `data-grabbed`, `data-resizing`); before an engine exists, `partAttributes` gives the same
      */
     attributes<P extends PartName>(
         part: P,

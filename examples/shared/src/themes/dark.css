@@ -1,0 +1,134 @@
+/* Theme "dark" — The same shapes as Light, on dark palettes.
+
+   One file per theme, selected by data-example-theme="dark" on any element (the embed puts it
+   on <body>, as an app would). A theme only sets values; it styles no markup. It declares:
+     1. shape tokens (--cal-*) that the examples' class names read: the font and its size
+        (--cal-font, --cal-size), the radius of a frame and of an event (--cal-radius,
+        --cal-event-radius), a slot's height in the time grid (--cal-slot-height), a day-grid
+        lane's height (--cal-lane-size, which the examples hand to the adapter's
+        --calendar-lane-size) and an event's padding (--cal-event-padding): the event density,
+        the stripe at an event's inline start (--cal-event-stripe, a width: 0px for none), the
+        grid lines (--cal-grid-width, --cal-grid-style), the column headers (--cal-header-weight,
+        --cal-header-case), today's marker (--cal-today-radius, --cal-today-size), the now
+        indicator's line and dot (--cal-now-width, --cal-now-dot), the frame's shadow
+        (--cal-shadow), motion (--cal-motion) and the focus ring's width (--cal-focus-width);
+     2. the Fragiola palettes the examples use, each with all SIX roles (base, soft, line,
+        contrast, accent, ring). A palette that omitted one would inherit it from the page and
+        leak across the theme boundary;
+     3. on every palette, the colours that depend on it: the grid lines (--cal-line), an event
+        (--cal-event-bg, --cal-event-fg, --cal-event-stripe-color), today's marker
+        (--cal-today-bg, --cal-today-fg), a selected range (--cal-selected-bg), a weekend day
+        (--cal-weekend-bg) and a hovered slot or day (--cal-hover-bg). They are declared per
+        palette so that var(--palette-…) resolves against the palette the element sits in (an
+        event's calendar picks its palette).
+
+   Specificity: the palette rules are ":root [data-example-theme="dark"] .palette-x", which ties
+   with Fragiola's own ":root[data-theme] .palette-x" and wins by coming later in the cascade, so
+   a theme overrides the page's light/dark. */
+
+[data-example-theme="dark"] {
+    color-scheme: dark;
+    --palette-state-shift: 0.1;
+    --cal-font: var(--font-sans);
+    --cal-size: 0.875rem;
+    --cal-radius: 8px;
+    --cal-event-radius: 4px;
+    --cal-slot-height: 2.25rem;
+    --cal-lane-size: 1.5rem;
+    --cal-event-padding: 0.125rem 0.375rem;
+    --cal-event-stripe: 0px;
+    --cal-grid-width: 1px;
+    --cal-grid-style: solid;
+    --cal-header-weight: 500;
+    --cal-header-case: none;
+    --cal-today-radius: 9999px;
+    --cal-today-size: 1.75rem;
+    --cal-now-width: 2px;
+    --cal-now-dot: 0.5rem;
+    --cal-shadow: 0 1px 2px oklch(0 0 0 / 0.06);
+    --cal-motion: 150ms;
+    --cal-focus-width: 2px;
+}
+
+:root [data-example-theme="dark"] .palette-surface,
+:root [data-example-theme="dark"].palette-surface {
+    --palette-base: oklch(0.13 0.01 250);
+    --palette-soft: oklch(0.22 0.012 250);
+    --palette-line: oklch(0.3 0.012 250);
+    --palette-contrast: oklch(0.95 0.005 250);
+    --palette-accent: oklch(0.88 0.005 250);
+    --palette-ring: var(--palette-accent);
+}
+
+:root [data-example-theme="dark"] .palette-raised,
+:root [data-example-theme="dark"].palette-raised {
+    --palette-base: oklch(0.19 0.01 250);
+    --palette-soft: oklch(0.27 0.012 250);
+    --palette-line: oklch(0.33 0.012 250);
+    --palette-contrast: oklch(0.95 0.005 250);
+    --palette-accent: oklch(0.88 0.005 250);
+    --palette-ring: var(--palette-accent);
+}
+
+:root [data-example-theme="dark"] .palette-blue,
+:root [data-example-theme="dark"].palette-blue {
+    --palette-base: oklch(0.7 0.18 250);
+    --palette-soft: oklch(0.3 0.08 250);
+    --palette-line: oklch(0.4 0.1 250);
+    --palette-contrast: oklch(0.12 0.02 250);
+    --palette-accent: oklch(0.78 0.15 250);
+    --palette-ring: var(--palette-accent);
+}
+
+:root [data-example-theme="dark"] .palette-orange,
+:root [data-example-theme="dark"].palette-orange {
+    --palette-base: oklch(0.75 0.16 55);
+    --palette-soft: oklch(0.3 0.08 55);
+    --palette-line: oklch(0.4 0.1 55);
+    --palette-contrast: oklch(0.12 0.02 55);
+    --palette-accent: oklch(0.8 0.14 55);
+    --palette-ring: var(--palette-accent);
+}
+
+:root [data-example-theme="dark"] .palette-green,
+:root [data-example-theme="dark"].palette-green {
+    --palette-base: oklch(0.68 0.16 150);
+    --palette-soft: oklch(0.3 0.07 150);
+    --palette-line: oklch(0.4 0.09 150);
+    --palette-contrast: oklch(0.12 0.02 150);
+    --palette-accent: oklch(0.75 0.14 150);
+    --palette-ring: var(--palette-accent);
+}
+
+:root [data-example-theme="dark"] .palette-danger,
+:root [data-example-theme="dark"].palette-danger {
+    --palette-base: oklch(0.68 0.18 25);
+    --palette-soft: oklch(0.3 0.08 25);
+    --palette-line: oklch(0.4 0.1 25);
+    --palette-contrast: oklch(0.12 0.02 25);
+    --palette-accent: oklch(0.75 0.16 25);
+    --palette-ring: var(--palette-accent);
+}
+
+:root [data-example-theme="dark"] .palette-purple,
+:root [data-example-theme="dark"].palette-purple {
+    --palette-base: oklch(0.7 0.18 300);
+    --palette-soft: oklch(0.3 0.08 300);
+    --palette-line: oklch(0.4 0.1 300);
+    --palette-contrast: oklch(0.12 0.02 300);
+    --palette-accent: oklch(0.78 0.15 300);
+    --palette-ring: var(--palette-accent);
+}
+
+:root [data-example-theme="dark"] [class*="palette-"],
+:root [data-example-theme="dark"][class*="palette-"] {
+    --cal-line: oklch(from var(--palette-line) l c h / 0.8);
+    --cal-event-bg: var(--palette-soft);
+    --cal-event-fg: var(--palette-accent);
+    --cal-event-stripe-color: var(--palette-base);
+    --cal-today-bg: var(--palette-accent);
+    --cal-today-fg: var(--palette-soft);
+    --cal-selected-bg: oklch(from var(--palette-line) l c h / 0.5);
+    --cal-weekend-bg: oklch(from var(--palette-soft) l c h / 0.5);
+    --cal-hover-bg: oklch(from var(--palette-soft) l c h / 0.7);
+}

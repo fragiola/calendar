@@ -3,9 +3,11 @@
 // from the focused cell grow the range and Enter confirms it. While it goes, the range is engine
 // view state (`engine.get("selection-preview")`, `data-selected`), `model.can("selection.set")`
 // answering each one (a refused range shows nothing); the release or Enter runs one
-// `selection.set` and tells the app (`select`).
+// `selection.set` and tells the app (`select`). The range shown is laid out like an event
+// (`engine.get("selection-segments")`), so an adapter draws its highlight as it draws a segment.
 import type { CellPosition, GridPoint } from "../../engine/grid-point";
 import { timePoint } from "../../engine/hit-test";
+import type { PreviewSegments } from "../../engine/preview";
 import type {
     FeatureEngine,
     FeatureEngineHost,
@@ -95,8 +97,37 @@ export function selectionEngine(
         const result = host.model.run("selection.set", range);
         if (result.ok) host.emit({ type: "select", range, keyboard });
     };
+    // the segments of the range shown (the pending one, else the selected one), kept per range and
+    // state (the view, the settings and today lay it out)
+    let laidOut: {
+        range: object;
+        state: object;
+        segments: PreviewSegments;
+    } | null = null;
+    const segments = (): PreviewSegments | null => {
+        const range =
+            pending ??
+            (host.model.get("selected-range") as SelectionRange | null);
+        if (!range) return null;
+        const state = host.model.state as object;
+        if (laidOut?.range !== range || laidOut.state !== state) {
+            laidOut = {
+                range,
+                state,
+                segments: host.previewSegments({
+                    eventId: null,
+                    occurrenceId: null,
+                    ...range,
+                }),
+            };
+        }
+        return laidOut.segments;
+    };
     return {
-        get: { "selection-preview": () => pending },
+        get: {
+            "selection-preview": () => pending,
+            "selection-segments": segments,
+        },
         pointerdown: (_event, target): FeatureGesture | undefined => {
             if (
                 (target.kind !== "day" &&

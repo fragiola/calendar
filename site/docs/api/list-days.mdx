@@ -1,0 +1,48 @@
+---
+title: Calendar.ListDays
+description: Calls your function once per visible day that has events, in order, so you render each day's heading and its list, with no element of its own.
+---
+
+`Calendar.ListDays` is a collection part: it calls its children function once per visible day
+that has events, in order, and renders nothing of its own. Days without events are left out. A
+call usually returns the day's heading and its `Calendar.ListDay`.
+
+## Behaviour
+
+- The days come from `model.get("list")`: the visible days of the current view, hidden days and
+  empty days left out. In a month view it is the month's agenda.
+- A day keeps its identity while it does not change: its call runs again when the day object
+  or the children function changes. See [Performance](/docs/guides/performance).
+
+## Usage
+
+```tsx
+import { Calendar, type ListDay } from "@fragiola/calendar-react";
+
+function agendaDay(day: ListDay) {
+    return (
+        <section className={day.today ? "day day-today" : "day"}>
+            <h3 id={`agenda-${day.date}`}>{day.date}</h3>
+            <Calendar.ListDay day={day} aria-labelledby={`agenda-${day.date}`}>
+                {(item) => <Calendar.ListEvent item={item}>{item.eventId}</Calendar.ListEvent>}
+            </Calendar.ListDay>
+        </section>
+    );
+}
+
+export function Days() {
+    return <Calendar.ListDays>{agendaDay}</Calendar.ListDays>;
+}
+```
+
+`agendaDay` reads only its argument, so it is declared once and stays stable.
+
+## Props
+
+`ListDaysProps`:
+
+| prop | type | description |
+| --- | --- | --- |
+| `children` | `(day: ListDay) => ReactNode` | called per day that has events: a heading of the app's, then `<Calendar.ListDay day={day}>` |
+
+`ListDay` is the core's: `date`, `today`, `past` and its `items`.

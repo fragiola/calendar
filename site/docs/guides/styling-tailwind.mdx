@@ -1,0 +1,90 @@
+---
+title: Styling with Tailwind
+description: Style the calendar with Tailwind's data variants and class functions of each part's state, the way the examples do.
+---
+
+Every state of the calendar is a `data-*` attribute or an ARIA attribute, present or absent, so
+Tailwind's `data-*` and `aria-*` variants style it without a line of custom CSS. Each part takes
+`className` as a string or a function of its state. The utility classes, the palette and the
+design are yours; the examples use Fragiola UI's palette roles.
+
+## Data variants
+
+```tsx
+<Calendar.Day
+    day={day}
+    className="border-s p-1 data-outside:opacity-50 data-today:bg-blue-50 data-selected:bg-blue-100 data-weekend:bg-gray-50 focus-visible:outline-2"
+/>
+```
+
+A boolean attribute is a bare variant (`data-today:`, `data-grabbed:`); a valued one takes an
+arbitrary variant: `data-[edge=start]:top-0` on a `ResizeHandle`, or
+`data-[calendar-id=ada]:bg-sky-100` on an event.
+
+## Class functions of the state
+
+A function receives the part's state, typed: an event's `calendarId`, `allDay`, `focused`,
+`dragging`, `grabbed`, `resizing`. Use it for what a variant cannot reach, such as a class per
+calendar:
+
+```tsx
+import { Calendar, type TimeEventState } from "@fragiola/calendar-react";
+
+const PALETTES: Record<string, string> = {
+    ada: "bg-sky-100 text-sky-900",
+    alan: "bg-amber-100 text-amber-900",
+};
+
+const event = (state: TimeEventState) =>
+    [
+        "rounded px-1.5 text-xs select-none data-dragging:opacity-40",
+        PALETTES[state.calendarId ?? ""] ?? "bg-gray-100",
+    ].join(" ");
+
+<Calendar.TimeEvent segment={segment} className={event} />;
+```
+
+## One styles file per component
+
+The examples keep every class string in a `styles.ts` beside the component: one string, or one
+function of the state, per part, and no class strings in the markup. A component then reads like
+its structure:
+
+```ts title="styles.ts"
+import type { SegmentState } from "@fragiola/calendar-react";
+import { cn } from "#/lib/cn";
+
+export const day = cn(
+    "flex min-h-0 flex-col border-s p-1",
+    "data-outside:text-palette-accent/60 data-today:bg-palette-soft",
+);
+
+export const segment = (state: SegmentState) =>
+    cn(
+        `palette-${state.calendarId ?? "blue"}`,
+        "cursor-default select-none data-dragging:opacity-40 data-grabbed:opacity-60",
+    );
+```
+
+```tsx
+import * as styles from "./styles";
+
+<Calendar.Day day={day} className={styles.day}>
+    <Calendar.DayEvents>
+        {(segment) => (
+            <Calendar.Segment segment={segment} className={styles.segment} />
+        )}
+    </Calendar.DayEvents>
+</Calendar.Day>;
+```
+
+## Custom properties as utilities
+
+The day-grid geometry and the theme's tokens are custom properties, which Tailwind sets and reads
+with arbitrary properties and values: `[--calendar-lane-size:1.5rem]` on the root,
+`h-(--cal-slot-height)` on a slot row, `rounded-(--cal-event-radius)` on an event box. Logical
+utilities (`ms-*`, `ps-*`, `start-*`, `border-s`) keep one class list right for both directions
+([Right-to-left calendars](/docs/guides/rtl)).
+
+The structural inline styles the parts write (an event's position) always win over a class: see
+[Styling with plain CSS](/docs/guides/styling-css) for the list.

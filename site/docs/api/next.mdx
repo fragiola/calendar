@@ -1,0 +1,49 @@
+---
+title: Calendar.Next
+description: A button that runs `view.next`, going to the next range, and is disabled when the model cannot.
+---
+
+`Calendar.Next` is a `button` that runs one view command. Its label, icon and look are yours;
+the command, its availability and the button's state are the package's.
+
+## Behaviour
+
+- A press runs `view.next`: the next range: a month on in a month view, a week in a week view, a day in a day view (skipping hidden days), `days` days in a `days` view.
+- It is disabled (`disabled` and `data-disabled`) while `model.can("view.next")` says no, which
+  happens when the step would leave the `validRange` setting.
+- It is an ordinary button outside the grid's roving focus: Tab reaches it, Enter and Space press
+  it.
+
+It renders `data-calendar-part="next"` on a `button` with `type="button"`.
+
+## Usage
+
+```tsx
+import { Calendar } from "@fragiola/calendar-react";
+import { ChevronRight } from "lucide-react";
+
+// inside Calendar.Root
+<Calendar.Next aria-label="Next month" className="icon-button">
+    <ChevronRight aria-hidden />
+</Calendar.Next>
+```
+
+An icon-only button needs its accessible name: the library sets none, so `aria-label` (or text)
+is yours. A right-to-left calendar flips the icon in your CSS, not the command.
+
+## Props
+
+`NextProps`; it also takes the [common props](/docs/api/root#common-props) and every `button`
+attribute.
+
+| prop | type | description |
+| --- | --- | --- |
+| `children` | `ReactNode` | its label: text or elements of yours |
+
+## State
+
+`NextState` is `CommandButtonState` ([hooks](/docs/api/hooks)):
+
+| field | type | description |
+| --- | --- | --- |
+| `disabled` | `boolean` | its command cannot run now (`data-disabled`) |

@@ -1,0 +1,98 @@
+---
+title: State attributes
+description: Every element names its part and shows its state as data attributes and ARIA, present or absent, so any CSS tool can style the calendar.
+---
+
+The parts render no class names. Instead every element says what it is, with
+`data-calendar-part`, and what state it is in, with `data-*` attributes and ARIA. A boolean state
+is **present or absent** (`data-today=""`, never `data-today="false"`), so a selector is just the
+attribute: `[data-today]`, `.day[data-outside]`, `data-today:font-semibold` in Tailwind.
+
+```css
+[data-calendar-part="day"][data-outside] { opacity: 0.5; }
+[data-calendar-part="day"][data-today] .day-number { font-weight: 600; }
+[data-calendar-part="time-event"][data-dragging] { opacity: 0.4; }
+[data-calendar-part="slot"][data-selected] { background: #dbeafe; }
+```
+
+The attributes come from the core (`partAttributes`, and the engine's), so every framework's parts
+set the same ones.
+
+## Parts
+
+`data-calendar-part` names each element:
+
+| part | element | role |
+| --- | --- | --- |
+| `root` | `Calendar.Root` (with `data-view`) | |
+| `previous`, `next`, `today` | `Calendar.Previous`, `Calendar.Next`, `Calendar.Today` | button |
+| `view-button` | `Calendar.ViewButton` (`aria-pressed`) | button |
+| `day-grid` | `Calendar.DayGrid` | grid |
+| `column-headers` | `Calendar.ColumnHeaders` | row |
+| `column-header` | `Calendar.ColumnHeader` | columnheader |
+| `week` | `Calendar.Week` | row |
+| `week-number` | `Calendar.WeekNumber` | rowheader |
+| `day` | `Calendar.Day` | gridcell |
+| `day-events` | `Calendar.DayEvents` | list |
+| `segment` | `Calendar.Segment`: an event in a day grid | listitem |
+| `more` | `Calendar.More`: a day's "+N more" | button |
+| `time-grid` | `Calendar.TimeGrid` | grid |
+| `all-day-row` | `Calendar.AllDayRow` | row |
+| `scroller` | `Calendar.Scroller` | |
+| `slot-row` | `Calendar.SlotRow` (with `data-time`) | row |
+| `slot-label` | `Calendar.SlotLabel` (with `data-time`) | rowheader |
+| `slot` | `Calendar.Slot` | gridcell |
+| `columns` | `Calendar.Columns` | row |
+| `column` | `Calendar.Column` | gridcell |
+| `column-events` | `Calendar.ColumnEvents` | list |
+| `time-event` | `Calendar.TimeEvent`: an event in a time grid | listitem |
+| `list` | `Calendar.List` | |
+| `list-day` | `Calendar.ListDay` | list |
+| `list-event` | `Calendar.ListEvent`: an event in a list | listitem |
+| `selection` | `Selection` (`/selection`) | `aria-hidden` |
+| `drag-preview` | `DragPreview` (`/drag-and-drop`, `/resize`) | `aria-hidden` |
+| `resize-handle` | `ResizeHandle` (`/resize`, with `data-edge`) | `aria-hidden` |
+| `now-indicator` | `NowIndicator` (`/now-indicator`) | `aria-hidden` |
+| `business-hours` | `BusinessHours` (`/constraints`) | `aria-hidden` |
+
+An event is one entity with three parts, named where it shows: `segment`, `time-event` or
+`list-event`.
+
+## Positions
+
+| attribute | on | value |
+| --- | --- | --- |
+| `data-view` | the root | the view's type: `month`, `week`, `day`, `days`, `list` |
+| `data-date` | days, column headers, slots, columns, day and column events, list days, "+N more", the now indicator | `YYYY-MM-DD` |
+| `data-time` | slot rows, slot labels, slots, the now indicator | `HH:mm` |
+| `data-event-id` | events | the event's id |
+| `data-occurrence-id` | events, resize handles | the occurrence's id (`<eventId>@<original start>` for a recurring one) |
+| `data-calendar-id` | events | the event's calendar (category) |
+| `data-edge` | resize handles | `start` or `end` |
+
+## State
+
+| attribute | on | present when |
+| --- | --- | --- |
+| `data-today` | days, column headers, columns | it is today, in the display zone |
+| `data-past` | days, column headers, columns | it is before today |
+| `data-outside` | days of a month | it is outside the month the view is about |
+| `data-weekend` | days, column headers, columns | it is a weekend day of the locale |
+| `data-disabled` | days, slots, columns; navigation buttons | outside `validRange`; the button's command cannot run |
+| `data-pressed` | view buttons | its view is the one shown |
+| `data-focused` | days, slots, events | it holds the roving focus |
+| `data-all-day` | events | the event is all-day |
+| `data-continues-before` | events | it started before this row, column or day |
+| `data-continues-after` | events | it ends after this row, column or day |
+| `data-selected` | days, slots | inside the selected range (`selection()`) |
+| `data-dragging` | events | a pointer drags it (`dragAndDrop()`) |
+| `data-grabbed` | events | the keyboard grabbed it (`dragAndDrop()`, `resize()`) |
+| `data-resizing` | events | a pointer resizes it (`resize()`) |
+| `data-business-hours` | days, slots | within the business hours (`constraints()`) |
+
+## ARIA
+
+The engine sets the grid's roles and the roving focus: one element of a grid has `tabindex="0"`
+(the tab stop), the others `-1`. `Calendar.ViewButton` sets `aria-pressed`; the decorations
+(`Selection`, `DragPreview`, `ResizeHandle`, `NowIndicator`, `BusinessHours`) are
+`aria-hidden`. The names are yours ([Accessible names and the keyboard](/docs/getting-started/accessible-names)).

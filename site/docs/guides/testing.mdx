@@ -1,0 +1,173 @@
+---
+title: Testing your calendar
+description: Test calendar logic in plain Node with an injected clock, components with Testing Library and roles, and the browser with a fixed time zone.
+---
+
+The model loads in plain Node: no DOM, no timers, no global clock it does not let you replace. So
+most of a calendar's behaviour (your commands, your middleware, what a view lays out) is a unit
+test. Components test with Testing Library through roles, accessible names and
+`data-calendar-part`; gestures and the keyboard in a real browser. Which runner you use is yours.
+
+## The model, in Node
+
+Inject the clock (`now`, epoch milliseconds) and the ids (`createId`), and fix the display zone in
+the settings. Nothing then depends on the machine:
+
+```ts title="calendar.test.ts"
+import { createCalendarModel } from "@fragiola/calendar";
+import { expect, it } from "vitest";
+
+const NOW = Date.parse("2026-11-26T12:00:00Z");
+
+function modelOf() {
+    let next = 0;
+    return createCalendarModel(
+        {
+            version: 1,
+            events: [
+                {
+                    id: "standup",
+                    title: "Standup",
+                    start: "2026-11-26T09:00:00Z",
+                    end: "2026-11-26T09:15:00Z",
+                    allDay: false,
+                },
+            ],
+            calendars: [],
+            settings: { timeZone: "UTC", firstDayOfWeek: 0 },
+            view: { type: "week", anchorDate: "2026-11-26" },
+        },
+        { now: () => NOW, createId: () => `id-${++next}` },
+    );
+}
+
+it("moves the standup an hour later", () => {
+    const model = modelOf();
+    const result = model.run("event.move", {
+        eventId: "standup",
+        delta: { minutes: 60 },
+    });
+    expect(result).toMatchObject({
+        ok: true,
+        value: { start: "2026-11-26T10:00:00Z" },
+    });
+});
+
+it("refuses an end before its start, and says why", () => {
+    const result = modelOf().check("event.resize", {
+        eventId: "standup",
+        edge: "end",
+        to: "2026-11-26T08:00:00Z",
+    });
+    expect(result.ok).toBe(false);
+});
+
+it("lays the week out", () => {
+    const grid = modelOf().get("time-grid");
+    expect(grid?.columns.map((column) => column.date)).toHaveLength(7);
+    expect(modelOf().get("today")).toBe("2026-11-26");
+});
+```
+
+`model.check` returns what `run` would, without committing: a cheap way to test your edit rules
+and constraints. A middleware is tested the same way: `model.use` it, run a command, read the
+result.
+
+## Components, with Testing Library
+
+Render `Calendar.Root` with a model on the fixed clock (its `now` prop, or a model you made), and
+reach the calendar through roles and names, as a reader would. The grid is a `grid`, a day a
+`gridcell`, a day's events a `list` of `listitem`s; the names are the ones your markup gives.
+`data-calendar-part` and `data-date` find a part when no role says enough (`modelOf` is the
+helper of the section above):
+
+```tsx
+import { Calendar } from "@fragiola/calendar-react";
+import { act, render, screen } from "@testing-library/react";
+import { expect, it } from "vitest";
+
+it("shows the standup on Thursday", () => {
+    const model = modelOf();
+    render(
+        <Calendar.Root model={model}>
+            <Calendar.TimeGrid aria-label="Week">
+                <Calendar.Columns>
+                    {(column) => (
+                        <Calendar.Column column={column}>
+                            <Calendar.ColumnEvents>
+                                {(segment) => (
+                                    <Calendar.TimeEvent
+                                        segment={segment}
+                                        aria-label={segment.eventId}
+                                    />
+                                )}
+                            </Calendar.ColumnEvents>
+                        </Calendar.Column>
+                    )}
+                </Calendar.Columns>
+            </Calendar.TimeGrid>
+        </Calendar.Root>,
+    );
+    const event = screen.getByRole("listitem", { name: "standup" });
+    expect(event.closest('[data-calendar-part="column"]')).toHaveProperty(
+        "dataset.date",
+        "2026-11-26",
+    );
+    act(() => {
+        model.run("event.move", { eventId: "standup", delta: { days: 1 } });
+    });
+    expect(
+        screen
+            .getByRole("listitem", { name: "standup" })
+            .closest('[data-calendar-part="column"]'),
+    ).toHaveProperty("dataset.date", "2026-11-27");
+});
+```
+
+jsdom has no layout, so positions and pointer gestures belong in a browser test. A server render
+works in Node too (`renderToString`): the first render reads the model's layout, before any engine.
+
+## The browser, with Playwright
+
+Fix the zone and the locale of both the browser and the server, and the page's clock, so a date in
+a spec never depends on the machine or the day the test runs:
+
+```ts title="playwright.config.ts"
+import { defineConfig } from "@playwright/test";
+
+process.env.TZ = "America/New_York";
+
+export default defineConfig({
+    use: {
+        timezoneId: "America/New_York",
+        locale: "en-US",
+    },
+    webServer: {
+        command: "pnpm dev",
+        env: { TZ: "America/New_York" },
+        url: "http://localhost:5173",
+    },
+});
+```
+
+```ts title="calendar.spec.ts"
+import { expect, test } from "@playwright/test";
+
+test("moves an event by the keyboard", async ({ page }) => {
+    await page.clock.setFixedTime(new Date("2026-11-26T12:00:00-05:00"));
+    await page.goto("/");
+    const event = page.getByRole("listitem", { name: "Standup" });
+    await event.focus();
+    await page.keyboard.press("Space");
+    await page.keyboard.press("ArrowRight");
+    await page.keyboard.press("Enter");
+    await expect(
+        page.locator('[data-calendar-part="column"][data-date="2026-11-27"]'),
+    ).toContainText("Standup");
+});
+```
+
+The repository's own suites follow these rules: specs reach the calendar only through
+`data-calendar-part`, `data-date`, `data-time`, `data-event-id`, roles, accessible names and test
+ids, with a touch project (a long press) in a mobile emulation. The [Keyboard](/docs/guides/keyboard)
+guide lists every key a spec can press.

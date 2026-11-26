@@ -1,0 +1,57 @@
+---
+title: Calendar.ColumnHeaders
+description: The grid's header row. It calls your function per column, a time grid's days or a month's weekdays, inside a row of its own.
+---
+
+`Calendar.ColumnHeaders` is the header row of a grid (`role="row"`). It renders a `div` and calls
+your children function once per column: each day of a time grid, or each day of a month's first
+row (standing for its weekday). What a header says is yours, from `useDayHeader`'s `Intl` parts.
+
+## Behaviour
+
+- The dates are the view's columns: hidden days (`hiddenDays`) are left out, and the order follows
+  `firstDayOfWeek` and the direction.
+- It calls the function again for a date whose column changed, and for every date when the
+  function itself is a new one (React's contract): an inline function is always current; declare
+  it outside the component, or with `useCallback`, to re-render only what changed (see
+  [performance](/docs/guides/performance)).
+- In a time grid, a corner cell for the time axis is yours: put it before the headers.
+
+It renders `data-calendar-part="column-headers"`.
+
+## Usage
+
+```tsx
+import { Calendar, useDayHeader } from "@fragiola/calendar-react";
+
+// the weekday and the day in a time grid, the weekday in a month, in the calendar's locale
+function DayHeader({ date }: { date: string }) {
+    const parts = useDayHeader(date);
+    return (
+        <Calendar.ColumnHeader date={date} className="header">
+            {parts.map((part) => part.value).join("")}
+        </Calendar.ColumnHeader>
+    );
+}
+
+const header = (date: string) => <DayHeader date={date} />;
+
+<Calendar.ColumnHeaders className="headers">{header}</Calendar.ColumnHeaders>;
+```
+
+## Props
+
+`ColumnHeadersProps`; it also takes the [common props](/docs/api/root#common-props) and every `div`
+attribute.
+
+| prop | type | description |
+| --- | --- | --- |
+| `children` | `(date: string) => ReactNode` | called per column with its day, `YYYY-MM-DD`; render a `Calendar.ColumnHeader` |
+
+## State
+
+`ColumnHeadersState`:
+
+| field | type | description |
+| --- | --- | --- |
+| `dates` | `readonly string[]` | the columns' days: a time grid's, or a month's first row |

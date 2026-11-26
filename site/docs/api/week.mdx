@@ -1,0 +1,63 @@
+---
+title: Calendar.Week
+description: A row of the month grid. It holds the week's days, an optional week number, and the row's selection and drag preview.
+---
+
+`Calendar.Week` is one row of a month (`role="row"`). It renders a `div` for the `DayGridWeek`
+that `Calendar.Weeks` gives you, and either calls a function per day or renders the elements you
+give it. The row's height and the space around its days are yours.
+
+## Behaviour
+
+- Given a function, it calls it per day (`(day) => <Calendar.Day day={day} />`), as a
+  `Calendar.Days` would. Given elements, it renders them: a `Calendar.WeekNumber`, then a
+  `Calendar.Days`, then decorations.
+- It is `position: relative`, the containing block of its decorations: the selection's highlight
+  (`Selection`) and the drag preview (`DragPreview`) place themselves over their days after
+  `--calendar-row-inset`, the room your row keeps before its first day (a week number).
+- Its days' events place themselves in lanes of `--calendar-lane-size`; see
+  [layout](/docs/concepts/layout).
+
+It renders `data-calendar-part="week"`.
+
+## Usage
+
+```tsx
+import { Calendar, type DayGridWeek } from "@fragiola/calendar-react";
+import { Selection } from "@fragiola/calendar-react/selection";
+import type { CSSProperties } from "react";
+
+function weekRow(week: DayGridWeek) {
+    return (
+        <Calendar.Week
+            week={week}
+            className="week"
+            style={{ "--calendar-row-inset": "2.5rem" } as CSSProperties}
+        >
+            <Calendar.WeekNumber className="week-number">
+                {(state) => state.weekNumber}
+            </Calendar.WeekNumber>
+            <Calendar.Days>{(day) => <Calendar.Day day={day} className="day" />}</Calendar.Days>
+            <Selection className="selected-range" />
+        </Calendar.Week>
+    );
+}
+```
+
+## Props
+
+`WeekProps`; it also takes the [common props](/docs/api/root#common-props) and every `div`
+attribute.
+
+| prop | type | description |
+| --- | --- | --- |
+| `week` | `DayGridWeek` | the row, from `Calendar.Weeks` |
+| `children` | `ReactNode \| (day: DayCell) => ReactNode` | a function called per day, or elements (`Calendar.WeekNumber`, `Calendar.Days`, decorations) |
+
+## State
+
+`WeekState`:
+
+| field | type | description |
+| --- | --- | --- |
+| `week` | `DayGridWeek` | the row: `id` (its first day), `weekNumber`, `days`, `segments`, `lanes` |

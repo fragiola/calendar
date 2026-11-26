@@ -1,0 +1,9 @@
+{
+    "levels": [
+        { "id": "basics", "title": "Basics" },
+        { "id": "interaction", "title": "Interaction" },
+        { "id": "data", "title": "Data" },
+        { "id": "apps", "title": "Apps" }
+    ],
+    "themes": ["light", "dark", "ide", "paper", "terminal"]
+}

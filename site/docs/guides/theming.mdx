@@ -1,0 +1,78 @@
+---
+title: Theming
+description: Build themes that change a calendar's shapes as well as its colours, with custom properties your class names read, as the five example themes do.
+---
+
+The calendar has no theme: it ships no CSS, so a theme is entirely yours. The examples show one
+way to make one that changes more than colours. Five themes (`light`, `dark`, `ide`, `paper`,
+`terminal`) restyle the same markup: slot height, event radius and density, grid line style,
+today's marker, the now line, header weight. Each theme file sets custom properties only; the
+examples' class names read them.
+
+<Example id="team-planner" variant="card" />
+
+## Tokens your class names read
+
+A theme is a set of values under a selector. The examples' tokens are named `--cal-*`: they are
+the examples' own convention, not the package's, so name yours as you like.
+
+```css title="themes/paper.css"
+[data-example-theme="paper"] {
+    --cal-font: ui-serif, Georgia, serif;
+    --cal-radius: 12px;
+    --cal-event-radius: 8px;
+    --cal-slot-height: 3rem;
+    --cal-lane-size: 1.75rem;
+    --cal-grid-style: dotted;
+    --cal-header-case: uppercase;
+    --cal-today-radius: 9999px;
+    --cal-now-width: 1px;
+}
+```
+
+The markup reads them, so switching a theme is switching an attribute on an ancestor:
+
+```tsx
+<Calendar.Root
+    model={model}
+    className="font-(family-name:--cal-font) [--calendar-lane-size:var(--cal-lane-size)]"
+>
+    <Calendar.SlotRows>
+        {(slot) => (
+            <Calendar.SlotRow slot={slot} className="flex h-(--cal-slot-height)" />
+        )}
+    </Calendar.SlotRows>
+</Calendar.Root>
+```
+
+Note the hand-over on the root: the theme's lane height becomes the package's
+`--calendar-lane-size`, which the day-grid segments read ([Layout](/docs/concepts/layout)).
+
+## Colours per calendar
+
+The examples give each calendar (category) a palette in its `data` and put the palette's class on
+its events (`palette-blue`); a theme declares the colours that depend on the palette (an event's
+background, its stripe, today's marker) on every palette, so an event takes its calendar's
+colours in every theme:
+
+```css
+[data-example-theme="paper"] .palette-blue {
+    --cal-event-bg: oklch(0.93 0.04 240);
+    --cal-event-fg: oklch(0.3 0.08 240);
+    --cal-event-stripe-color: oklch(0.55 0.12 240);
+}
+```
+
+## Switching at run time
+
+A theme attribute on an ancestor (`data-example-theme` in the examples) and a `color-scheme` that
+matches it are all a switch needs: no re-render of the calendar, no prop. The examples' embed sets
+the attribute on `<body>` before the first paint, so portalled popovers and dialogs take the theme
+too.
+
+## Keeping themes honest
+
+The examples test their themes: every theme declares the same tokens and the same palettes with
+all six roles, the text passes AA contrast, a theme file only sets values, and the themes differ
+in shape (computed styles in a browser test). The code panel of every example shows its theme's
+CSS: open any of the [examples](/examples) and switch the theme to see the same markup change.

@@ -15,7 +15,6 @@ import type {
     FeatureEngineHost,
     FeatureGesture,
     FeatureModel,
-    MutablePartAttributes,
     PressTarget,
 } from "../features/engine-types";
 import { type FeatureKeyKind, requiresFeature } from "../features/keys";
@@ -35,22 +34,13 @@ import { clockOf } from "../model/model-clock";
 import type { QueryArgs } from "../state/queries";
 import { fromEpochDay } from "../time/epoch-day";
 import { formatPlainDate } from "../time/format-plain-date";
-import { minutesOfDay } from "../time/minutes-of-day";
-import { parseDateTime } from "../time/parse-date-time";
-import { parsePlainTime } from "../time/parse-plain-time";
-import { instantToWallClock } from "../time-zone/instant-to-wall-clock";
 import { resolveTimeZone } from "../time-zone/resolve-time-zone";
 import { startOfDay } from "../time-zone/start-of-day";
 import { todayOf } from "../view/today";
 import type { CalendarEngineAdapter, PartName, ViewChange } from "./adapter";
 import { type EngineHost, resolveHost } from "./engine-host";
 import type { CalendarEngineEvent } from "./events";
-import {
-    type CellPosition,
-    cellKey,
-    type FocusPosition,
-    type GridPoint,
-} from "./grid-point";
+import type { CellPosition, FocusPosition, GridPoint } from "./grid-point";
 import {
     type Box,
     type GridGeometry,
@@ -59,6 +49,17 @@ import {
     timePoint,
 } from "./hit-test";
 import { type GridCells, keyTarget } from "./keyboard";
+import { attributesOf } from "./part-attributes";
+import {
+    cellOfOccurrence,
+    defaultTabStop,
+    gridCellsOf,
+    isShown,
+    keyOfPosition,
+    minutesOf,
+    occurrenceOf,
+    positionOfPart,
+} from "./positions";
 import { type PreviewTimes, previewSegments } from "./preview";
 import {
     clearEventTouchAction,
@@ -168,6 +169,17 @@ const TOUCH_SLOP = 5;
 const MAX_DELAY = 2_147_483_647;
 
 const FOCUSABLE: ReadonlySet<string> = new Set(["day", "slot", "event"]);
+/** The app's own controls: inside the root, the grid's keys leave them alone. */
+const INTERACTIVE =
+    'button, input, textarea, select, a[href], [contenteditable="true"], [contenteditable=""]';
+/** The parts that are buttons: the grid's keys leave them alone. */
+const BUTTONS: ReadonlySet<string> = new Set([
+    "more",
+    "previous",
+    "next",
+    "today",
+    "view-button",
+]);
 
 /** The registry key of a part's element. */
 function keyOf(part: string, payload: Readonly<Record<string, unknown>>) {
@@ -198,11 +210,6 @@ function boxOf(element: Element): Box {
         right: rect.right,
         bottom: rect.bottom,
     };
-}
-
-function minutesOf(value: string, fallback: number): number {
-    const time = parsePlainTime(value);
-    return time.ok ? minutesOfDay(time.value) : fallback;
 }
 
 class Engine<T extends CalendarTypes, F extends CalendarFeatures> {
@@ -482,24 +489,11 @@ class Engine<T extends CalendarTypes, F extends CalendarFeatures> {
     }
 
     private gridCells(): GridCells {
-        const dayGrid = this.model.get("day-grid") as DayGrid | null;
-        const timeGrid = this.timeGrid();
-        return {
-            view: this.model.state.view.type,
-            rtl: this.direction() === "rtl",
-            rows: (dayGrid?.weeks ?? []).map((week) =>
-                week.days.map((day) => day.date),
-            ),
-            columns: (timeGrid?.columns ?? []).map((column) => column.date),
-            slots: (timeGrid?.slots ?? []).map((slot) => slot.time),
-            hiddenDays: this.settings().hiddenDays,
-        };
+        return gridCellsOf(this.erased(), this.direction() === "rtl");
     }
 
     private occurrence(occurrenceId: string): Occurrence | undefined {
-        return this.model.get("occurrence-by", { id: occurrenceId }) as
-            | Occurrence
-            | undefined;
+        return occurrenceOf(this.erased(), occurrenceId);
     }
 
     /** The cell an occurrence starts in, in the current view. */
@@ -507,22 +501,11 @@ class Engine<T extends CalendarTypes, F extends CalendarFeatures> {
         readonly start: string;
         readonly allDay: boolean;
     }): CellPosition | null {
-        if (occurrence.allDay) return { kind: "day", date: occurrence.start };
-        const at = parseDateTime(occurrence.start);
-        if (!at.ok) return null;
-        const wall = instantToWallClock(at.value.instant, this.timeZone());
-        const date = formatPlainDate(wall);
-        const timeGrid = this.timeGrid();
-        if (!timeGrid) return { kind: "day", date };
-        const settings = this.settings();
-        const min = minutesOf(settings.slotMinTime, 0);
-        const minutes = wall.hour * 60 + wall.minute;
-        const index = Math.floor((minutes - min) / settings.slotDuration);
-        const slot =
-            timeGrid.slots[
-                Math.min(Math.max(index, 0), timeGrid.slots.length - 1)
-            ];
-        return slot ? { kind: "slot", date, time: slot.time } : null;
+        return cellOfOccurrence(this.erased(), occurrence);
+    }
+
+    private erased(): CalendarModel {
+        return this.model as unknown as CalendarModel;
     }
 
     /** The occurrences shown in a cell, in their order there (lane, then top). */
@@ -567,76 +550,87 @@ class Engine<T extends CalendarTypes, F extends CalendarFeatures> {
 
     /** Whether a position is shown by the current view. */
     private shown(position: FocusPosition): boolean {
-        if (position.kind === "event") {
-            return (
-                this.model.get("occurrences") as readonly Occurrence[]
-            ).some(
-                (occurrence) =>
-                    occurrence.occurrenceId === position.occurrenceId,
-            );
-        }
-        const grid = this.gridCells();
-        if (position.kind === "slot") {
-            return (
-                grid.columns.includes(position.date) &&
-                grid.slots.includes(position.time)
-            );
-        }
-        return grid.rows.some((dates) => dates.includes(position.date));
+        return isShown(this.erased(), position);
     }
 
     private tabStop(): FocusPosition | null {
         if (this.focusPosition && this.shown(this.focusPosition)) {
             return this.focusPosition;
         }
-        const grid = this.gridCells();
-        const today = formatPlainDate(fromEpochDay(this.todayNow()));
-        if (grid.view === "list") return null;
-        if (grid.columns.length > 0) {
-            const date = grid.columns.includes(today) ? today : grid.columns[0];
-            const time = grid.slots[0];
-            return date !== undefined && time !== undefined
-                ? { kind: "slot", date, time }
-                : null;
-        }
-        const dates = grid.rows.flat();
-        if (dates.length === 0) return null;
-        if (dates.includes(today)) return { kind: "day", date: today };
-        const current = this.model.get("current-range") as { start: string };
-        const date = dates.includes(current.start) ? current.start : dates[0];
-        return date === undefined ? null : { kind: "day", date };
+        return defaultTabStop(this.erased(), this.todayNow());
     }
 
     /** The key of a position's element. */
     private keyOfPosition(position: FocusPosition): string {
-        return position.kind === "event"
-            ? `event ${position.occurrenceId} ${position.cell.date}`
-            : cellKey(position);
+        return keyOfPosition(position);
+    }
+
+    /**
+     * A position as its element is registered: a day-grid segment over several days is one
+     * element per row, registered with its first day there, so an event position in a day cell
+     * names the day its segment starts in that row (the same position otherwise).
+     */
+    private shownAt(position: FocusPosition): FocusPosition {
+        if (position.kind !== "event" || position.cell.kind !== "day") {
+            return position;
+        }
+        const { cell, occurrenceId } = position;
+        for (const week of this.dayGrid()?.weeks ?? []) {
+            const column = week.days.findIndex((day) => day.date === cell.date);
+            if (column < 0) continue;
+            const segment = week.segments.find(
+                (one) =>
+                    one.occurrenceId === occurrenceId &&
+                    one.startColumn <= column &&
+                    column < one.startColumn + one.span,
+            );
+            const start = segment && week.days[segment.startColumn]?.date;
+            return start && start !== cell.date
+                ? { ...position, cell: { kind: "day", date: start } }
+                : position;
+        }
+        return position;
     }
 
     private elementOf(
         position: FocusPosition,
         loose: boolean,
     ): HTMLElement | undefined {
-        const exact = this.registry.get(this.keyOfPosition(position));
+        const exact = this.registry.get(
+            this.keyOfPosition(this.shownAt(position)),
+        );
         if (exact || !loose || position.kind !== "event") {
             return exact?.element;
         }
+        // a segment over several days is registered with its first day in its row: the element
+        // that starts last at or before the cell is the one the cell shows, else any of its own
+        let best: Registration | undefined;
+        let any: Registration | undefined;
         for (const registration of this.registry.values()) {
             if (
-                registration.part === "event" &&
-                registration.payload.occurrenceId === position.occurrenceId
+                registration.part !== "event" ||
+                registration.payload.occurrenceId !== position.occurrenceId
             ) {
-                return registration.element;
+                continue;
+            }
+            any ??= registration;
+            const date = String(registration.payload.date);
+            if (
+                date <= position.cell.date &&
+                (!best || date > String(best.payload.date))
+            ) {
+                best = registration;
             }
         }
-        return undefined;
+        return (best ?? any)?.element;
     }
 
     /** Moves the roving focus, and DOM focus once the position's element is registered. */
     private focusOn(position: FocusPosition): void {
         const before = this.focusPosition;
         this.focusPosition = position;
+        // exact: a loose match could be an element the commit under way removes (a dropped
+        // event's old place); the adapter's `committed()` resolves a pending focus loosely
         const element = this.elementOf(position, false);
         if (element) {
             this.pendingFocus = false;
@@ -673,27 +667,11 @@ class Engine<T extends CalendarTypes, F extends CalendarFeatures> {
     private positionOf(
         registration: Pick<Registration, "part" | "payload">,
     ): FocusPosition | null {
-        const { part, payload } = registration;
-        const date = String(payload.date);
-        if (part === "day") return { kind: "day", date };
-        if (part === "slot") {
-            return { kind: "slot", date, time: String(payload.time) };
-        }
-        if (part !== "event") return null;
-        const occurrenceId = String(payload.occurrenceId);
-        const occurrence = this.occurrence(occurrenceId);
-        let cell = occurrence ? this.cellOf(occurrence) : null;
-        if (!cell || cell.date !== date) {
-            cell =
-                cell?.kind === "slot"
-                    ? { kind: "slot", date, time: this.firstSlot() ?? "00:00" }
-                    : { kind: "day", date };
-        }
-        return { kind: "event", occurrenceId, cell };
-    }
-
-    private firstSlot(): string | undefined {
-        return this.timeGrid()?.slots[0]?.time;
+        return positionOfPart(
+            this.erased(),
+            registration.part,
+            registration.payload,
+        );
     }
 
     private focusAction(
@@ -764,7 +742,33 @@ class Engine<T extends CalendarTypes, F extends CalendarFeatures> {
     private keyDown(event: KeyboardEvent): void {
         if (this.destroyed || event.defaultPrevented) return;
         const registration = this.registrationOf(event.target);
-        const fromElement = registration ? this.positionOf(registration) : null;
+        // a button's keys are its own (a navigation button's click); a "+N more" link's Enter is
+        // its tap (its Space clicks it: `click`)
+        // an app's own control inside a part (a button, a field) keeps its keys
+        if (
+            event.target !== registration?.element &&
+            (event.target as Element | null)?.closest?.(INTERACTIVE) &&
+            !(
+                registration &&
+                (event.target as Element).closest(INTERACTIVE) ===
+                    registration.element
+            )
+        ) {
+            return;
+        }
+        if (registration && BUTTONS.has(registration.part)) {
+            if (
+                registration.part === "more" &&
+                this.moreKey(event, String(registration.payload.date))
+            ) {
+                event.preventDefault();
+                event.stopPropagation();
+            }
+            return;
+        }
+        const fromElement = registration
+            ? this.keptCell(this.positionOf(registration))
+            : null;
         if (fromElement) this.focusPosition = fromElement;
         const position = fromElement ?? this.focusPosition;
         const taken = this.keyChain(event, position);
@@ -838,6 +842,12 @@ class Engine<T extends CalendarTypes, F extends CalendarFeatures> {
                 const next = list[at + (event.key === "ArrowDown" ? 1 : -1)];
                 if (at >= 0 && next !== undefined) {
                     this.focusOn({ ...position, occurrenceId: next });
+                } else if (
+                    at === list.length - 1 &&
+                    event.key === "ArrowDown"
+                ) {
+                    // a day's "+N more" link is the last item of its events
+                    this.focusMore(position.cell);
                 }
                 return true;
             }
@@ -845,7 +855,7 @@ class Engine<T extends CalendarTypes, F extends CalendarFeatures> {
         }
         if ((event.key === "Enter" || event.key === "F2") && !event.shiftKey) {
             const [first] = this.eventsIn(position);
-            if (first === undefined) return false;
+            if (first === undefined) return this.focusMore(position);
             this.focusOn({
                 kind: "event",
                 occurrenceId: first,
@@ -888,11 +898,70 @@ class Engine<T extends CalendarTypes, F extends CalendarFeatures> {
         return true;
     }
 
+    /**
+     * The focus position of an element, keeping the cell the focus entered it from: a segment over
+     * several days is one element, registered with its first day, and the keys move among the
+     * events of the day the focus came from (D12).
+     */
+    private keptCell(position: FocusPosition | null): FocusPosition | null {
+        const current = this.focusPosition;
+        if (
+            position?.kind === "event" &&
+            current?.kind === "event" &&
+            current.occurrenceId === position.occurrenceId &&
+            // the same element: the same row's segment (not another week's, or another column's)
+            this.keyOfPosition(this.shownAt(current)) ===
+                this.keyOfPosition(position)
+        ) {
+            return current;
+        }
+        return position;
+    }
+
+    /** Focuses a day's "+N more" link, when the day has one: whether it did. */
+    private focusMore(cell: CellPosition): boolean {
+        if (cell.kind !== "day") return false;
+        const more = this.registry.get(keyOf("more", { date: cell.date }));
+        if (!more) return false;
+        more.element.focus({ preventScroll: false });
+        return true;
+    }
+
+    /**
+     * The keys of a "+N more" link, the last item of its day's events (D12): Enter is its tap
+     * (Space clicks it: `click`), Up goes back to the day's last event, Escape to the day.
+     */
+    private moreKey(event: KeyboardEvent, date: string): boolean {
+        if (event.ctrlKey || event.altKey || event.metaKey) return false;
+        const cell: CellPosition = { kind: "day", date };
+        switch (event.key) {
+            case "Enter":
+                this.moreClick(date);
+                return true;
+            case "Escape":
+                this.focusOn(cell);
+                return true;
+            case "ArrowUp": {
+                const last = this.eventsIn(cell).at(-1);
+                this.focusOn(
+                    last === undefined
+                        ? cell
+                        : { kind: "event", occurrenceId: last, cell },
+                );
+                return true;
+            }
+            case "ArrowDown":
+                return true;
+            default:
+                return false;
+        }
+    }
+
     private focusIn(event: FocusEvent): void {
         const registration = this.registrationOf(event.target);
         if (!registration || !FOCUSABLE.has(registration.part)) return;
         if (registration.element !== event.target) return;
-        const position = this.positionOf(registration);
+        const position = this.keptCell(this.positionOf(registration));
         if (!position) return;
         const before = this.focusPosition;
         this.focusPosition = position;
@@ -966,14 +1035,15 @@ class Engine<T extends CalendarTypes, F extends CalendarFeatures> {
             element.tabIndex =
                 position &&
                 stop &&
-                this.keyOfPosition(position) === this.keyOfPosition(stop)
+                this.keyOfPosition(position) ===
+                    this.keyOfPosition(this.shownAt(stop))
                     ? 0
                     : -1;
         }
         if (
             this.pendingFocus &&
             this.focusPosition &&
-            key === this.keyOfPosition(this.focusPosition)
+            key === this.keyOfPosition(this.shownAt(this.focusPosition))
         ) {
             this.pendingFocus = false;
             this.focusElement(element);
@@ -1017,6 +1087,7 @@ class Engine<T extends CalendarTypes, F extends CalendarFeatures> {
                 (event) => this.keyDown(event as KeyboardEvent),
             ],
             [element, "focusin", (event) => this.focusIn(event as FocusEvent)],
+            [element, "click", (event) => this.click(event as MouseEvent)],
             [
                 element,
                 "focusout",
@@ -1515,14 +1586,7 @@ class Engine<T extends CalendarTypes, F extends CalendarFeatures> {
             return;
         }
         if (target.kind === "more" && target.date !== undefined) {
-            const day = this.dayGrid()
-                ?.weeks.flatMap((week) => week.days)
-                .find((one) => one.date === target.date);
-            this.emit({
-                type: "more-click",
-                date: target.date,
-                occurrenceIds: day?.hiddenOccurrenceIds ?? [],
-            });
+            this.moreClick(target.date);
             return;
         }
         if (target.kind === "day" && target.date !== undefined) {
@@ -1542,6 +1606,30 @@ class Engine<T extends CalendarTypes, F extends CalendarFeatures> {
                 at: point.at,
             });
         }
+    }
+
+    /**
+     * A click with no pointer and no key behind it (`detail` 0: assistive technology activating a
+     * "+N more" link) is its tap; a pointer's tap or Enter already told the app.
+     */
+    private click(event: MouseEvent): void {
+        if (this.destroyed || event.detail !== 0) return;
+        const registration = this.registrationOf(event.target);
+        if (registration?.part === "more") {
+            this.moreClick(String(registration.payload.date));
+        }
+    }
+
+    /** A day's "+N more" link was pressed (a tap, Enter or Space): the app opens its popover. */
+    private moreClick(date: string): void {
+        const day = this.dayGrid()
+            ?.weeks.flatMap((week) => week.days)
+            .find((one) => one.date === date);
+        this.emit({
+            type: "more-click",
+            date,
+            occurrenceIds: day?.hiddenOccurrenceIds ?? [],
+        });
     }
 
     private slotPoint(date: string, time: string): GridPoint | null {
@@ -1637,117 +1725,20 @@ class Engine<T extends CalendarTypes, F extends CalendarFeatures> {
         part: PartName,
         payload: Readonly<Record<string, unknown>>,
     ): PartAttributes {
-        const into: MutablePartAttributes = { "data-calendar-part": part };
-        const model = this.model;
-        const date =
-            typeof payload.date === "string" ? payload.date : undefined;
-        const listView = model.state.view.type === "list";
-        switch (part) {
-            case "root":
-                Object.assign(into, model.get("root-attributes"));
-                break;
-            case "day-grid":
-            case "time-grid":
-                into.role = "grid";
-                break;
-            case "week":
-            case "column":
-                into.role = "row";
-                if (part === "column" && date) {
-                    Object.assign(
-                        into,
-                        model.get("day-attributes-by", { date }),
-                    );
-                }
-                break;
-            case "day":
-            case "slot": {
-                Object.assign(
-                    into,
-                    part === "day"
-                        ? model.get("day-attributes-by", { date: date ?? "" })
-                        : model.get("slot-attributes-by", {
-                              date: date ?? "",
-                              time: String(payload.time),
-                          }),
-                );
-                into.role = "gridcell";
-                this.focusAttributes(part, payload, into);
-                break;
-            }
-            case "day-events":
-            case "list-day":
-                into.role = "list";
-                if (date) into["data-date"] = date;
-                break;
-            case "column-header":
-                into.role = "columnheader";
-                if (date) {
-                    Object.assign(
-                        into,
-                        model.get("day-attributes-by", { date }),
-                    );
-                }
-                break;
-            case "event": {
-                const occurrenceId = String(payload.occurrenceId);
-                Object.assign(
-                    into,
-                    model.get("event-attributes-by", {
-                        occurrenceId,
-                        continuesBefore: payload.continuesBefore === true,
-                        continuesAfter: payload.continuesAfter === true,
-                    }),
-                );
-                const occurrence = this.occurrence(occurrenceId);
-                const inTimeGrid =
-                    occurrence?.allDay === false &&
-                    model.state.view.type !== "month" &&
-                    !listView;
-                if (!inTimeGrid) into.role = "listitem";
-                if (listView) into.tabindex = "0";
-                else this.focusAttributes(part, payload, into);
-                break;
-            }
-            case "resize-handle":
-                into["data-occurrence-id"] = String(payload.occurrenceId);
-                into["data-edge"] = String(payload.edge);
-                break;
-            case "more":
-            case "business-hours":
-                if (date) into["data-date"] = date;
-                break;
-            case "slot-label":
-                into["data-time"] = String(payload.time);
-                break;
-            default:
-                break;
-        }
-        for (const feature of this.parts) {
-            feature.attributes?.(part, payload, into);
-        }
-        return into;
-    }
-
-    private focusAttributes(
-        part: PartName,
-        payload: Readonly<Record<string, unknown>>,
-        into: MutablePartAttributes,
-    ): void {
-        const stop = this.tabStop();
-        const position = this.positionOf({ part, payload });
-        const same =
-            stop !== null &&
-            position !== null &&
-            this.keyOfPosition(stop) === this.keyOfPosition(position);
-        into.tabindex = same ? "0" : "-1";
-        const focused = this.focusPosition;
-        into["data-focused"] =
-            focused !== null &&
-            position !== null &&
-            this.keyOfPosition(focused) === this.keyOfPosition(position)
-                ? ""
-                : undefined;
+        return attributesOf(
+            this.erased(),
+            part,
+            payload,
+            {
+                // as the elements are registered: a multi-day segment is focused from any of its days
+                tabStop: () => {
+                    const stop = this.tabStop();
+                    return stop && this.shownAt(stop);
+                },
+                focused: this.focusPosition && this.shownAt(this.focusPosition),
+            },
+            this.parts,
+        );
     }
 
     // ---------------------------------------------------------------------------------------------

@@ -217,6 +217,28 @@ model.run("event.set-flags", {"eventId":"standup","durationEditable":false});
 model.dispatch({"command":"event.set-flags","payload":{"eventId":"standup","durationEditable":false}});
 ```
 
+### `event.set-all`
+
+Replace every event with `events` (an app's controlled list: give each its `id`). An event object the calendar already holds is kept as it is; the others are validated like the document's. The edit flags and the constraints, which guard the user's edits, do not apply; an event source's fetched ranges stay as they are (a list that drops a source's events does not refetch them).
+
+**Payload**
+
+| field | type | required | description |
+| --- | --- | --- | --- |
+| `events` | `object[]` | yes |  |
+
+**Result**
+
+| field | type | required | description |
+| --- | --- | --- | --- |
+| `eventIds` | `string[]` | yes |  |
+| `removedEventIds` | `string[]` | yes |  |
+
+```ts
+model.run("event.set-all", {"events":[{"id":"standup","title":"Standup","start":"2026-11-26T09:00:00-03:00","end":"2026-11-26T09:15:00-03:00","allDay":false}]});
+model.dispatch({"command":"event.set-all","payload":{"events":[{"id":"standup","title":"Standup","start":"2026-11-26T09:00:00-03:00","end":"2026-11-26T09:15:00-03:00","allDay":false}]}});
+```
+
 ## Calendars
 
 ### `calendar.add`

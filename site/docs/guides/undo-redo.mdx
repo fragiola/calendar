@@ -1,0 +1,98 @@
+---
+title: Undo and redo
+description: Add undo and redo to a calendar in app code, recording each change of the events from the command bus and restoring it with event.set-all.
+---
+
+Undo is app policy: what counts as a step (a move, but not a view change? a selection?) depends on
+your product, so the package ships none. The command bus makes it short to write. Every commit
+reaches `model.subscribe` with the state before and after it, and `event.set-all` puts a list of
+events back in one command. The examples keep a copyable `UndoManager` in `_kit/undo.ts`.
+
+<Example id="undo-redo" />
+
+## Recording steps
+
+A listener sees one event per commit: the command, its payload and result, `before` and `after`
+states, `transient` and the `meta` it ran with. A drag is one step: the engine runs one command on
+its drop, never a stream of moves.
+
+```ts
+import type {
+    CalendarEventJson,
+    CalendarModel,
+    CalendarState,
+    CommandEvent,
+} from "@fragiola/calendar-react";
+
+const UNDO_META = { undo: true } as const;
+
+export function recordHistory(model: CalendarModel) {
+    const undoStack: CalendarState["events"][] = [];
+    const redoStack: CalendarState["events"][] = [];
+
+    model.subscribe((event: CommandEvent) => {
+        // an undo's own command, and transient steps, are not steps
+        if (event.meta?.undo === true || event.transient) return;
+        // a step is a change of the events, not of the view or the settings
+        if (event.before.events === event.after.events) return;
+        undoStack.push(event.before.events);
+        redoStack.length = 0;
+    });
+
+    const swap = (
+        from: CalendarState["events"][],
+        to: CalendarState["events"][],
+    ) => {
+        const events = from.pop();
+        if (!events) return;
+        to.push(model.state.events);
+        // the model's own event objects: `event.set-all` keeps each one as it is
+        const list = [...events] as unknown as CalendarEventJson[];
+        model.run("event.set-all", { events: list }, { meta: UNDO_META });
+    };
+
+    return {
+        undo: () => swap(undoStack, redoStack),
+        redo: () => swap(redoStack, undoStack),
+    };
+}
+```
+
+The state is frozen and shared: keeping `before.events` costs a reference, not a copy. An event
+object the model still holds is kept as it is by `event.set-all`, so an undo re-renders only the
+rows whose events changed.
+
+## Buttons and shortcuts
+
+`_kit/undo.ts` adds a snapshot (`canUndo`, `canRedo`, the steps' command names) with
+`subscribe` and `getSnapshot`, ready for `useSyncExternalStore`:
+
+```tsx
+import { useSyncExternalStore } from "react";
+import { UndoManager } from "./undo";
+
+function UndoButtons({ undo }: { undo: UndoManager }) {
+    const history = useSyncExternalStore(undo.subscribe, undo.getSnapshot);
+    return (
+        <>
+            <button type="button" disabled={!history.canUndo} onClick={() => undo.undo()}>
+                Undo
+            </button>
+            <button type="button" disabled={!history.canRedo} onClick={() => undo.redo()}>
+                Redo
+            </button>
+        </>
+    );
+}
+```
+
+The example binds Ctrl or Cmd + Z (and Shift + Z, or Y, to redo) on the document; a text field
+keeps its own.
+
+## What a step is
+
+The manager above records changes of the events. To make a view change undoable too, record
+`before.view` and run `view.go-to` and `view.set` on undo. To group several commands into one
+step, run them as one `batch`: a batch is one commit, so one step. A middleware
+(`model.use`) can stop a change before it happens; an undo is the change after it. See
+[The command bus](/docs/api/command-bus).

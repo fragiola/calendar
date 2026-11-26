@@ -1,0 +1,125 @@
+---
+title: Saving and restoring
+description: Save a calendar as its JSON document and load it back with createCalendarModel, with or without the view the reader was on.
+---
+
+A calendar is a JSON document: its events, its calendars (categories) and its settings, and on
+request the view. `model.get("calendar-json")` writes it; `createCalendarModel` reads it back,
+validated. Where you keep it (local storage, a server, a file) and when you save are yours: the
+package ships no persistence.
+
+<Example id="save-and-restore" />
+
+## The round trip
+
+```ts
+import {
+    type CalendarDocument,
+    createCalendarModel,
+} from "@fragiola/calendar-react";
+
+const model = createCalendarModel({
+    version: 1,
+    events: [],
+    calendars: [],
+    settings: { timeZone: "America/New_York" },
+});
+
+// the document: events, calendars and every setting (defaults written too)
+const saved: CalendarDocument = model.get("calendar-json");
+// and with the view (type, anchor date, days) the reader was on
+const withView = model.get("calendar-json", { includeView: true });
+
+const restored = createCalendarModel(JSON.parse(JSON.stringify(withView)));
+```
+
+`calendar-json` writes every setting, so loading it and writing it again gives the same document.
+The view is model state, not document: it is left out unless you ask for it. The engine's state
+(focus, a gesture, a preview) is never in it.
+
+## Saving to local storage
+
+The examples keep a copyable helper in `_kit/persist.ts`:
+
+```ts title="persist.ts"
+import type {
+    CalendarDocument,
+    CalendarModel,
+    CalendarTypes,
+} from "@fragiola/calendar-react";
+
+/** The saved document under `key`, or undefined (nothing saved, storage blocked, bad JSON). */
+export function restoreCalendar<T extends CalendarTypes>(
+    key: string,
+): CalendarDocument<T> | undefined {
+    try {
+        const text = window.localStorage.getItem(key);
+        return text === null
+            ? undefined
+            : (JSON.parse(text) as CalendarDocument<T>);
+    } catch {
+        return undefined;
+    }
+}
+
+/** Saves the model's document, with its view, under `key`. */
+export function saveCalendar<T extends CalendarTypes>(
+    key: string,
+    model: CalendarModel<T>,
+): boolean {
+    try {
+        window.localStorage.setItem(
+            key,
+            JSON.stringify(model.get("calendar-json", { includeView: true })),
+        );
+        return true;
+    } catch {
+        return false;
+    }
+}
+```
+
+The example creates its model from `restoreCalendar(KEY) ?? initial()` and saves on a button. To
+save on every change instead, subscribe to the model: `model.subscribe` calls you once per commit.
+
+```ts
+const stop = model.subscribe((event) => {
+    if (event.transient) return;
+    saveCalendar("my-calendar", model);
+});
+```
+
+## Loading something you did not write
+
+`createCalendarModel` validates the document against its JSON Schema and throws a
+`CalendarValidationError` with every issue and its JSON path when it is invalid: an end before its
+start, an unknown zone, a field of a feature the model does not install. `validateCalendar(json)`
+returns the same issues without throwing (an empty list when the document is valid; give it the
+model's `features` too), so a restore can fall back:
+
+```ts
+import {
+    type CalendarDocument,
+    createCalendarModel,
+    validateCalendar,
+} from "@fragiola/calendar-react";
+
+declare const text: string;
+declare function initial(): CalendarDocument;
+
+const json: unknown = JSON.parse(text);
+const issues = validateCalendar(json);
+const model = createCalendarModel(
+    issues.length === 0 ? (json as CalendarDocument) : initial(),
+);
+```
+
+Events given without an `id` get one at load (`createId`, an option of `createCalendarModel`), so
+save the document after the first load to keep those ids stable.
+
+## The view and the features
+
+A recurring event's `recurrence`, an event's `sourceId` and a feature's settings are fields of
+their feature: load the document into a model that installs the same features. The fields of a
+feature that is not installed are a validation issue, never dropped silently. See
+[The JSON document](/docs/api/json-document) for every field.

@@ -1,0 +1,115 @@
+---
+title: Dates and time zones
+description: All-day dates, RFC 3339 instants, exclusive ends, a display zone and each event's home zone, with daylight saving time handled by Intl alone.
+---
+
+Dates in a calendar are where off-by-one bugs live: a day that lasts 23 hours, an all-day end that
+is inclusive in one library and exclusive in another, a wall clock that jumps. The calendar keeps
+them exact with three rules and no date library: it reads zones from `Intl` only, and has no
+runtime dependency.
+
+## Two kinds of value
+
+- **An all-day date is `YYYY-MM-DD`**: `"2026-11-26"`. It is a day on the calendar, the same
+  wherever the reader is.
+- **A timed value is an RFC 3339 date-time with its offset**: `"2026-11-26T09:30:00-05:00"`. It
+  is an instant, unambiguous, as a server or an assistant writes it. A date-time without an offset
+  is refused.
+
+Every **end is exclusive**, for both: an all-day event on the 26th alone ends on the 27th, and a
+meeting from 09:00 to 10:00 ends at 10:00. A timed event may last no time (a deadline); one that
+ends before it starts is refused.
+
+```json
+[
+    { "id": "offsite", "title": "Offsite", "start": "2026-11-26", "end": "2026-11-28", "allDay": true },
+    {
+        "id": "review",
+        "title": "Review",
+        "start": "2026-11-26T10:00:00-05:00",
+        "end": "2026-11-26T11:00:00-05:00",
+        "allDay": false
+    }
+]
+```
+
+The offsite shows on the 26th and the 27th. `nextDayThreshold` (an `HH:mm`, default `00:00`)
+decides whether a timed event ending shortly after midnight shows on that next day.
+
+## The display zone and an event's zone
+
+The settings' `timeZone` is the **display zone**: the zone the views lay days and times out in,
+an IANA name or `"local"` (the reader's computer). An event may have its own `timeZone`, its home
+zone, which matters when it moves or repeats; without one, the display zone is used.
+
+```ts
+const model = createCalendarModel({
+    version: 1,
+    events: [
+        {
+            id: "standup",
+            title: "Standup",
+            start: "2026-10-31T09:00:00-04:00",
+            end: "2026-10-31T09:30:00-04:00",
+            allDay: false,
+            timeZone: "America/New_York",
+        },
+    ],
+    settings: { timeZone: "Europe/London", locale: "en-GB" },
+});
+```
+
+London readers see the standup at 13:00; switch the display zone with
+`model.run("settings.set", { settings: { timeZone: "America/New_York" } })` and it shows at 09:00. The event's
+instant never changes.
+
+## Moves keep the wall clock
+
+Moving an event by whole days is a calendar move in its zone: 09:00 stays 09:00 across a daylight
+saving change. Moving by minutes is a move of the instant. Durations of timed events are instant
+durations.
+
+```ts
+model.run("event.move", { eventId: "standup", delta: { days: 2 } });
+// start "2026-11-02T09:00:00-05:00": still 09:00 in New York, after the clocks went back
+```
+
+A drag across a change lands where the pointer is: whole days on the wall clock, plus the minutes
+between the two points.
+
+## Days are not 24 hours long
+
+The time grid's axis is the display zone's wall clock: every column shows the same slots, and an
+event sits at its wall-clock times. On the day New York's clocks go back (2026-11-01, 25 hours) a
+slot's hour happens twice; on a day a zone skips, its skipped hour holds nothing. A wall time that
+does not exist moves forward past the gap; one that happens twice takes the earlier offset.
+
+The [time zones](/examples/time-zones) example switches the display zone and opens the week of a
+change; [Time zones and DST](/docs/guides/time-zones) is the task-by-task guide.
+
+## Today comes from a clock
+
+"Today", the days in the past, the default anchor date and `view.today` read the model's clock,
+`Date.now` unless you inject one. A test or a server render passes a fixed one, and gets the same
+"today" every time; the engine moves "today" at the display zone's next midnight.
+
+```ts
+const model = createCalendarModel(json, {
+    now: () => Date.parse("2026-11-26T12:00:00-05:00"),
+});
+model.get("today"); // "2026-11-26" in the display zone
+```
+
+## Formatting is data
+
+The package renders no date. A title, a day's header and a slot's label are `Intl` parts in the
+calendar's `locale`, which you join, style or replace:
+
+```tsx
+const parts = useDayHeader("2026-11-26", { weekday: "long", day: "numeric" });
+// in en-US: [{ type: "day", value: "26" }, { type: "literal", value: " " }, { type: "weekday", value: "Thursday" }]
+```
+
+The core's date helpers (`parsePlainDate`, `addDays`, `wallClockToInstant`, `formatInstant`, …)
+are exported for your own code ([Date helpers](/docs/api/date-helpers)). A date from a date picker
+(`{ year, month, day }`, a `PlainDate`) goes to `view.go-to` as it is.

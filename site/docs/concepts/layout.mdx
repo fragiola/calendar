@@ -1,0 +1,103 @@
+---
+title: Layout
+description: The core lays out every view as plain data, lanes for day grids, fractions and overlap columns for time grids, and keeps unchanged parts the same objects.
+---
+
+Where an event goes is a pure function of the state, computed by the core: the same on the
+server, in the first render and in a test. The parts place themselves from it with structural
+style; you size the cells and draw the boxes. The engine adds only what needs pixels: how many
+events fit a day.
+
+## Day grids: lanes
+
+`model.get("day-grid")` is the month view, and the all-day row of the time-grid views: weeks, each
+with its days and its **segments** (an occurrence's part within one row).
+
+| field | of | meaning |
+| --- | --- | --- |
+| `id` | a week | its first day, its key |
+| `weekNumber` | a week | under the `weekNumbers` setting (`"iso"` or `"locale"`) |
+| `days` | a week | each `{ date, today, outside, weekend, past, disabled, hiddenCount, hiddenOccurrenceIds }` |
+| `segments` | a week | the segments shown, by lane then column |
+| `lanes` | a week | how many lanes the shown segments use |
+| `startColumn`, `span` | a segment | its first column (0 at the inline start) and how many days it covers |
+| `lane` | a segment | its lane, 0 at the top |
+| `continuesBefore`, `continuesAfter` | a segment | it started in an earlier row, or ends in a later one |
+
+Segments are packed into lanes by start, then longer first, then `eventOrder`
+(`"start,-duration,allDay,title"` by default). A multi-day event is one segment per row it
+crosses. With `dayMaxEvents` (a number, or `"auto"`: what fits, measured by the engine) a segment
+past the limit is left out and its days count it in `hiddenCount`: `Calendar.More` renders while
+that is above 0.
+
+`Calendar.Segment` places itself in its day's `Calendar.DayEvents`, which is its containing block:
+`position: absolute`, its lane times `--calendar-lane-size` from the top, one lane tall, and as
+wide as its days plus the gaps between them. `Calendar.DayEvents` holds the row's lanes
+(`min-block-size`), so every day of a row is as tall. Three custom properties, set by you on any
+ancestor, describe your grid:
+
+| property | default | what it is |
+| --- | --- | --- |
+| `--calendar-lane-size` | `1.5rem` | the height of a lane |
+| `--calendar-day-gap` | `0px` | the space between two days' event areas (your padding and borders) |
+| `--calendar-row-inset` | `0px` | the space before a row's first day (a week number, the all-day label) |
+
+```css
+.month { --calendar-lane-size: 1.375rem; }
+.day { padding: 0.25rem; border-inline-start: 1px solid #e5e7eb; }
+/* a segment over two days crosses one day's padding twice and one border */
+.week { --calendar-day-gap: calc(0.5rem + 1px); --calendar-row-inset: 2rem; }
+```
+
+A row (`Calendar.Week`, `Calendar.AllDayRow`) is `position: relative`, the containing block of its
+`Selection` and `DragPreview`, placed over their days after `--calendar-row-inset`. Logical
+properties throughout: a right-to-left calendar needs nothing more.
+
+## Time grids: fractions and overlap columns
+
+`model.get("time-grid")` is the slots (`slotDuration` from `slotMinTime` to `slotMaxTime`) and the
+columns (the days), each with its timed segments. Positions are **fractions** of a column (0 to
+1), never pixels, so the grid is as tall as your slot rows make it.
+
+| field | of | meaning |
+| --- | --- | --- |
+| `time`, `top`, `height` | a slot | its `HH:mm` start and its place in a column |
+| `date`, `today`, `weekend`, `past`, `disabled` | a column | its day |
+| `top`, `height` | a segment | where it starts and how long it is, as fractions of the column |
+| `column`, `columns`, `span` | a segment | its overlap column, its cluster's number of columns, how many it is widened over |
+| `continuesBefore`, `continuesAfter` | a segment | it started before the column's day (or `slotMinTime`), or ends after it |
+
+Occurrences that overlap, directly or through others, form a cluster. Each takes the first column
+free at its start (by start, then longer first), and is widened to the right up to the first
+column holding an occurrence it overlaps. An event shorter than `eventMinDuration` (15 minutes) counts as that
+long, so a deadline stays visible. A multi-day timed event is split per column.
+
+`Calendar.TimeEvent` maps the fractions to percentages of its column: `top` and `height`, and
+`inset-inline-start` and `width` from its overlap columns.
+
+```tsx
+// a segment { top: 0.375, height: 0.0625, column: 1, columns: 2, span: 1 } renders
+// style="position: absolute; top: 37.5%; height: 6.25%; inset-inline-start: 50%; width: 50%"
+<Calendar.TimeEvent segment={segment} className="event" />
+```
+
+## Lists
+
+`model.get("list")` lays out the visible days of any view as an agenda: the days that have
+occurrences, each with its items in order. `model.is("list-empty")` says when there is none, for
+your "no events" message.
+
+## Unchanged parts keep their identity
+
+A layout keeps the objects of what did not change: a week row, a column, a slot, a list day and a
+segment are the same objects while they are equal and laid out from the same events. Moving one
+event makes the rows or columns it left and entered new, and nothing else, so a part, a memo or a
+stable children function re-renders only what changed
+([Composition](/docs/concepts/composition), [Performance](/docs/guides/performance)).
+
+```ts
+const before = model.get("day-grid");
+model.run("event.move", { eventId: "review", delta: { days: 7 } });
+const after = model.get("day-grid");
+before?.weeks[0] === after?.weeks[0]; // true when that week did not hold the review
+```

@@ -1,0 +1,100 @@
+---
+title: Typed data
+description: A registry declares each event kind's data and a calendar's data, so documents, commands, reads and middleware are checked against your types.
+---
+
+An event carries the app's own data in `data`, and a calendar (a category of events) carries its
+own. A **registry** types both: each event kind, keyed by its name, with the type of its `data`,
+and the type of a calendar's `data`. Give it to the model and every document, command and read is
+checked against it, with no cast.
+
+## Declare the registry
+
+```ts
+type Types = {
+    events: {
+        meeting: { room: string; attendees: string[] };
+        focus: undefined;
+        trip: { destination: string };
+    };
+    calendar: { color: "blue" | "green" | "orange" };
+};
+```
+
+An event's `kind` names its type; `data` is required when the kind's type is an object and
+optional when it allows `undefined` (`focus` above). An event without a `kind` has no typed data.
+
+## Type the document and the model
+
+```ts
+import {
+    type CalendarDocument,
+    createCalendarModel,
+} from "@fragiola/calendar-react";
+
+const json: CalendarDocument<Types> = {
+    version: 1,
+    calendars: [{ id: "ada", title: "Ada", data: { color: "blue" } }],
+    events: [
+        {
+            id: "review",
+            kind: "meeting",
+            title: "Design review",
+            start: "2026-11-26T10:00:00-05:00",
+            end: "2026-11-26T11:00:00-05:00",
+            allDay: false,
+            calendarId: "ada",
+            data: { room: "Blue", attendees: ["ada", "grace"] },
+        },
+    ],
+};
+
+const model = createCalendarModel<Types>(json);
+```
+
+`CalendarEventJson<Types>` is a union over the kinds, so a `meeting` without a `room`, or a `trip`
+with one, does not compile. The same holds for `event.add` and `event.set-data`:
+
+```ts
+model.run("event.add", {
+    kind: "trip",
+    title: "Lisbon",
+    start: "2026-12-01",
+    end: "2026-12-04",
+    allDay: true,
+    data: { destination: "Lisbon" },
+});
+```
+
+## Read typed data
+
+Reads narrow on the kind: an event from `model.get("event-by")` is a `CalendarEventOf<Types>`.
+In the model's state the type of `data` is optional (it is checked where events are written: the
+document and the commands), so read it with `?.`.
+
+```ts
+const event = model.get("event-by", { id: "review" });
+if (event?.kind === "meeting") {
+    event.data?.room; // string | undefined
+}
+const calendar = model.get("calendar-by", { id: "ada" });
+calendar?.data?.color; // "blue" | "green" | "orange" | undefined
+```
+
+In a component, pass the registry to the hook, which cannot infer it through context:
+
+```tsx
+function Room({ eventId }: { eventId: string }) {
+    const { model } = useCalendar<Types>();
+    const event = model.get("event-by", { id: eventId });
+    return event?.kind === "meeting" ? <span>{event.data?.room}</span> : null;
+}
+```
+
+## Data is JSON
+
+The document is JSON: `data` holds JSON values (strings, numbers, booleans, arrays, objects,
+`null`), so it round-trips through `model.get("calendar-json")`, a server and an assistant. Keep
+`Date` objects, functions and class instances out of it.
+
+The [custom event content](/examples/custom-event-content) example renders each kind its own way.

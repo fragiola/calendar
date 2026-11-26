@@ -1,0 +1,39 @@
+---
+title: Glossary
+description: The words the calendar's docs, commands and types use, from event and occurrence to segment, slot, lane and range, each with what it means here.
+---
+
+The docs, the commands, the keys and the types share one vocabulary. Each word means one thing.
+
+| word | meaning |
+| --- | --- |
+| event | an entity of the document: a title, a start, an end, `allDay`, its calendar, its data |
+| occurrence | what a view shows of an event: one for a plain event (its id is the event's), one per date of a recurring event (`<eventId>@<original start>`) |
+| calendar | a category of events (a person, a team, a room): `calendarId` on an event, with its own `editable` and `visible` |
+| document | the JSON a model loads and writes: `{ version: 1, events, calendars, settings }` |
+| model | the calendar's state and rules, with no DOM: `createCalendarModel` |
+| engine | one calendar on screen: focus, gestures, previews, measurement |
+| command | a change, `<entity>.<verb>`: `event.move`, `view.next` |
+| view | a layout type (`month`, `week`, `day`, `days`, `list`) over a range |
+| anchor date | the date a view is built around (`view.go-to` moves it) |
+| visible range | every day a view shows (a month's six weeks) |
+| current range | the range a view is about (the month itself) |
+| display zone | the settings' `timeZone`: the zone days and times are laid out in |
+| home zone | an event's own `timeZone`: its moves keep its wall clock there, its rule repeats there |
+| day grid | the month's layout, and the all-day row of a time grid: rows of days with segments |
+| segment | an occurrence's part within one row of a day grid, or one column of a time grid |
+| lane | a segment's line within its row, 0 at the top |
+| time grid | the week, day and `days` views: columns of days and rows of slots |
+| column | a day of a time grid |
+| slot | a step of a time grid's day (`slotDuration`), the grid's cell |
+| all-day row | the time grid's day-grid row for all-day and multi-day events |
+| selected | a range of days or times chosen with `selection()`; events are not selected |
+| focused | the date or event holding the roving focus |
+| grabbed | an event the keyboard picked up to move or resize (Space) |
+| edit scope | how far an edit of a recurring event's occurrence goes: `this`, `following`, `all` |
+| feature | an opt-in capability from its own entry: `selection()`, `dragAndDrop()`, … |
+| part | an element a primitive renders, named by `data-calendar-part` |
+| collection part | a part that calls your function per entity of the layout: `Weeks`, `Days`, `Columns`, … |
+
+See [The model and commands](/docs/concepts/model-and-commands) and
+[Views and ranges](/docs/concepts/views-and-ranges) for the words at work.

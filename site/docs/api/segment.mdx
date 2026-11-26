@@ -1,0 +1,75 @@
+---
+title: Calendar.Segment
+description: An event's part in a day-grid row. It is focusable and draggable, and places itself in its lane over the days it covers.
+---
+
+`Calendar.Segment` is an occurrence's part within one row of a day grid (`role="listitem"`): an
+all-day or multi-day event in a month, or in a time grid's all-day row. A multi-day event over two
+weeks is two segments, one per row. It renders a `div` with what you give it: the event's title
+and time are model data that you render (`model.get("occurrence-by", { id })`).
+
+## Behaviour
+
+- **It places itself** (structural style, on logical properties): `position: absolute` in its
+  day's `Calendar.DayEvents`, `inset-block-start` its `lane` times `--calendar-lane-size`, one
+  lane high, `inline-size` its `span` days plus `span - 1` times `--calendar-day-gap`. Right to
+  left needs nothing more.
+- **It is focusable**: one of the grid's roving items. Enter on its day moves the focus to the
+  day's first event, Up and Down between them, Escape back to the day; Enter on it is the engine's
+  `event-click` (`onEventClick`), as a tap is.
+- **It is draggable** with `dragAndDrop()` (`touch-action: none` while installed): a mouse drag
+  after 5 px, a touch after a long press, Space to grab it from the keyboard. With `resize()`, a
+  `ResizeHandle` inside it resizes it.
+- **Its state** is `data-*`: `data-event-id`, `data-occurrence-id`, `data-calendar-id`,
+  `data-all-day`, `data-continues-before`, `data-continues-after` (its event goes on past the row),
+  `data-focused`, `data-dragging`, `data-grabbed`, `data-resizing`.
+
+It renders `data-calendar-part="segment"`. Its accessible name is yours: its text content, or an
+`aria-label`.
+
+## Usage
+
+```tsx
+import { Calendar, type Segment, useCalendar } from "@fragiola/calendar-react";
+import { ResizeHandle } from "@fragiola/calendar-react/resize";
+
+function EventChip({ segment }: { segment: Segment }) {
+    const { model } = useCalendar();
+    const occurrence = model.get("occurrence-by", { id: segment.occurrenceId });
+    return (
+        <Calendar.Segment
+            segment={segment}
+            className={(state) =>
+                [
+                    "chip",
+                    state.continuesBefore && "chip-open-start",
+                    state.continuesAfter && "chip-open-end",
+                    state.dragging && "chip-dragging",
+                ]
+                    .filter(Boolean)
+                    .join(" ")
+            }
+        >
+            {occurrence?.title}
+            <ResizeHandle edge="end" className="chip-handle" />
+        </Calendar.Segment>
+    );
+}
+```
+
+The same element can come from `useSegment(segment)` ([hooks](/docs/api/hooks)).
+
+<Example id="all-day-and-multi-day" variant="card" />
+
+## Props
+
+`SegmentProps`; it also takes the [common props](/docs/api/root#common-props) and every `div`
+attribute.
+
+| prop | type | description |
+| --- | --- | --- |
+| `segment` | `Segment` | the segment, from `Calendar.DayEvents`' children function |
+| `children` | `ReactNode \| (state) => ReactNode` | the event's content, or a function of its state |
+
+Its state is `SegmentState` ([hooks](/docs/api/hooks)): the event's ids and flags, and the
+`segment` (`startColumn`, `span`, `lane`).

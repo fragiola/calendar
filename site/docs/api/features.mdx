@@ -1,0 +1,163 @@
+---
+title: Features
+description: The opt-in features, each on its own entry point, with what each factory adds, its options, its parts in React, and the types for writing a feature.
+---
+
+The core is a minimal calendar: the document, the views and their layout, the event commands with
+their edit rules, the keyboard over dates and events. Everything else is an opt-in feature, a
+factory from its own entry point that the main entry never imports, so a calendar that does not
+drag ships no drag code ([Features](/docs/concepts/features)). The features are given to the model
+once, for its life; which ones a screen offers is yours.
+
+```tsx
+import { Calendar } from "@fragiola/calendar-react";
+import { dragAndDrop } from "@fragiola/calendar-react/drag-and-drop";
+import { resize } from "@fragiola/calendar-react/resize";
+import { selection } from "@fragiola/calendar-react/selection";
+
+// a const tuple, outside the component: read once by the root
+const FEATURES = [selection(), dragAndDrop(), resize()] as const;
+
+export function Planner() {
+    return (
+        <Calendar.Root features={FEATURES} defaultView="week">
+            {/* the time grid, with Selection, DragPreview and ResizeHandle parts */}
+        </Calendar.Root>
+    );
+}
+```
+
+Each React entry `@fragiola/calendar-react/<entry>` re-exports the core's `@fragiola/calendar/<entry>`
+and adds the feature's parts and hooks, so a React app installs one package. A feature's command,
+key, setting or document field in a model without it is refused, naming the feature; a feature's
+root callback (`onSelect`) is a type error without it.
+
+## The features
+
+| factory | entry | adds |
+| --- | --- | --- |
+| `selection(options?)` | `@fragiola/calendar/selection` | selecting a range of days or time by pointer and keyboard: `selection.set`, `selection.clear`, `"selected-range"`, the `select` event |
+| `dragAndDrop(options?)` | `@fragiola/calendar/drag-and-drop` | moving events by pointer and keyboard, across days and between the all-day row and the time grid: one `event.move` on drop |
+| `resize()` | `@fragiola/calendar/resize` | changing an event's start or end by its handles and by keyboard |
+| `recurrence()` | `@fragiola/calendar/recurrence` | recurring events: RRULE, excluded dates, overrides, edit scopes |
+| `nowIndicator(options?)` | `@fragiola/calendar/now-indicator` | the current time's place in the time grid, updated on each tick |
+| `constraints()` | `@fragiola/calendar/constraints` | business hours, allowed ranges and overlap rules that refuse commands |
+| `externalDrop(options?)` | `@fragiola/calendar/external-drop` | receiving drags from outside: native drops and app-driven drags (requires `dragAndDrop()`) |
+| `eventSources()` | `@fragiola/calendar/event-sources` | the ranges to fetch per source and their loading state; the fetch is yours |
+
+Each factory returns its feature type: `SelectionFeature`, `DragAndDropFeature`, `ResizeFeature`,
+`RecurrenceFeature`, `NowIndicatorFeature`, `ConstraintsFeature`, `ExternalDropFeature`,
+`EventSourcesFeature`. `model.get("features")` lists the installed ones as `CalendarFeatureInfo`
+(`name`, `requires`).
+
+## Options
+
+`SelectionOptions`, `DragAndDropOptions`, `NowIndicatorOptions` and `ExternalDropOptions`:
+
+| option | of | default | description |
+| --- | --- | --- | --- |
+| `selectMinDistance` | `selection()` | `0` | the pixels a mouse or pen press moves before it selects; 0: a click selects its day or slot |
+| `recurringScope` | `dragAndDrop()` | `"this"` | the `EditScope` a drop of a recurring occurrence runs with; ask the user in a middleware instead ([Recurring events](/docs/guides/recurring-events)) |
+| `interval` | `nowIndicator()` | `60000` | how often the position moves, in ms, on the interval's boundaries (at least a second) |
+| `accept` | `externalDrop()` | any | whether a native drag may drop, from its `DataTransfer.types` (`"Files"`, `"text/plain"`) |
+| `draft` | `externalDrop()` | none | the `ExternalEventDraft` a native drop adds, from its `DataTransfer` and `GridPoint`, or `null` to leave the drop to the app |
+
+```ts
+import { externalDrop } from "@fragiola/calendar-react/external-drop";
+
+const files = externalDrop({
+    accept: (types) => types.includes("Files"),
+    draft: (dataTransfer) => {
+        const file = dataTransfer.files[0];
+        return file ? { title: file.name, duration: { minutes: 30 } } : null;
+    },
+});
+```
+
+## What each entry exports
+
+| entry | the core's | React's own |
+| --- | --- | --- |
+| `selection` | `selection`, `SelectionOptions`, `SelectionFeature`, `SelectionRange`, `SelectionSlice` (the `selection` state slice) | `Selection`, `SelectionProps`, `SelectionState`, `useSelection`, `CalendarSelection` ([Selection](/docs/api/selection)) |
+| `drag-and-drop` | `dragAndDrop`, `DragAndDropOptions`, `DragAndDropFeature`, `DragPreview`, `PreviewSegments`, `PreviewTimes` | `DragPreview` (the component shadows the type), `DragPreviewProps`, `DragPreviewState`, `useDragPreview` ([DragPreview](/docs/api/drag-preview)) |
+| `resize` | `resize`, `ResizeFeature`, `DragPreview` | `ResizeHandle`, `ResizeHandleProps`, `ResizeHandleState`, and `DragPreview` ([ResizeHandle](/docs/api/resize-handle)) |
+| `recurrence` | `recurrence`, `RecurrenceFeature`, `RecurrenceJson`, `EditScope`, `OccurrenceTarget`, `parseRecurrenceRule`, `formatRecurrenceRule`, `RecurrenceRule`, `RecurrenceFrequency`, `RecurrenceWeekday` | the core's only |
+| `now-indicator` | `nowIndicator`, `NowIndicatorOptions`, `NowIndicatorFeature`, `NowPosition` | `NowIndicator`, `NowIndicatorProps`, `NowIndicatorState`, `useNowPosition` ([NowIndicator](/docs/api/now-indicator)) |
+| `constraints` | `constraints`, `ConstraintsFeature`, `BusinessHours`, `ConstraintRange`, `EventConstraint`, `BusinessHoursRange`, `SelectionRange` | `BusinessHours` (the component shadows the type), `BusinessHoursProps`, `BusinessHoursState`, `useBusinessHours` ([BusinessHours](/docs/api/business-hours)) |
+| `external-drop` | `externalDrop`, `ExternalDropOptions`, `ExternalDropFeature`, `ExternalEventDraft`, `DragPreview` | the core's only |
+| `event-sources` | `eventSources`, `EventSourcesFeature`, `EventSource`, `EventSourceStatus`, `RangeToFetch`, `EventSourcesSlice`, `SourceState` | the core's only |
+
+### Recurrence rules
+
+`parseRecurrenceRule(value)` reads an RRULE string into a `RecurrenceRule` (a `ValidationResult`:
+an unknown part is an issue naming it); `formatRecurrenceRule(rule)` writes one back. A rule's
+`freq` is a `RecurrenceFrequency` (`"DAILY"`, `"WEEKLY"`, `"MONTHLY"`, `"YEARLY"`), its `byDay` a
+list of `RecurrenceWeekday` (`{ weekday, ordinal? }`).
+
+```ts
+import {
+    formatRecurrenceRule,
+    parseRecurrenceRule,
+} from "@fragiola/calendar-react/recurrence";
+
+const parsed = parseRecurrenceRule("FREQ=MONTHLY;BYDAY=-1FR");
+if (parsed.ok) {
+    parsed.value.byDay; // [{ weekday: 5, ordinal: -1 }]: the last Friday
+    formatRecurrenceRule({ ...parsed.value, count: 6 }); // "FREQ=MONTHLY;COUNT=6;BYDAY=-1FR"
+}
+```
+
+### Event sources' state
+
+`SourceState` is what the model knows of one source (`fetched` and `loading` ranges, merged);
+`EventSourcesSlice` holds them by source id (`eventSourceStates`), model state that the document
+does not write. `model.get("event-source-by", { id })` gives an `EventSourceStatus`,
+`model.get("ranges-to-fetch")` the `RangeToFetch` entries
+([Loading events from a server](/docs/guides/loading-events)).
+
+## Feature names
+
+`FEATURE_KEYS` lists what each feature owns by name (its commands, keys, fields, settings and
+engine events), which is how the core refuses what belongs to a feature that is not installed and
+types the verbs from the installed ones. `FeatureName` is one of its keys: `"selection"`,
+`"drag-and-drop"`, `"resize"`, `"recurrence"`, `"now-indicator"`, `"constraints"`,
+`"external-drop"` and `"event-sources"`. `emittersOf(type)` names the features that emit an
+engine event (`emittersOf("drop")` is drag and drop and resize).
+
+## Typing with features
+
+A model's type carries its features: `CalendarModel<T, typeof FEATURES>` checks a feature's
+command and keys, and `CalendarStateOf<T, F>` adds their state slices. The type helpers:
+
+| type | description |
+| --- | --- |
+| `CalendarFeatures` | a tuple of features, as `features` takes it |
+| `AnyCalendarFeature` | any one feature |
+| `AnyFeatures<F>` | whether `F` is the open tuple (any features) |
+| `CalendarStateOf<T, F>` | the state with the features' slices |
+| `EngineRunKeyOf<F, All>`, `EngineGetKeyOf<F, All>`, `EngineIsKeyOf<F, All>` | the engine keys the features allow |
+| `EngineEventTypeOf<F, All>` | the engine events they emit |
+
+## Writing a feature
+
+`defineFeature(spec)` freezes a `CalendarFeature`: its `name` (a `FeatureName`), the features it
+`requires`, its settings, commands and keys, and the contribution points the core calls (its
+occurrences, its edit writes, its checks, its engine side). The built-in features are written
+with it; it is the extension point the core is built on, documented for readers of their code.
+
+| type | role |
+| --- | --- |
+| `CalendarFeature` | a feature: its name, requirements, settings, commands, keys and contribution points |
+| `FeatureCommand` | a command it adds, with its JSON Schemas |
+| `FeatureState` | the state its rules read: the `DraftState` with its slice |
+| `FeatureDocument` | the document fields it loads and writes |
+| `FeatureReads` | reads the core lends its rules: every event's occurrences, a recurring one's expanded |
+| `EditRequest`, `EditWrite` | an edit of an occurrence the core computed, and how a feature writes it (an override, an exdate, a split) |
+| `EventChange` | the change a constraint checks: the event before and after, the occurrence it started from |
+| `PartAttributes`, `MutablePartAttributes` | the attributes a part gets, read-only and while a feature adds its own |
+| `FeatureModel` | the model as a feature's engine side sees it |
+| `FeatureEngine` | a feature's engine side: its keys, its key handling, its press handling |
+| `FeatureEngineHost` | what the engine lends it: the model, the clock, the measured grid, the shared drag session |
+| `FeatureGesture` | a press that became a gesture: `move`, `end`, `cancel`, `active` |
+| `PressTarget` | what a press started on |
+| `Draft`, `DraftState` | the state a command's reducer writes, and its ids and clock |

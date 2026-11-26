@@ -1,0 +1,213 @@
+---
+title: Model
+description: createCalendarModel and the model it returns. Its state, its five verbs, and every key of get and is, with what each one reads.
+---
+
+The model is the calendar's data, its view and its rules, in plain Node: no DOM, no framework.
+`createCalendarModel(json, options)` loads a document and returns a `CalendarModel`; a React app
+usually lets `Calendar.Root` create it, or creates it once (`useState`) and passes it as `model`.
+What the model never holds is yours: the screen (focus, gestures, measurements: the
+[engine](/docs/api/engine)), the app's policy (undo, persistence) and every word on screen.
+
+```ts
+import { createCalendarModel } from "@fragiola/calendar-react";
+import { recurrence } from "@fragiola/calendar-react/recurrence";
+
+type Types = {
+    events: { meeting: { room: string }; reminder: undefined };
+    calendar: { color: string };
+};
+
+const FEATURES = [recurrence()] as const;
+
+const model = createCalendarModel<Types, typeof FEATURES>(
+    {
+        version: 1,
+        events: [
+            {
+                id: "standup",
+                kind: "meeting",
+                title: "Standup",
+                start: "2026-11-23T09:00:00-05:00",
+                end: "2026-11-23T09:15:00-05:00",
+                allDay: false,
+                timeZone: "America/New_York",
+                recurrence: { rule: "FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR" },
+                data: { room: "Blue" },
+            },
+        ],
+        settings: { timeZone: "America/New_York", locale: "en-US" },
+        view: { type: "week", anchorDate: "2026-11-26" },
+    },
+    { features: FEATURES },
+);
+
+model.get("occurrences").length; // the standups the week shows
+model.is("event-recurring", { eventId: "standup" }); // true
+```
+
+An invalid document throws a `CalendarValidationError` with every issue and its JSON path; it is
+the model's only throw (commands return results). Validate untrusted JSON first with
+`validateCalendar` ([The JSON document](/docs/api/json-document)).
+
+## `createCalendarModel`
+
+`createCalendarModel<Types, Features>(json?, options?)` takes the document (version 1; none is an
+empty calendar) and a `CalendarModelOptions`. With a `Types` registry given as the first type
+argument, the features' tuple is the second (`typeof FEATURES`): TypeScript infers no type argument
+once one is written ([Typed data](/docs/concepts/typed-data)).
+
+| option | type | description |
+| --- | --- | --- |
+| `features` | `CalendarFeatures` | the opt-in features (`[selection(), dragAndDrop()]`), each from its entry; fixed for the model's life ([Features](/docs/api/features)) |
+| `createId` | `CreateId` | makes the id of an event or a calendar given without one, called with `"event"` or `"calendar"`; default `` `event-${n}` `` |
+| `now` | `() => number` | the clock, epoch milliseconds: today, `past`, the default anchor and `view.today` read it; default `Date.now` |
+
+`CreateId` is `(kind: "event" | "calendar") => string`. A dry run (`can`, `check`) draws ids from
+a copy, so the `run` after a `check` names the same id.
+
+## Members
+
+Every member is bound, so `const { run } = model` works.
+
+| member | signature | description |
+| --- | --- | --- |
+| `state` | `CalendarStateOf<T, F>` | the current state: frozen, JSON-shaped; a command makes a new one that shares what it did not touch |
+| `run` | `(command, payload, options?) => CommandResult` | runs a command through the middleware and commits it ([The command bus](/docs/api/command-bus)) |
+| `dispatch` | `(input: unknown, options?: DispatchOptions) => CommandResult` | `run` for untrusted JSON (`{ command, payload }`): an assistant's or a server's |
+| `can` | `(command, payload, options?) => boolean` | whether `run` would succeed, committing nothing |
+| `check` | `(command, payload, options?) => CommandResult` | what `run` would return, committing nothing |
+| `get` | `(key, payload?) => result` | reads a fact: the keys below |
+| `is` | `(key, payload?) => boolean` | asks a yes/no question: the keys below |
+| `use` | `(middleware: Middleware) => () => void` | adds a middleware around every command; returns its remover |
+| `subscribe` | `(listener: CommandListener) => () => void` | listens to every commit; returns its remover |
+
+`DispatchOptions` holds `meta`: what the app adds to a dispatched command (who asked), never read
+from the untrusted input.
+
+| field | type | description |
+| --- | --- | --- |
+| `meta` | `Record<string, unknown>` | handed to middleware and listeners as `ctx.meta` and `event.meta` |
+
+## The state
+
+`model.state` is a `CalendarState` (with the installed features' slices: `CalendarStateOf`).
+
+| field | type | description |
+| --- | --- | --- |
+| `events` | `readonly CalendarEventOf<T>[]` | the events, in document order |
+| `calendars` | `readonly CalendarInfoOf<T>[]` | the calendars (categories) |
+| `settings` | `CalendarSettings` | the settings in effect, defaults filled ([Settings](/docs/api/settings)) |
+| `view` | `ViewState` | the view: model state, not document |
+
+`ViewState` is the view as the model holds it:
+
+| field | type | description |
+| --- | --- | --- |
+| `type` | `ViewType` | `"month"`, `"week"`, `"day"`, `"days"` or `"list"` |
+| `anchorDate` | `string` | the date the view is built around, `YYYY-MM-DD` |
+| `days` | `number` | a `days` view's number of days, 1 to 14 |
+| `duration` | `number` | a `list` view's number of days; without it, the anchor's month |
+
+`CalendarEvent` and `CalendarInfo` (typed by the registry as `CalendarEventOf<T>` and
+`CalendarInfoOf<T>`) are the frozen entities of the state: the fields of their JSON
+([The JSON document](/docs/api/json-document)) with the ids and the end filled in.
+
+## `get` keys
+
+`model.get(key, payload)` is typed by `ModelGetMap`: `ModelGetKey` names a key,
+`ModelGetPayload<T, K>` its payload and `ModelGetResult<T, K>` its result. A key whose payload
+has no required field takes none (`QueryArgs`). A feature's key needs its feature; without it the
+key is a type error and `undefined` at run time. Results keep their identity while they do not
+change, so an adapter re-renders only what changed.
+
+| key | payload | result |
+| --- | --- | --- |
+| `"event-by"` | `{ id }` | the event, or `undefined` |
+| `"events"` | none | every event, in document order |
+| `"calendar-events-by"` | `{ calendarId }` | a calendar's events |
+| `"calendar-by"` | `{ id }` | the calendar, or `undefined` |
+| `"calendars"` | none | every calendar |
+| `"settings"` | none | the settings in effect |
+| `"event-permissions-by"` | `{ eventId }` | its `EventPermissions` in effect: the event's flags, its calendar's, the settings' |
+| `"view"` | none | the `ViewState` |
+| `"today"` | none | today in the display zone, from the clock |
+| `"visible-range"` | none | the days the view shows (a month's whole weeks), as a `DateRangeJson` |
+| `"current-range"` | none | the days the view is about (a month view's month) |
+| `"occurrences"` | none | the occurrences the view shows, in event order |
+| `"occurrence-by"` | `{ id }` | an occurrence by its id, shown or not |
+| `"occurrences-in"` | `{ range }` | every occurrence touching a range, series expanded (`recurrence()`) |
+| `"day-grid"` | `{ maxLanes? }` | the `DayGrid` of a month view or a time grid's all-day row; `null` for a list |
+| `"time-grid"` | none | the `TimeGrid` of a week, day or `days` view; `null` otherwise |
+| `"list"` | none | the `ListLayout`: the view's days that hold occurrences |
+| `"day-attributes-by"` | `{ date }` | a day's part attributes: `data-date`, `data-today`, … |
+| `"event-attributes-by"` | `EventAttributesPayload` | an occurrence's part attributes |
+| `"slot-attributes-by"` | `SlotAttributesPayload` | a slot's part attributes |
+| `"title-parts"` | `{ format? }` | the view's title as `Intl` range parts |
+| `"day-header-by"` | `{ date, format? }` | a day's header as `Intl` parts |
+| `"slot-label-by"` | `{ time, format? }` | a slot label as `Intl` parts |
+| `"business-hours-in"` | `{ range? }` | each day's `BusinessHoursRange` (`constraints()`) |
+| `"ranges-to-fetch"` | `{ range? }` | per source, the `RangeToFetch` entries not fetched nor loading (`eventSources()`) |
+| `"event-source-by"` | `{ id }` | a source's `EventSourceStatus` (`eventSources()`) |
+| `"selected-range"` | none | the selected `SelectionRange`, or `null` (`selection()`) |
+| `"root-attributes"` | none | the root's part attributes (`data-view`) |
+| `"calendar-json"` | `{ includeView? }` | the document, a writable copy; the view only with `includeView` |
+| `"commands"` | none | every command's `CommandInfo`, with its JSON Schemas |
+| `"features"` | none | the installed features' `CalendarFeatureInfo` |
+
+`DateRangeJson` is `{ start, end }` with `YYYY-MM-DD` days, `end` exclusive.
+`EventAttributesPayload` is `{ occurrenceId, continuesBefore?, continuesAfter? }` and
+`SlotAttributesPayload` `{ date, time }`. The formatting keys take `FormatOptions`
+(`Intl.DateTimeFormatOptions` without `timeZone`) and return parts, never text: you join them
+([Dates and time zones](/docs/concepts/dates-and-time-zones)).
+
+```ts
+const title = model
+    .get("title-parts", { format: { month: "long", year: "numeric" } })
+    .map((part) => part.value)
+    .join(""); // "November 2026"
+```
+
+## `is` keys
+
+`model.is(key, payload)` is typed by `ModelIsMap` (`ModelIsKey`, `ModelIsPayload<K>`).
+
+| key | payload | true when |
+| --- | --- | --- |
+| `"event-editable"` | `{ eventId }` | the event can change (`event.update`) |
+| `"event-start-editable"` | `{ eventId }` | its start can move (`event.move`) |
+| `"event-duration-editable"` | `{ eventId }` | its duration can change (`event.resize` of the end) |
+| `"event-deletable"` | `{ eventId }` | it can be removed |
+| `"calendar-visible"` | `{ calendarId }` | the calendar's events show |
+| `"date-today"` | `{ date }` | the date is today in the display zone |
+| `"date-disabled"` | `{ date }` | the date is outside `validRange` |
+| `"list-empty"` | none | the list layout has no day |
+| `"event-recurring"` | `{ eventId }` | the event has a rule (`recurrence()`) |
+| `"event-source-loading"` | `{ sourceId? }` | the source (or any) has a range being fetched (`eventSources()`) |
+
+```ts
+if (model.is("event-start-editable", { eventId: "standup" })) {
+    model.run("event.move", { eventId: "standup", delta: { minutes: 30 } });
+}
+```
+
+## Layout types
+
+The layouts are pure functions of the state, so a server render and the first client render have
+them ([Layout](/docs/concepts/layout)).
+
+| type | fields |
+| --- | --- |
+| `DayGrid` | `weeks`: its `DayGridWeek` rows |
+| `DayGridWeek` | `id` (its first day), `weekNumber`, `days` (`DayCell`), `segments` (`Segment`), `lanes` |
+| `DayCell` | `date`, `today`, `outside`, `weekend`, `past`, `disabled`, `hiddenCount`, `hiddenOccurrenceIds` |
+| `Segment` | `eventId`, `occurrenceId`, `allDay`, `startColumn`, `span`, `lane`, `continuesBefore`, `continuesAfter` |
+| `TimeGrid` | `slots` (`TimeSlot`) and `columns` (`TimeGridColumn`) |
+| `TimeSlot` | `time` (`HH:mm`), `top` and `height` (fractions of a column) |
+| `TimeGridColumn` | `date`, `today`, `weekend`, `past`, `disabled`, `segments` (`TimeSegment`) |
+| `TimeSegment` | `eventId`, `occurrenceId`, `top` and `height` (fractions of the column), `column`, `columns`, `span`, `continuesBefore`, `continuesAfter` |
+| `ListLayout` | `days`: its `ListDay` entries |
+| `ListDay` | `date`, `today`, `past`, `items` (`ListItem`) |
+| `ListItem` | `eventId`, `occurrenceId`, `allDay`, `continuesBefore`, `continuesAfter` |
+| `Occurrence` | `occurrenceId`, `eventId`, `start`, `end`, `allDay`, `title` (an override's): what is shown of an event |
+| `OccurrenceWindow` | `range` and `timeZone`: what a feature expands occurrences over |

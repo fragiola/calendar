@@ -1,0 +1,77 @@
+---
+title: Calendar.Day
+description: A day cell of a month or of the all-day row. It is a cell of the grid's roving focus, with its date and its state as attributes.
+---
+
+`Calendar.Day` is one day of a day grid (`role="gridcell"`): a month's day, or a day of a time
+grid's all-day row. It renders a `div` with what you give it: a date label, its
+`Calendar.DayEvents`, a `Calendar.More`. The date's text is yours (the cell gives it as
+`data-date` and in its state).
+
+## Behaviour
+
+- It is a cell of the grid's roving focus: one of them is the tab stop (`tabindex="0"`), the
+  others `tabindex="-1"`; the focused one has `data-focused`.
+- Enter (or F2) moves the focus into its events; Escape from an event returns here.
+- A tap moves the roving focus to it and is the engine's `date-click` (`onDateClick`); with
+  `selection()` a press and drag selects days.
+- Its state is `data-*` present or absent: `data-date`, `data-today`, `data-outside` (outside the
+  month a month view is about), `data-weekend`, `data-past`, `data-disabled` (outside
+  `validRange`), `data-selected` (`selection()`), `data-business-hours` (`constraints()`).
+
+It renders `data-calendar-part="day"`. A screen reader hears the cell's content: put the date in
+it (visually hidden if you like), as the library renders no text.
+
+## Usage
+
+```tsx
+import { Calendar, type DayCell } from "@fragiola/calendar-react";
+
+const dayLabel = new Intl.DateTimeFormat("en-US", {
+    dateStyle: "full",
+    timeZone: "UTC",
+});
+
+function MonthDay({ day }: { day: DayCell }) {
+    const [year, month, date] = day.date.split("-").map(Number);
+    return (
+        <Calendar.Day
+            day={day}
+            className={(state) => (state.day.outside ? "day outside" : "day")}
+        >
+            <span aria-hidden>{date}</span>
+            <span className="sr-only">
+                {dayLabel.format(Date.UTC(year ?? 0, (month ?? 1) - 1, date))}
+            </span>
+            <Calendar.DayEvents>
+                {(segment) => <Calendar.Segment segment={segment} />}
+            </Calendar.DayEvents>
+            <Calendar.More>{({ hiddenCount }) => `+${hiddenCount} more`}</Calendar.More>
+        </Calendar.Day>
+    );
+}
+```
+
+The same element can come from `useDay(day)`, which returns its state and props
+([hooks](/docs/api/hooks)).
+
+## Props
+
+`DayProps`; it also takes the [common props](/docs/api/root#common-props) and every `div` attribute.
+
+| prop | type | description |
+| --- | --- | --- |
+| `day` | `DayCell` | the day, from `Calendar.Week`'s (or `Calendar.Days`') children function |
+| `children` | `ReactNode \| (day, segments) => ReactNode` | elements, or a function of the day and the segments that start in it |
+
+## State
+
+`DayState` ([hooks](/docs/api/hooks)):
+
+| field | type | description |
+| --- | --- | --- |
+| `day` | `DayCell` | the day as the layout gives it: `date`, `today`, `outside`, `weekend`, `past`, `disabled`, `hiddenCount`, `hiddenOccurrenceIds` |
+| `focused` | `boolean` | it holds the roving focus |
+| `selected` | `boolean` | a selected range covers it (`selection()`) |
+| `disabled` | `boolean` | outside `validRange` |
+| `businessHours` | `boolean` | it has business hours (`constraints()`) |

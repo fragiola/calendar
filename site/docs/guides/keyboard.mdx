@@ -1,0 +1,135 @@
+---
+title: Keyboard
+description: The calendar's keyboard model, one tab stop with roving focus over the dates, into a day's events, and grabbing, moving and resizing events.
+---
+
+There is no WAI-ARIA pattern for an event calendar, so the calendar combines two: the month grid
+and the time grid are an APG grid with one tab stop and the date picker's keys over the date
+cells, and each cell's events are a list you enter and leave. The features add selection, grab,
+move and resize. Every key is the engine's; the live region and its words are yours.
+
+<Example id="keyboard" />
+
+## Moving over the dates
+
+Tab enters the grid once, on its tab stop: the focused cell if it is shown, else today, else the
+range's first day (a time grid: the first slot of today's column, or of the first column). Tab
+again leaves the grid.
+
+| key | month view (days) | time grid (slots) |
+| --- | --- | --- |
+| ArrowLeft / ArrowRight | the previous / next day (mirrored right to left) | the same slot of the previous / next day |
+| ArrowUp / ArrowDown | the same day a week before / after | the previous / next slot; Up from the first slot reaches the all-day row |
+| Home / End | the week's first / last day | the first / last day of the week shown |
+| PageUp / PageDown | the previous / next month | the previous / next range (`view.previous`, `view.next`), same column |
+| Shift + PageUp / PageDown | the previous / next year | the previous / next week |
+
+A move past the dates shown navigates there (`view.go-to`). Keys with Ctrl, Alt or Meta stay the
+browser's. Letters are not bound. A press on a day or a slot moves the roving focus to it too.
+
+## Into a day's events
+
+| key | on a cell | on an event |
+| --- | --- | --- |
+| Enter (or F2 on a cell) | focuses the cell's first event (a time grid: the first event starting in the slot) | Enter: `event-click` (`onEventClick`, with `keyboard: true`) |
+| ArrowUp / ArrowDown | | the previous / next event of the cell |
+| Escape | | back to the cell |
+
+An event's accessible name is yours (its children, or an `aria-label`): the library sets none.
+
+## "+N more"
+
+A day's `Calendar.More` link is the last item of its events: Down from the day's last event
+focuses it, and Enter on a day whose events are all hidden focuses it. On the link, Enter is its
+`more-click` (`onMoreClick`), Space clicks it, Up goes back to the last event (or the day) and
+Escape returns to the day. It keeps `tabindex="-1"`, outside the roving focus. See
+[More events and "+N more"](/docs/guides/more-events).
+
+## Grabbing, moving and resizing
+
+With `dragAndDrop()` installed, Space on a focused event grabs it (`data-grabbed`); with
+`resize()`, Shift and the arrows resize a grabbed event.
+
+| key | while grabbed |
+| --- | --- |
+| ArrowLeft / ArrowRight | move by a day |
+| ArrowUp / ArrowDown | month: move by a week; time grid: move by `snapDuration` |
+| Shift + arrows | resize the end (time grid: Up / Down by a snap step; day grid: Left / Right by a day) |
+| Enter | drop: one `event.move`, one `event.resize`, or a `batch` of both |
+| Escape | cancel: nothing runs |
+| Tab | cancel, and leave |
+
+A refused target shows no preview (the engine asks `model.check` for each), and Enter on it runs
+nothing. Focus follows the dropped event to its new element.
+
+## Selecting a range
+
+With `selection()` installed, Shift and the arrows from the focused cell extend a selected range,
+and Enter confirms it: the `select` engine event (`onSelect`), the same as a pointer selection.
+Escape drops it. See [Selecting ranges](/docs/guides/selecting-ranges).
+
+## Announcing in a live region
+
+The engine announces each step of a keyboard gesture as data (`onAnnounce`): a grab, a target
+(`drag-over`, with the preview's times or `null` when refused), a drop, a cancel, a selection
+being extended. You word it, in your language, in a live region you render:
+
+```tsx
+import {
+    type Announcement,
+    Calendar,
+    createCalendarModel,
+} from "@fragiola/calendar-react";
+import { dragAndDrop } from "@fragiola/calendar-react/drag-and-drop";
+import { useState } from "react";
+
+const features = [dragAndDrop()] as const;
+
+function words(announcement: Announcement): string {
+    switch (announcement.kind) {
+        case "grab":
+            return "Grabbed. Arrows move it, Enter drops it, Escape cancels.";
+        case "drag-over":
+            return announcement.preview
+                ? `To ${announcement.preview.start}.`
+                : "It cannot go there.";
+        case "drop":
+            return "Moved.";
+        case "drag-cancel":
+            return "Left where it was.";
+        case "select-extend":
+            return announcement.range ? "Range selected." : "Not selectable.";
+    }
+}
+
+export function KeyboardWeek() {
+    const [model] = useState(() =>
+        createCalendarModel(
+            { version: 1, events: [], calendars: [], settings: {} },
+            { features },
+        ),
+    );
+    const [message, setMessage] = useState("");
+    return (
+        <Calendar.Root
+            model={model}
+            onAnnounce={({ announcement }) => setMessage(words(announcement))}
+        >
+            <div role="status" aria-live="polite">
+                {message}
+            </div>
+            {/* the time grid */}
+        </Calendar.Root>
+    );
+}
+```
+
+The example's `announce.ts` words each announcement with the event's title and its new times
+from `Intl`. A live region re-renders on every key: keep the grid's children functions stable so
+it does not re-render the rows too (see [Performance](/docs/guides/performance)).
+
+## Touch and pointers
+
+A mouse drag starts after 5 pixels (`dragThreshold`); a touch needs a long press
+(`longPressDelay`, 500 ms) unless the event is already focused, so a swipe still scrolls. Both
+are props of `Calendar.Root`.

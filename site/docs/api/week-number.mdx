@@ -1,0 +1,47 @@
+---
+title: Calendar.WeekNumber
+description: The row header of a month's week. It gives you the row's week number under the weekNumbers setting; what it shows is yours.
+---
+
+`Calendar.WeekNumber` is the row header of a `Calendar.Week` (`role="rowheader"`). It renders a
+`div` with what you give it, and hands you the row's week number.
+
+## Behaviour
+
+- The number follows the `weekNumbers` setting: `"iso"` (ISO 8601 weeks) or `"locale"` (the
+  locale's first day and minimal days); a row's number is its middle day's.
+- It is not in the roving focus.
+- It lives inside a `Calendar.Week`; keep its room with `--calendar-row-inset` on the row so the
+  selection and the drag preview start after it.
+
+It renders `data-calendar-part="week-number"`.
+
+## Usage
+
+```tsx
+<Calendar.Week week={week}>
+    <Calendar.WeekNumber className="week-number">
+        {({ weekNumber }) => <span aria-label={`Week ${weekNumber}`}>{weekNumber}</span>}
+    </Calendar.WeekNumber>
+    <Calendar.Days>{(day) => <Calendar.Day day={day} />}</Calendar.Days>
+</Calendar.Week>
+```
+
+<Example id="locale-and-week-numbers" variant="card" />
+
+## Props
+
+`WeekNumberProps`; it also takes the [common props](/docs/api/root#common-props) and every `div`
+attribute.
+
+| prop | type | description |
+| --- | --- | --- |
+| `children` | `ReactNode \| (state) => ReactNode` | what it shows, or a function of its state |
+
+## State
+
+`WeekNumberState`:
+
+| field | type | description |
+| --- | --- | --- |
+| `weekNumber` | `number` | the row's week number, under the `weekNumbers` setting |

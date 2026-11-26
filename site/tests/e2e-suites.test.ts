@@ -86,8 +86,8 @@ describe("the E2E suites a change runs", () => {
         expect(e2eSuites([], EXAMPLES)).toEqual(NONE);
     });
 
-    it("finds no examples app yet, and none in a missing folder", () => {
-        expect(examplesFrameworks()).toEqual([]);
+    it("finds the examples apps with a Playwright config, and none in a missing folder", () => {
+        expect(examplesFrameworks()).toEqual(["react"]);
         expect(examplesFrameworks(join(tmpdir(), "no-such-examples"))).toEqual(
             [],
         );

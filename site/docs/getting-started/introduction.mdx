@@ -1,0 +1,55 @@
+---
+title: Introduction
+description: What the event calendar package gives you (views, interaction, dates, time zones and accessibility) and what stays yours.
+---
+
+Fragiola Calendar (`@fragiola/calendar-react`) is a **headless**, accessible event calendar for
+React 19: team planners, booking screens, schedules, agendas. It ships the behaviour of an event
+calendar and its accessibility as composable primitives over a framework-free core
+(`@fragiola/calendar`), which the React package re-exports, so an app installs one package.
+
+## What it gives you
+
+- **Views.** Month, week, day, any number of days (1 to 14) and a list, each laid out by the core:
+  all-day and multi-day events in lanes, timed events in overlap columns, "+N more" when a day is
+  full ([Views and ranges](/docs/concepts/views-and-ranges), [Layout](/docs/concepts/layout)).
+- **Interaction.** Select a range of days or times, move an event across days and between the
+  all-day row and the time grid, resize it, drop something from outside the calendar: with a
+  mouse, a touch (a long press) or the keyboard. Each is an opt-in feature
+  ([Features](/docs/concepts/features)).
+- **Exact dates.** All-day dates are `YYYY-MM-DD`, timed values RFC 3339 date-times with their
+  offset, ends are exclusive, and days are never assumed to last 24 hours. Time zones and
+  daylight saving time come from `Intl`, with no date library
+  ([Dates and time zones](/docs/concepts/dates-and-time-zones)).
+- **Recurring events.** An RFC 5545 rule subset, excluded dates, occurrences changed one by one,
+  and the "this", "following" and "all" edit scopes
+  ([Occurrences and recurrence](/docs/concepts/occurrences-and-recurrence)).
+- **Accessibility.** The month and the time grid are WAI-ARIA grids with one tab stop and the date
+  picker's keyboard; each day's events are a list; drags have a keyboard equivalent and their
+  announcements are data you word ([Accessible names and the keyboard](/docs/getting-started/accessible-names)).
+- **A model.** The calendar is a JSON document, typed by your registry. Every change is a command
+  through a middleware chain, so you can veto, rewrite or record anything a click, a key, a drop,
+  a server or an assistant does ([The model and commands](/docs/concepts/model-and-commands)).
+
+## What stays yours
+
+The package ships **no CSS, no icons, no text, no rendered menus and no popovers**:
+
+- every visible word: an event's title is model data you render, and dates and times are
+  `Intl` parts you join (`useCalendarTitle`, `useDayHeader`, `useSlotLabel`);
+- every accessible name: the library sets no `aria-label`;
+- every pixel: the parts expose their state as `data-*` attributes and ARIA
+  ([State attributes](/docs/concepts/state-attributes)), and place events with structural style
+  only (percentages in the time grid, lanes from `--calendar-lane-size` in a day grid);
+- the app's policy: the event editor, the "+N more" popover, the date picker, a calendars panel,
+  undo and redo, persistence, translations. The [examples](/examples) show each as copyable code.
+
+<Example id="month" />
+
+## Where to go next
+
+<Cards>
+<Card title="Installation" href="/docs/getting-started/installation" description="One package, React 19, and the feature entries." />
+<Card title="Your first calendar" href="/docs/getting-started/first-calendar" description="A typed week view, from the document to the events on screen." />
+<Card title="Composition" href="/docs/concepts/composition" description="Children functions per row, day and event: you own the markup." />
+</Cards>

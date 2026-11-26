@@ -1,0 +1,46 @@
+---
+title: Calendar.Days
+description: The days of the enclosing row. It calls your function per day of a month's week or of the all-day row, with no element of its own.
+---
+
+`Calendar.Days` walks the days of the row around it, a `Calendar.Week` or a `Calendar.AllDayRow`.
+It renders nothing of its own: it calls your function per day (a `DayCell`) with the row, and you
+render a `Calendar.Day`.
+
+## Behaviour
+
+- The days are the row's columns: hidden days are left out, the order follows `firstDayOfWeek`
+  and the direction.
+- It calls the function again for a day whose object changed, and for every day when the function
+  itself is a new one (React's contract): an inline function written inside a row is new each
+  time that row renders, which is when its layout changed. See
+  [performance](/docs/guides/performance).
+- Use it when the row holds more than its days (a week number, a label, a decoration); otherwise
+  give the row a function directly.
+
+## Usage
+
+```tsx
+import { Calendar } from "@fragiola/calendar-react";
+
+<Calendar.AllDayRow className="all-day">
+    <div aria-hidden className="all-day-label">all-day</div>
+    <Calendar.Days>
+        {(day) => (
+            <Calendar.Day day={day} className="all-day-cell">
+                <Calendar.DayEvents>
+                    {(segment) => <Calendar.Segment segment={segment} />}
+                </Calendar.DayEvents>
+            </Calendar.Day>
+        )}
+    </Calendar.Days>
+</Calendar.AllDayRow>;
+```
+
+## Props
+
+`DaysProps` (it renders no element, so it takes no other prop):
+
+| prop | type | description |
+| --- | --- | --- |
+| `children` | `(day: DayCell, week: DayGridWeek) => ReactNode` | called per day of the row; render a `Calendar.Day` |

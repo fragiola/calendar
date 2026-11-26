@@ -1,0 +1,77 @@
+---
+title: Calendar.Column
+description: A day's positioned layer over the slot rows, the containing block of its timed events, its now line, its business hours and the previews.
+---
+
+`Calendar.Column` is one day of the columns' layer: a `div` with `role="gridcell"` and the day's
+`data-date`, `data-today`, `data-weekend`, `data-past` and `data-disabled`. It is
+`position: relative`, the containing block of what is positioned in it: the day's events
+(`Calendar.ColumnEvents`) and the features' `NowIndicator`, `BusinessHours`, `Selection` and
+`DragPreview`. Its width and its look are yours; give it the day's full height.
+
+## Behaviour
+
+- Its day's `gridcell` in the grid's last row (the APG
+  [grid pattern](https://www.w3.org/WAI/ARIA/apg/patterns/grid/)), holding the day's
+  timed events as a `list`. It is not in the roving focus: the slots are.
+- The engine measures it and hit-tests on it: a drag over it lands at the time under the pointer,
+  snapped to `snapDuration`. Give it the height of the slot rows it covers.
+- With `selection()`, a selected range covering the day sets `data-selected`.
+
+## Usage
+
+```tsx
+import { Calendar, type TimeGridColumn } from "@fragiola/calendar-react";
+import { BusinessHours } from "@fragiola/calendar-react/constraints";
+import { DragPreview } from "@fragiola/calendar-react/drag-and-drop";
+import { NowIndicator } from "@fragiola/calendar-react/now-indicator";
+import { Selection } from "@fragiola/calendar-react/selection";
+
+export function dayColumn(column: TimeGridColumn) {
+    return (
+        <Calendar.Column
+            column={column}
+            className={({ column }) => (column.today ? "column column-today" : "column")}
+        >
+            <BusinessHours className="business-hours" />
+            <Calendar.ColumnEvents>
+                {(segment) => <Calendar.TimeEvent segment={segment} />}
+            </Calendar.ColumnEvents>
+            <Selection className="selection" />
+            <DragPreview className="preview" />
+            <NowIndicator className="now" />
+        </Calendar.Column>
+    );
+}
+```
+
+Each feature part needs its feature in the model's `features` (`constraints()`, `selection()`,
+`dragAndDrop()` or `resize()`, `nowIndicator()`); without it, it renders nothing and warns once.
+
+## Attributes
+
+| attribute | value |
+| --- | --- |
+| `data-calendar-part` | `data-calendar-part="column"` |
+| `data-date` | its day, `YYYY-MM-DD` |
+| `data-today`, `data-weekend`, `data-past`, `data-disabled`, `data-selected` | present when on |
+| `role` | `gridcell` |
+| `style` | `position: relative` (structural) |
+
+## Props
+
+`ColumnProps` takes the [common props](/docs/api/root#common-props) and any `div` attribute, and:
+
+| prop | type | description |
+| --- | --- | --- |
+| `column` | `TimeGridColumn` | the column, from `Calendar.Columns`' children function |
+| `children` | `ReactNode` | what is positioned in it: `Calendar.ColumnEvents`, and the features' `NowIndicator`, `BusinessHours`, `Selection`, `DragPreview` |
+
+## State
+
+`ColumnState`:
+
+| field | type | description |
+| --- | --- | --- |
+| `column` | `TimeGridColumn` | the column as the time grid gives it (`date`, `today`, `weekend`, `past`, `disabled`, `segments`) |
+| `selected` | `boolean` | a selected range covers the day (`selection()`) |

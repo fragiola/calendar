@@ -1,0 +1,106 @@
+---
+title: Selection
+description: The highlight of the range selected with selection(), laid out as an event in a column or over a day-grid row, that you style.
+---
+
+`Selection` is the highlight of the range a user selects with the `selection()` feature, from
+`@fragiola/calendar-react/selection`. It is laid out as an event: in a `Calendar.Column` it is
+positioned like a timed event, in a `Calendar.Week` or `Calendar.AllDayRow` it covers the row's
+days. It renders a `div` per place the range shows (one per column or row it covers); its look is
+yours.
+
+## Behaviour
+
+- A press and drag over the slots or the days selects a range (after `selectMinDistance` pixels;
+  a click selects its day or slot); Shift + arrows extend it from the focused cell and Enter
+  confirms it. The confirmed range is `selection.set` and the `select` engine event
+  (`onSelect`); `selection.clear` clears it.
+- `state.pending` is on while the range is still being selected, before it is set.
+- It is `aria-hidden`: the covered days and slots carry `data-selected`, and `onAnnounce` reports
+  the steps as data your live region words.
+- In a row it is positioned over its days after `--calendar-row-inset` (the row's space before its
+  first day: a week number, a label); the row is its containing block.
+- Without `selection()` in the model's features it renders nothing and warns once.
+
+## Usage
+
+```tsx
+import {
+    Calendar,
+    type CalendarEngineEventOf,
+    createCalendarModel,
+} from "@fragiola/calendar-react";
+import { Selection, selection } from "@fragiola/calendar-react/selection";
+import { useState } from "react";
+
+const FEATURES = [selection()] as const;
+
+export function SelectToCreate() {
+    const [model] = useState(() =>
+        createCalendarModel(
+            { version: 1, events: [], calendars: [], view: { type: "week", anchorDate: "2026-11-26" } },
+            { features: FEATURES },
+        ),
+    );
+    return (
+        <Calendar.Root
+            model={model}
+            onSelect={(event: CalendarEngineEventOf<"select">) =>
+                model.run("event.add", {
+                    title: "New event",
+                    start: event.range.start,
+                    end: event.range.end,
+                    allDay: event.range.allDay,
+                })
+            }
+        >
+            <Calendar.TimeGrid aria-label="Week">
+                <Calendar.Columns>
+                    {(column) => (
+                        <Calendar.Column column={column}>
+                            <Selection
+                                className={({ pending }) =>
+                                    pending ? "selection selection-pending" : "selection"
+                                }
+                            />
+                        </Calendar.Column>
+                    )}
+                </Calendar.Columns>
+            </Calendar.TimeGrid>
+        </Calendar.Root>
+    );
+}
+```
+
+A real grid also renders its slot rows (see [Calendar.TimeGrid](/docs/api/time-grid)); here the
+selected range becomes an event. See [Selecting ranges](/docs/guides/selecting-ranges).
+
+<Example id="select-to-create" />
+
+## Attributes
+
+| attribute | value |
+| --- | --- |
+| `data-calendar-part` | `data-calendar-part="selection"` |
+| `aria-hidden` | `true` |
+| `style` | positioned as an event in a column, over its days in a row (structural) |
+
+## Props
+
+`SelectionProps` takes the [common props](/docs/api/root#common-props) and any `div` attribute,
+and:
+
+| prop | type | description |
+| --- | --- | --- |
+| `children` | `ReactNode`, or `(state: SelectionState) => ReactNode` | what it shows: elements, or a function of its state |
+
+## State
+
+`SelectionState`:
+
+| field | type | description |
+| --- | --- | --- |
+| `segment` | `TimeSegment` or `Segment` | the highlight's part here: a time-grid segment (in a column) or a day-grid segment (in a row) |
+| `pending` | `boolean` | the range is still being selected (a pointer, Shift + arrows), not set yet |
+
+`useSelection` (on the [hooks page](/docs/api/hooks)) gives the range itself.

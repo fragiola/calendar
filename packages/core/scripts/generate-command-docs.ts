@@ -135,6 +135,17 @@ const EXAMPLES: Record<string, unknown> = {
     "event.remove": { eventId: "trip" },
     "event.set-data": { eventId: "standup", data: { room: "Blue" } },
     "event.set-flags": { eventId: "standup", durationEditable: false },
+    "event.set-all": {
+        events: [
+            {
+                id: "standup",
+                title: "Standup",
+                start: "2026-11-26T09:00:00-03:00",
+                end: "2026-11-26T09:15:00-03:00",
+                allDay: false,
+            },
+        ],
+    },
     "calendar.add": { id: "home", title: "Home" },
     "calendar.update": { calendarId: "work", editable: false },
     "calendar.remove": { calendarId: "work", events: "keep" },

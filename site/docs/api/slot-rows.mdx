@@ -1,0 +1,55 @@
+---
+title: Calendar.SlotRows
+description: Calls your function once per slot of the time grid, from slotMinTime to slotMaxTime, and renders no element of its own.
+---
+
+`Calendar.SlotRows` is a collection part: it calls its children function once per slot of the
+time grid (`slotDuration` minutes from `slotMinTime` to `slotMaxTime`), in order, and renders
+nothing of its own. What a slot row looks like, and its height, is what your function returns.
+
+## Behaviour
+
+- The slots come from `model.get("time-grid")`: every column shows the same slots, on the display
+  zone's wall clock (a 23- or 25-hour day keeps the same rows).
+- A slot keeps its identity while it does not change, and a row's call runs again only when
+  its slot or the children function changes. An inline function is always current but re-renders
+  every row when the component that writes it renders; a function declared outside the component
+  (it reads only its argument) or wrapped in `useCallback` re-renders only the rows whose slot
+  changed. See [Performance](/docs/guides/performance).
+
+## Usage
+
+```tsx
+import { Calendar, type TimeSlot } from "@fragiola/calendar-react";
+
+// reads only its argument: declared once, so it is stable
+function slotRow(slot: TimeSlot) {
+    return (
+        <Calendar.SlotRow slot={slot} className="slot-row">
+            <Calendar.SlotLabel className="slot-label">
+                {slot.time.endsWith(":00") ? slot.time : null}
+            </Calendar.SlotLabel>
+            <Calendar.Slots>
+                {(column) => <Calendar.Slot date={column.date} className="slot" />}
+            </Calendar.Slots>
+        </Calendar.SlotRow>
+    );
+}
+
+export function Slots() {
+    return <Calendar.SlotRows>{slotRow}</Calendar.SlotRows>;
+}
+```
+
+It renders an hour label on the full hours and one cell per day in every row.
+
+## Props
+
+`SlotRowsProps`:
+
+| prop | type | description |
+| --- | --- | --- |
+| `children` | `(slot: TimeSlot) => ReactNode` | called per slot of the time grid (`<Calendar.SlotRow slot={slot}>`) |
+
+`TimeSlot` is the core's: `time` (`HH:mm`), and `top` and `height`, its place in a column as
+fractions (0 to 1).

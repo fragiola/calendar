@@ -1,0 +1,170 @@
+---
+title: Controlled state
+description: Drive the events, the settings, the view and the date from React state, hear every change, or hand the root a model you own.
+---
+
+`Calendar.Root` works three ways: it creates a model from its `default…` props and keeps it
+(uncontrolled), it follows props you keep in React state (controlled), or it shows a model you
+created (`model`). Whichever you choose, the model holds the calendar and every change is a
+command; the controlled props are commands the root sends for you. Where the state lives is yours.
+
+## Uncontrolled: the root's own model
+
+The `default…` props, `features`, `now` and `createId` are read once, when the root mounts:
+
+```tsx
+import { Calendar } from "@fragiola/calendar-react";
+import { dragAndDrop } from "@fragiola/calendar-react/drag-and-drop";
+
+const features = [dragAndDrop()] as const;
+
+<Calendar.Root
+    defaultEvents={events}
+    defaultCalendars={calendars}
+    defaultView="week"
+    defaultDate="2026-11-26"
+    settings={{ timeZone: "Europe/Lisbon", locale: "pt-PT" }}
+    features={features}
+>
+    {/* the week's parts */}
+</Calendar.Root>;
+```
+
+A drop, a command from a button or from an assistant changes that model, and the calendar shows
+it. `useCalendar()` gives any component inside the root the model and the engine.
+
+## Controlled events
+
+`events` keeps the events in your state. A new list replaces the model's events
+(`event.set-all`, so give every event its `id`), and `onEventsChange` hears every other change, a
+drop included, with the model's events:
+
+```tsx
+import {
+    Calendar,
+    type CalendarEventJson,
+    type CalendarEventOf,
+} from "@fragiola/calendar-react";
+import { dragAndDrop } from "@fragiola/calendar-react/drag-and-drop";
+import { useState } from "react";
+
+const features = [dragAndDrop()] as const;
+
+export function Planner(props: { initial: CalendarEventJson[] }) {
+    const [events, setEvents] = useState<
+        readonly (CalendarEventJson | CalendarEventOf)[]
+    >(props.initial);
+    return (
+        <Calendar.Root
+            events={events}
+            onEventsChange={setEvents}
+            defaultView="week"
+            features={features}
+        >
+            {/* the week's parts */}
+        </Calendar.Root>
+    );
+}
+```
+
+The list the root reports is the model's own, so handing it back runs nothing. The props are
+sent, not enforced: a change you do not echo stays in the model (the reply is yours).
+To refuse a change, refuse the command (edit flags, a middleware): see
+[Drag and drop](/docs/guides/drag-and-drop).
+
+## Controlled settings, view and date
+
+- `settings` applies a changed value with `settings.set` (the changed object as a whole patch).
+  A model the root creates starts with them.
+- `view` (with `days` for a `days` view) runs `view.set`; `onViewChange` hears `{ type, days }`.
+- `date` runs `view.go-to`; `onDateChange` hears the view's anchor date (`YYYY-MM-DD`) after
+  Previous, Next, Today, a keyboard page or a `view.go-to` from anywhere.
+
+```tsx
+import { Calendar, type ViewType } from "@fragiola/calendar-react";
+import { useState } from "react";
+
+export function RoutedCalendar() {
+    const [view, setView] = useState<ViewType>("month");
+    const [date, setDate] = useState("2026-11-26");
+    return (
+        <Calendar.Root
+            view={view}
+            onViewChange={(next) => setView(next.type)}
+            date={date}
+            onDateChange={setDate}
+            defaultEvents={[]}
+        >
+            {/* a date picker beside it can call setDate */}
+        </Calendar.Root>
+    );
+}
+```
+
+Each controlled prop is sent when its value changes from the last one sent, with
+`meta: { source: "controlled" }`, so a middleware can tell it from a user's change. A value the
+model refuses (a date outside `validRange`) warns once and the model keeps its
+own.
+
+## Giving the root a model
+
+Create the model yourself when something outside React needs it (a test, a server, an assistant)
+or when you add middleware:
+
+```tsx
+import { Calendar, createCalendarModel } from "@fragiola/calendar-react";
+import { useState } from "react";
+
+export function OwnModel() {
+    const [model] = useState(() => {
+        const model = createCalendarModel({
+            version: 1,
+            events: [],
+            calendars: [],
+            view: { type: "week", anchorDate: "2026-11-26" },
+        });
+        model.use((ctx, next) => {
+            console.log(ctx.command, ctx.payload);
+            return next();
+        });
+        return model;
+    });
+    return <Calendar.Root model={model}>{/* the parts */}</Calendar.Root>;
+}
+```
+
+A model has its own features, clock and id generator: the root's `features`, `now` and
+`createId` are for the model it creates. A new model identity creates a new engine. Controlled
+props given with a `model` bring it to them in the first layout effect, so a server render shows
+the model's state as it is: give a model that already matches.
+
+## Reaching the calendar from outside the root
+
+A toolbar beside the calendar, a menu or a test reaches the root's model and engine through a
+calendar ref. `useCalendarRef()` keeps one in a component and re-renders it when the root mounts
+or unmounts; `createCalendarRef()` makes one outside React:
+
+```tsx
+import { Calendar, useCalendarRef } from "@fragiola/calendar-react";
+
+export function WithExternalToolbar() {
+    const calendar = useCalendarRef();
+    return (
+        <>
+            <button
+                type="button"
+                disabled={!calendar.current}
+                onClick={() => calendar.current?.model.run("view.today", {})}
+            >
+                Today
+            </button>
+            <Calendar.Root calendarRef={calendar} defaultEvents={[]}>
+                {/* the parts */}
+            </Calendar.Root>
+        </>
+    );
+}
+```
+
+`calendar.current` is `{ model, engine }` while the root is mounted and `null` otherwise. See
+[Hooks](/docs/api/hooks) and [Calendar.Root](/docs/api/root).

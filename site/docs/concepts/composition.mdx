@@ -1,0 +1,140 @@
+---
+title: Composition
+description: You assemble the calendar from its parts and own the markup between them; collection parts call your function per row, day and event of the layout.
+---
+
+There is no `<Calendar view="month" />`. You assemble a view from the parts of one namespace,
+`Calendar.*`, and everything between them is yours: a date label, a week number, a button, an
+icon, a wrapper for your grid layout. The layout says which rows, days, slots and events there
+are; **collection parts** turn it into your markup by calling a function per entity.
+
+## Parts and collection parts
+
+A part renders one element with its role, its attributes and its registration:
+`Calendar.DayGrid`, `Calendar.Week`, `Calendar.Day`, `Calendar.Segment`, … A collection part calls
+its children function once per entity of the layout, in order:
+
+| collection part | calls your function with | inside |
+| --- | --- | --- |
+| `Calendar.Weeks` | each week row of a month (`DayGridWeek`) | `Calendar.DayGrid` |
+| `Calendar.Days` | each day of the row (`DayCell`, and the row) | `Calendar.Week`, `Calendar.AllDayRow` |
+| `Calendar.DayEvents` | each segment starting in the day (`Segment`) | `Calendar.Day` |
+| `Calendar.ColumnHeaders` | each day's date (`YYYY-MM-DD`) | a grid |
+| `Calendar.SlotRows` | each slot of the time grid (`TimeSlot`) | `Calendar.TimeGrid` |
+| `Calendar.Slots` | each day of the slot's row (`TimeGridColumn`) | `Calendar.SlotRow` |
+| `Calendar.Columns` | each day of the time grid (`TimeGridColumn`) | `Calendar.TimeGrid` |
+| `Calendar.ColumnEvents` | each timed segment of the day (`TimeSegment`) | `Calendar.Column` |
+| `Calendar.ListDays` | each day with events (`ListDay`) | `Calendar.List` |
+| `Calendar.ListDay` | each event of the day (`ListItem`) | `Calendar.ListDays` |
+
+`Weeks`, `Days`, `SlotRows`, `Slots` and `ListDays` render no element of their own; the others
+render their container (a row, a list) around what you return.
+
+```tsx
+<Calendar.DayGrid aria-label="Month" className="month">
+    <Calendar.ColumnHeaders className="weekdays">
+        {(date) => <Calendar.ColumnHeader date={date}>{weekday(date)}</Calendar.ColumnHeader>}
+    </Calendar.ColumnHeaders>
+    <Calendar.Weeks>
+        {(week) => (
+            <Calendar.Week week={week} className="week">
+                <Calendar.WeekNumber>{week.weekNumber}</Calendar.WeekNumber>
+                <Calendar.Days>
+                    {(day) => (
+                        <Calendar.Day day={day} className="day">
+                            <span>{Number(day.date.slice(8))}</span>
+                            <Calendar.DayEvents>
+                                {(segment) => <EventSegment segment={segment} />}
+                            </Calendar.DayEvents>
+                            <Calendar.More>{({ hiddenCount }) => `+${hiddenCount} more`}</Calendar.More>
+                        </Calendar.Day>
+                    )}
+                </Calendar.Days>
+            </Calendar.Week>
+        )}
+    </Calendar.Weeks>
+</Calendar.DayGrid>
+```
+
+`Calendar.Week` and `Calendar.AllDayRow` take either elements (a week number, then
+`Calendar.Days`, then a row's decorations) or a function called per day, the short form when the
+row holds nothing else. A part that shows state takes a function of its state as children
+(`Calendar.More`, `Calendar.Segment`, `Calendar.TimeEvent`).
+
+## When your function is called again
+
+A collection part follows React's contract. It calls your function again for an entity whose
+layout object changed, and for **every** entity when the function itself changed. The layout keeps
+the objects of what did not change (a week row is the same object while nothing in it changed),
+so moving one event changes the rows or columns it left and entered, and nothing else.
+
+- An **inline function** is a new function on every render of the component that writes it: each
+  render calls it again for every row. What it closes over (app state, props) is always current.
+- A **stable function** is called again only for the rows whose layout changed. Make it stable with
+  `useCallback`, listing what it reads, or declare it outside the component when it reads only its
+  arguments.
+
+```tsx
+import { Calendar, type DayGridWeek } from "@fragiola/calendar-react";
+import { useCallback } from "react";
+
+function Month({ highlighted }: { highlighted: string | null }) {
+    // called again for a row whose layout changed, or for every row when `highlighted` changes
+    const renderWeek = useCallback(
+        (week: DayGridWeek) => (
+            <Calendar.Week week={week} className="week">
+                {(day) => (
+                    <Calendar.Day day={day} className="day">
+                        <Calendar.DayEvents>
+                            {(segment) => (
+                                <Calendar.Segment
+                                    segment={segment}
+                                    data-highlighted={segment.eventId === highlighted ? "" : undefined}
+                                />
+                            )}
+                        </Calendar.DayEvents>
+                    </Calendar.Day>
+                )}
+            </Calendar.Week>
+        ),
+        [highlighted],
+    );
+    return (
+        <Calendar.DayGrid aria-label="Month">
+            <Calendar.Weeks>{renderWeek}</Calendar.Weeks>
+        </Calendar.DayGrid>
+    );
+}
+```
+
+The functions nested inside a row may stay inline: they are new only when their row is called
+again. Most calendars need nothing of this; a grid that re-renders often (a live region that
+changes on every key, a form beside the calendar) does. [Performance](/docs/guides/performance)
+measures it.
+
+## Swap the element
+
+Every part renders a default element (a `div`, a `button` for the navigation buttons and
+`Calendar.More`). `render` replaces it, as an element whose props are merged with the part's, or
+as a function of the props and the part's state. Never `asChild`.
+
+```tsx
+<Calendar.ListDay day={day} render={<ol />}>
+    {(item) => <Calendar.ListEvent item={item} render={<li />}>{title(item)}</Calendar.ListEvent>}
+</Calendar.ListDay>
+
+<Calendar.Next render={(props, state) => <IconButton {...props} disabled={state.disabled} />}>
+    Next
+</Calendar.Next>
+```
+
+[The primitive contract](/docs/concepts/primitive-contract) says what every part accepts.
+
+## Hooks for your own parts
+
+A component you write inside a part reads the calendar through hooks: `useCalendar` (the model
+and the engine), `useCalendarView`, `useCalendarTitle`, `useDayHeader`, and the part hooks
+(`useDay`, `useSegment`, `useTimeEvent`, …) that give a part's state and props to spread on an
+element of yours ([Hooks](/docs/api/hooks)).
+
+<Example id="custom-event-content" />

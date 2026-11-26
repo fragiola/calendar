@@ -1,0 +1,186 @@
+---
+title: Calendar.Root
+description: The calendar's root element. It creates or takes a model, starts the engine, maps the controlled props onto commands and hears the engine's events.
+---
+
+`Calendar.Root` is the element every other part lives in. It holds the calendar's model (the
+events, the calendars, the settings and the view) and the engine that turns pointers and keys into
+commands on it. It renders one `div` and the children you give it: the toolbar, the grid, a live
+region. What it shows, and how it looks, stays yours.
+
+## Behaviour
+
+- **A model, given or created.** Give it a `model` from `createCalendarModel`, or let it create
+  one from `defaultEvents`, `defaultCalendars`, `settings`, `defaultView`, `defaultDate`,
+  `features`, `now` and `createId`. These are read once, at mount; a new `model` identity starts a
+  new engine.
+- **The engine, after the first commit.** The engine (keyboard, gestures, measurement, focus) is
+  created in a layout effect, so a server render and the first client render show the model's
+  layout and attributes with no timer and no listener. The parts read the model until then.
+- **Controlled props are sent, not enforced.** `events` runs `event.set-all`, `settings` runs
+  `settings.set`, `view` (with `days`) runs `view.set` and `date` runs `view.go-to`, each when its
+  value changes, with `meta: { source: "controlled" }`. `onEventsChange`, `onViewChange` and
+  `onDateChange` hear every other change: echo it into your state to keep it, as with any
+  controlled React input. A refused value warns once and the model keeps its own.
+- **Engine events become callbacks.** Each engine event has a callback on the root
+  (`onEventClick`, `onSelect`, …); a feature's callback compiles only with that feature installed.
+- **One tab stop.** The grid inside it has one tab stop and a roving focus over its days or slots
+  (the APG grid pattern, https://www.w3.org/WAI/ARIA/apg/patterns/grid/; see
+  [accessible names and the keyboard](/docs/getting-started/accessible-names)).
+
+It renders `data-calendar-part="root"` and `data-view` (the view shown), plus what the features
+add.
+
+## Usage
+
+```tsx
+import {
+    Calendar,
+    type CalendarEventJson,
+    useCalendarTitle,
+} from "@fragiola/calendar-react";
+import { dragAndDrop } from "@fragiola/calendar-react/drag-and-drop";
+
+type Types = { events: { meeting: { room: string } }; calendar: undefined };
+
+const features = [dragAndDrop()] as const;
+
+const events: CalendarEventJson<Types>[] = [
+    {
+        id: "standup",
+        title: "Standup",
+        start: "2026-11-26T09:00:00-03:00",
+        end: "2026-11-26T09:15:00-03:00",
+        allDay: false,
+        kind: "meeting",
+        data: { room: "Blue" },
+    },
+];
+
+function Title() {
+    const parts = useCalendarTitle();
+    return <h2>{parts.map((part) => part.value).join("")}</h2>;
+}
+
+export function TeamWeek() {
+    return (
+        <Calendar.Root<Types, typeof features>
+            aria-label="Team calendar"
+            defaultEvents={events}
+            settings={{ timeZone: "America/Sao_Paulo", locale: "en-US" }}
+            defaultView="week"
+            features={features}
+            onEventClick={(event) => console.log("open", event.eventId)}
+            onEventDrop={(event) => console.log("moved to", event.start)}
+            className={(state) => (state.gestureActive ? "cal dragging" : "cal")}
+        >
+            <Title />
+            <Calendar.Previous>Previous</Calendar.Previous>
+            <Calendar.Today>Today</Calendar.Today>
+            <Calendar.Next>Next</Calendar.Next>
+            {/* a Calendar.TimeGrid, a Calendar.DayGrid or a Calendar.List */}
+        </Calendar.Root>
+    );
+}
+```
+
+The root's type arguments are the registry and the features (`RootProps<T, F>`): with them, a
+feature's callback such as `onEventDrop` is typed, and without its feature it is a type error. A
+`model` carries its own, so `<Calendar.Root model={model}>` needs none.
+
+## Props
+
+The root's own props (`RootBaseProps<T, F>`); it also takes the [common props](/docs/api/root#common-props),
+the engine props and the event props below, and every `div` attribute.
+
+| prop | type | default | description |
+| --- | --- | --- | --- |
+| `model` | `CalendarModel<T, F>` | created by the root | the calendar model; a new identity creates a new engine |
+| `events` | `(CalendarEventJson<T> \| CalendarEventOf<T>)[]` | | controlled events: a new list replaces the model's (`event.set-all`, each with its id) |
+| `defaultEvents` | `CalendarEventJson<T>[]` | `[]` | the events of the model the root creates (read once) |
+| `onEventsChange` | `(events) => void` | | the model's events after every command that changes them, a drop included |
+| `defaultCalendars` | `CalendarInfoJson<T>[]` | `[]` | the calendars (categories) of the model the root creates (read once) |
+| `settings` | `CalendarSettingsJson` | | the settings: the created model starts with them, and a change runs `settings.set` |
+| `view` | `ViewType` | | controlled view type (`view.set`) |
+| `defaultView` | `ViewType` | `"month"` | the view of the model the root creates (read once) |
+| `days` | `number` | | a `days` view's number of days, with `view` or `defaultView` |
+| `onViewChange` | `(view: RootView) => void` | | the view type (and a `days` view's count) changed |
+| `date` | `DateInput` | | controlled date: a new value runs `view.go-to` |
+| `defaultDate` | `DateInput` | today | the date the created model opens on (read once) |
+| `onDateChange` | `(date: string) => void` | | the view's anchor date (`YYYY-MM-DD`) changed |
+| `features` | `F` | `[]` | the opt-in features of the created model, each from its entry (read once) |
+| `now` | `() => number` | `Date.now` | the clock of the created model, epoch milliseconds (read once) |
+| `createId` | `CreateId` | | the id generator of the created model (read once) |
+| `calendarRef` | `CalendarRef<T, F>` | | access to the model and the engine from outside the root ([hooks](/docs/api/hooks)) |
+| `children` | `ReactNode` | | the toolbar, the grid, anything of yours |
+
+## Engine props
+
+Read once, when the root creates its engine (`RootEngineProps`, the engine's
+`CalendarEngineOptions`; see [the engine](/docs/api/engine)).
+
+| prop | type | default | description |
+| --- | --- | --- | --- |
+| `host` | `Partial<EngineHost>` | the root's window | timers, frames, `ResizeObserver` and computed styles (tests inject them) |
+| `longPressDelay` | `number` | `500` | how long a touch is held before it drags or selects, ms |
+| `dragThreshold` | `number` | `5` | the pixels a mouse or pen press moves before a drag starts |
+| `autoScroll` | `{ edge?, speed? } \| false` | `{ edge: 40, speed: 12 }` | the time grid's autoscroll near the scroller's edges |
+
+## Event props
+
+One callback per engine event (`RootEventProps<F>`, named by `ENGINE_EVENT_CALLBACKS`). Each gets
+the event as data, `CalendarEngineEventOf<"event-click">` and so on.
+
+| prop | feature | called when |
+| --- | --- | --- |
+| `onEventClick` | | an event is tapped, or Enter is pressed on a focused one (`eventId`, `occurrenceId`, `keyboard`) |
+| `onDateClick` | | a day or a slot is tapped (`date`, `allDay`, a slot's `time` and `at`) |
+| `onMoreClick` | | a day's "+N more" is pressed, or Enter on it (`date`, `occurrenceIds`): open your popover |
+| `onSelect` | `selection()` | a range is selected by a pointer's release or Enter (`range`, `keyboard`) |
+| `onEventDrop` | `dragAndDrop()`, `resize()` | a move or a resize ran its one command (`kind`, `eventId`, `start`, `end`, `allDay`) |
+| `onExternalDrop` | `externalDrop()` | something from outside was dropped (`eventId`, `point`, `types`, `dataTransfer`) |
+| `onTodayChange` | | the day changed at midnight in the display zone (`today`) |
+| `onAnnounce` | | the engine has something to announce (`announcement`, data): word it in your live region |
+
+The root's DOM `onSelect` is not a prop: `onSelect` is the selection's.
+
+## Common props
+
+Every part that renders an element takes these, on top of its element's attributes
+(`PrimitiveProps<State>`, and `DivPrimitiveProps<State>`, `ButtonPrimitiveProps<State>` or
+`SpanPrimitiveProps<State>` with them).
+
+| prop | type | description |
+| --- | --- | --- |
+| `render` | `RenderProp<State>` | replaces the element: an element whose props are merged (`render={<section />}`), or a function `(props, state) => element` (never `asChild`) |
+| `className` | `string \| (state) => string` | a class, or a function of the part's state |
+| `style` | `CSSProperties \| (state) => CSSProperties` | a style, or a function of the state; the structural keys the part sets win |
+| `ref` | `Ref<HTMLElement>` | a plain prop, merged with the part's own |
+
+A `render` function receives `RenderedProps`: spread them on the element it returns (their `ref`
+is a callback ref).
+
+```tsx
+<Calendar.Day
+    day={day}
+    render={(props, state) => (
+        <section {...props} aria-current={state.day.today ? "date" : undefined} />
+    )}
+/>
+```
+
+## State
+
+`RootState`, given to `className`, `style` and `render`:
+
+| field | type | description |
+| --- | --- | --- |
+| `view` | `ViewType` | the view shown (`data-view`) |
+| `gestureActive` | `boolean` | a pointer gesture or a keyboard grab is under way |
+
+`RootView`, what `onViewChange` receives:
+
+| field | type | description |
+| --- | --- | --- |
+| `type` | `ViewType` | the view type |
+| `days` | `number \| undefined` | a `days` view's count |

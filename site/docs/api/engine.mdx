@@ -1,0 +1,202 @@
+---
+title: Engine
+description: createCalendarEngine and the engine of one calendar on screen. Focus, gestures, measurement, the screen's keys and events, and the adapter surface.
+---
+
+The engine is one calendar view on screen, over a model: the roving focus and the keyboard, the
+pointer and touch gestures (selection, drag, resize, external drops), the measurement of
+`dayMaxEvents: "auto"`, the midnight refresh and the now line's tick. It reads the DOM only
+through the root element's window, or through an injected host. `Calendar.Root` creates it in a
+layout effect and destroys it on unmount; `useCalendar().engine` gives it to your components
+([Model and engine](/docs/concepts/model-and-engine)). The words of an announcement, the popover
+of a "+N more" link and the editor a selection opens are yours.
+
+```tsx
+import { useCalendar } from "@fragiola/calendar-react";
+
+function GoToReview() {
+    const { engine } = useCalendar();
+    return (
+        <button
+            type="button"
+            onClick={() => engine.run("focus", { occurrenceId: "review" })}
+        >
+            Focus the review
+        </button>
+    );
+}
+```
+
+`engine.run("focus", …)` navigates to the event when the view does not show it, then gives it
+the grid's tab stop and the DOM focus.
+
+## `createCalendarEngine`
+
+`createCalendarEngine(model, options?)` returns a `CalendarEngine`; the adapter attaches its root.
+A React app never calls it: the root's engine props take the same `CalendarEngineOptions`.
+
+| option | type | default | description |
+| --- | --- | --- | --- |
+| `host` | `Partial<EngineHost>` | the root's window | the timers, frames, `ResizeObserver` and computed styles; any member can be injected |
+| `longPressDelay` | `number` | `500` | ms a touch is held before it drags or selects |
+| `dragThreshold` | `number` | `5` | px a mouse or pen press moves before a drag starts |
+| `autoScroll` | `{ edge?, speed? } \| false` | `{ edge: 40, speed: 12 }` | the time grid's scroll while a gesture nears its scroller's edges |
+
+## Members
+
+Every member is one verb, as on the model, and bound.
+
+| member | signature | description |
+| --- | --- | --- |
+| `run` | `(action, payload?) => CommandResult` | runs a screen action (the keys below) |
+| `can` | `(action, payload?) => boolean` | whether `run` would succeed |
+| `check` | `(action, payload?) => CommandResult` | what `run` would return |
+| `get` | `(key, payload?) => result` | reads a fact of the screen |
+| `is` | `(key, payload?) => boolean` | asks a yes/no question of the screen |
+| `subscribe` | `(listener: (event: CalendarEngineEvent) => void) => () => void` | listens to the engine events; returns its remover |
+| `destroy` | `() => void` | releases every listener, timer and element |
+| `adapter` | `CalendarEngineAdapter` | what only an adapter calls |
+
+An engine action has no dot, so it never reads as a command: commands change the calendar
+through the model; actions are what only the screen does.
+
+## `run` actions
+
+Typed by `EngineRunMap` (`EngineRunKey`):
+
+| action | payload | result |
+| --- | --- | --- |
+| `"focus"` | a `FocusTarget`: `{ date, time? }` or `{ occurrenceId, date? }` | `{ focused }`: the `FocusPosition` |
+| `"cancel-gesture"` | none | `{ cancelled }`: a drag, a selection or a grab ended with nothing committed |
+| `"measure"` | none | `{ maxLanes }`: the day cells measured again (`dayMaxEvents: "auto"`) |
+| `"external-drag-start"` | `{ event }`: an `ExternalEventDraft` | starts an app-driven drag from outside (`externalDrop()`) |
+| `"external-drag-move"` | `{ clientX, clientY }` | `{ point }`: the `GridPoint` under it |
+| `"external-drag-end"` | `{ cancel? }` | `{ eventId }`: the event added, or `null` |
+
+An `ExternalEventDraft` is `event.add`'s payload without its times, plus an optional
+`duration` (`{ minutes?, days? }`) ([External drop](/docs/guides/external-drop)).
+
+## `get` keys
+
+Typed by `EngineGetMap` (`EngineGetKey`):
+
+| key | payload | result |
+| --- | --- | --- |
+| `"focused"` | none | the `FocusPosition`, or `null` before anything was focused |
+| `"tab-stop"` | none | where the grid's one tab stop is |
+| `"day-grid"` | none | the `DayGrid` with the measured lane limit applied |
+| `"max-lanes"` | none | the measured lane limit of `dayMaxEvents: "auto"`, or `null` |
+| `"direction"` | none | `"ltr"` or `"rtl"`, read from the root's computed style |
+| `"point-at"` | `{ clientX, clientY }` | the `GridPoint` under a client point, or `null` |
+| `"drag-preview"` | none | the dragged occurrence where it would land, a `DragPreview` (`dragAndDrop()`) |
+| `"resize-preview"` | none | the resized occurrence's new times (`resize()`) |
+| `"selection-preview"` | none | the `SelectionRange` being selected (`selection()`) |
+| `"selection-segments"` | none | the selection laid out as an event: `PreviewSegments` (`selection()`) |
+| `"now-position"` | none | the current time's `NowPosition` in the time grid (`nowIndicator()`) |
+
+`FocusPosition` is a `CellPosition` (`{ kind: "day", date }` or `{ kind: "slot", date, time }`)
+or an `EventPosition` (`{ kind: "event", occurrenceId, cell }`). A `GridPoint` is a day
+(`{ kind: "day", date }`) or a time snapped to `snapDuration` (`{ kind: "time", date, minutes,
+time }`). Positions are dates and times, never pixels. `KeyTarget` is where a key takes the
+focus from a cell, for a feature's key handling.
+
+A `DragPreview` holds its `PreviewTimes` (`eventId`, `occurrenceId`, `start`, `end`, `allDay`),
+its `PreviewSegments` (`weeks` and `columns`, in the layouts' shape) and its `kind` (`"move"`,
+`"resize"` or `"external"`) and `keyboard`. A `NowPosition` is `{ date, time, top }`, `top` a
+fraction of the column.
+
+## `is` keys
+
+Typed by `EngineIsMap` (`EngineIsKey`):
+
+| key | payload | true when |
+| --- | --- | --- |
+| `"gesture-active"` | none | a pointer gesture or a keyboard grab is under way |
+| `"event-dragging"` | `{ occurrenceId }` | the occurrence is being dragged (`dragAndDrop()`) |
+| `"event-grabbed"` | `{ occurrenceId }` | it is grabbed by the keyboard (`dragAndDrop()`) |
+| `"event-resizing"` | `{ occurrenceId }` | it is being resized (`resize()`) |
+
+## Engine events
+
+`engine.subscribe` hears a `CalendarEngineEvent` (`CalendarEngineEventType` names its `type`,
+`CalendarEngineEventOf<K>` one of them). In React, each is a root callback: `on` plus its
+`ENGINE_EVENT_CALLBACKS` name ([Calendar.Root](/docs/api/root)).
+
+| type | callback | carries |
+| --- | --- | --- |
+| `"event-click"` | `onEventClick` | `eventId`, `occurrenceId`, `keyboard`: a tap on an event, or Enter on a focused one |
+| `"date-click"` | `onDateClick` | `date`, `allDay`, a slot's `time` and `at`: a tap on a day or a slot |
+| `"more-click"` | `onMoreClick` | `date`, `occurrenceIds`: a "+N more" link; the popover is yours |
+| `"select"` | `onSelect` | `range`, `keyboard`: a range was selected (`selection()`) |
+| `"drop"` | `onEventDrop` | `kind` (`"move"` or `"resize"`), the ids, the new times, `keyboard` |
+| `"external-drop"` | `onExternalDrop` | `eventId` (or `null`), `point`, `types`, `dataTransfer` (`externalDrop()`) |
+| `"today-change"` | `onTodayChange` | `today`: the day changed at midnight in the display zone |
+| `"announce"` | `onAnnounce` | `announcement`: an `Announcement` your live region words |
+
+An `Announcement` is data, never text: its `kind` is `"grab"`, `"drag-over"`, `"drop"`,
+`"drag-cancel"` or `"select-extend"`, with the occurrence and the times or range
+([Keyboard](/docs/guides/keyboard)).
+
+```ts
+import type { Announcement } from "@fragiola/calendar-react";
+
+function announcementText(announcement: Announcement): string {
+    switch (announcement.kind) {
+        case "grab":
+            return "Grabbed. Use the arrows to move, Enter to drop.";
+        case "drop":
+            return `Dropped at ${announcement.preview.start}.`;
+        case "drag-cancel":
+            return "Cancelled.";
+        default:
+            return "";
+    }
+}
+```
+
+## The host
+
+`EngineHost` is what the engine schedules and measures with. Every member not injected is the
+root's window's, read when the root is attached, so the same engine runs in an iframe; a test
+injects its own timers.
+
+| member | type | description |
+| --- | --- | --- |
+| `setTimeout` | `(callback, ms) => number` | the midnight refresh, a long press, the now tick |
+| `clearTimeout` | `(id) => void` | cancels one |
+| `requestAnimationFrame` | `(callback) => number` | autoscroll |
+| `cancelAnimationFrame` | `(id) => void` | cancels one |
+| `ResizeObserver` | `ResizeObserverConstructor` | observes the measured cells (`dayMaxEvents: "auto"`); none: measured on commit only |
+| `getComputedStyle` | `(element) => { direction }` | the root's `direction` |
+
+## The adapter surface
+
+`engine.adapter` (`CalendarEngineAdapter`) is what a framework adapter calls; an app does not.
+
+| member | description |
+| --- | --- |
+| `model` | the model this engine shows |
+| `attachRoot` | attaches the root element: the engine listens to its pointers, keys, focus and native drags |
+| `detachRoot` | detaches it, cancelling a gesture under way |
+| `register` | `register(part, payload, element)` registers (or, with `null`, unregisters) a part's element: measured, hit-tested, focused |
+| `attributes` | `attributes(part, payload)`: a part's `PartAttributes`: `data-calendar-part`, the model's, the engine's and the features' |
+| `committed` | the adapter committed a render: the engine measures and gives focus to an element it waited for |
+| `subscribe` | calls a listener with a `ViewChange` (`focus`, `gesture`, `layout`) when the view changes; returns its remover |
+| `getSnapshot` | a number that changes whenever the view changes |
+
+`PartName` names a registered part and `PartPayloadMap` its payload (`{ date }` for a day,
+`{ occurrenceId, date }` for an event). Before an engine exists (a server render, the first
+client render), `partAttributes(model, part, payload)` gives the same attributes with nothing
+focused, the tab stop where the model puts it ([State attributes](/docs/concepts/state-attributes)).
+
+```ts
+import { createCalendarModel, partAttributes } from "@fragiola/calendar-react";
+
+const model = createCalendarModel({
+    version: 1,
+    events: [],
+    view: { type: "month", anchorDate: "2026-11-26" },
+});
+partAttributes(model, "day", { date: "2026-11-26" });
+// { "data-calendar-part": "day", "data-date": "2026-11-26", role: "gridcell", tabindex: ..., ... }
+```

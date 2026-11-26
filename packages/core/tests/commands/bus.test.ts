@@ -13,6 +13,7 @@ const ALL_COMMANDS = [
     "event.remove",
     "event.set-data",
     "event.set-flags",
+    "event.set-all",
     "calendar.add",
     "calendar.update",
     "calendar.remove",

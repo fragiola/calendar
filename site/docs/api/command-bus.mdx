@@ -1,0 +1,210 @@
+---
+title: The command bus
+description: How commands run, what they return, the error codes, batches, middleware that vetoes or rewrites, and the listeners that hear every commit.
+---
+
+Every change to a calendar is a command through the model's bus: a click, a drop, a server's
+reply and an assistant's tool call all take the same path, through the same middleware and the
+same rules. The bus gives you the results, the dry runs, the middleware chain and the events;
+what you do with them (ask the user, log, sync, undo) is yours. The commands themselves are on
+[Commands](/docs/api/commands), generated from the catalogue.
+
+## Running a command
+
+`model.run(command, payload, options?)` returns a `CommandResult`: `{ ok: true, value }` or
+`{ ok: false, error }`. It never throws on bad input. `CommandName` names every command,
+`PayloadOf<T, C>` and `ResultOf<T, C>` type its payload and value, and `CommandMap` holds them.
+
+```ts
+import { createCalendarModel } from "@fragiola/calendar-react";
+
+const model = createCalendarModel({
+    version: 1,
+    events: [
+        {
+            id: "review",
+            title: "Design review",
+            start: "2026-11-26T14:00:00-05:00",
+            end: "2026-11-26T15:00:00-05:00",
+            allDay: false,
+        },
+    ],
+    settings: { timeZone: "America/New_York" },
+});
+
+const moved = model.run("event.move", {
+    eventId: "review",
+    delta: { days: 1 },
+});
+if (moved.ok) {
+    moved.value.start; // "2026-11-27T14:00:00-05:00"
+} else {
+    console.warn(moved.error.code, moved.error.message);
+}
+```
+
+`RunOptions` are the same on `run`, `can` and `check`:
+
+| option | type | description |
+| --- | --- | --- |
+| `transient` | `boolean` | a step of a continuous gesture: listeners see it marked, so an undo stack can merge it |
+| `meta` | `Record<string, unknown>` | free-form information for middleware and listeners (who asked, a drag's details) |
+
+## Untrusted JSON: `dispatch`
+
+`model.dispatch(input, options?)` runs `{ command, payload }` from JSON you did not write: a
+server's message, an assistant's tool call. The input is validated (an unknown name is
+`unknown_command`); `options.meta` is the app's, never read from the input, so a middleware can
+tell an assistant's commands from the user's.
+
+```ts
+const result = model.dispatch(
+    { command: "event.remove", payload: { eventId: "review" } },
+    { meta: { source: "assistant" } },
+);
+```
+
+`model.get("commands")` lists every installed command as a `CommandInfo`, with its JSON Schemas:
+the tool definitions for an assistant ([AI and automation](/docs/guides/ai-and-automation)).
+
+| field | type | description |
+| --- | --- | --- |
+| `name` | `string` | `event.move` |
+| `description` | `string` | what it does |
+| `payloadSchema` | `JsonSchema` | its payload |
+| `resultSchema` | `JsonSchema` | its value |
+| `transient` | `boolean` | whether it may run as a gesture's step |
+
+`JsonSchema` and `JsonValue` type the schemas and the JSON they describe.
+
+## Dry runs: `can` and `check`
+
+`model.can(command, payload)` says whether `run` would succeed; `model.check` returns what it
+would return. Neither commits, and both pass the middleware with `ctx.dryRun` set. A drag asks
+`check` for each target, so a refused one shows no preview.
+
+```ts
+model.can("event.resize", {
+    eventId: "review",
+    edge: "end",
+    to: "2026-11-26T14:00:00-05:00",
+}); // false: a resize to nothing is invalid_payload
+```
+
+## Errors
+
+A failed result's `error` is a `CommandError`: `code`, `message`, `path` (a JSON pointer into
+the payload) and, for `invalid_payload`, `issues` (each a `ValidationIssue`).
+
+| code (`CommandErrorCode`) | when |
+| --- | --- |
+| `unknown_command` | no command has this name |
+| `invalid_payload` | the payload does not match the schema, or is nonsense (an end before its start), or names a field of a feature not installed |
+| `not_found` | an entity the payload names does not exist, or the command belongs to a feature not installed |
+| `refused` | a rule forbids it: an edit flag, `validRange`, a constraint; the message names it |
+| `vetoed` | a middleware vetoed it |
+| `queued` | issued from a middleware: it runs after the current command |
+| `middleware_error` | a middleware threw |
+
+## Batches
+
+`batch` runs several commands as one commit: all of them apply, or none. Each entry is a
+`BatchEntry` (`{ command, payload }`); the commit's event lists them as `BatchStep` entries.
+
+```ts
+model.run("batch", {
+    commands: [
+        { command: "event.move", payload: { eventId: "review", delta: { days: 1 } } },
+        { command: "event.update", payload: { eventId: "review", title: "Design review (moved)" } },
+    ],
+});
+```
+
+## Middleware
+
+`model.use(middleware)` adds a `Middleware` around every command, the engine's included; it
+returns its remover. A middleware receives a `CommandContext` (a union over the commands, so
+checking `ctx.command` narrows `ctx.payload`) and `next`:
+
+- **veto**: return an error without calling `next`: `veto(message?)` makes the `vetoed` result;
+- **rewrite**: assign `ctx.payload`, then call `next` (the payload is validated again);
+- **observe**: call `next` and look at its result.
+
+Returning `undefined` passes on `next`'s result. A middleware runs for dry runs too (`ctx.dryRun`): keep its side effects out of them.
+
+```ts
+import { veto } from "@fragiola/calendar-react";
+
+const stopGuarding = model.use((ctx, next) => {
+    if (ctx.command === "event.remove" && ctx.meta?.source === "assistant") {
+        return veto("The assistant may not remove events");
+    }
+    return next();
+});
+```
+
+What a middleware reads (`CommandContextBase`):
+
+| field | type | description |
+| --- | --- | --- |
+| `command` | `CommandName` | the command, which narrows `payload` |
+| `payload` | `PayloadOf<T, C>` | the validated payload; assign a new object to rewrite it |
+| `dryRun` | `boolean` | `can`, `check` or a drag's hover: nothing will be committed |
+| `transient` | `boolean` | a gesture's step |
+| `inBatch` | `boolean` | a command inside a batch (the batch itself also passes the chain) |
+| `meta` | `Record<string, unknown>` | the run's or the dispatch's `meta` |
+| `state` | `CalendarState<T>` | the committed state the command applies to |
+| `get` | `(key, payload?) => result` | reads as the command sees it, inside a batch after its earlier commands |
+
+`ctx.get` is typed by `CommandContextGetMap`: `"event-by"`, `"calendar-by"`, `"settings"` and
+`"view"`.
+
+## Listening to commits
+
+`model.subscribe(listener)` calls a `CommandListener` with a `CommandEvent` after every commit
+(not for dry runs nor refused commands); it returns its remover.
+
+| field | type | description |
+| --- | --- | --- |
+| `command` | `string` | the command (a feature's too) |
+| `payload` | `unknown` | its payload |
+| `result` | `unknown` | its value |
+| `before` | `CalendarState<T>` | the state before |
+| `after` | `CalendarState<T>` | the state after |
+| `transient` | `boolean` | a gesture's step |
+| `meta` | `Record<string, unknown>` | the run's `meta` |
+| `commands` | `readonly BatchStep[]` | for a batch: the commands it ran, flattened |
+
+```ts
+const stop = model.subscribe((event) => {
+    if (!event.transient) save(model.get("calendar-json"));
+});
+
+declare function save(json: unknown): void;
+```
+
+The model's reads are on [Model](/docs/api/model): `model.get` and `model.is`.
+
+## Payload types
+
+The payloads of the core's commands, for code that builds them:
+
+| type | of |
+| --- | --- |
+| `EventAddPayload` | `event.add`: a new event, its `end` optional |
+| `EventUpdatePayload` | `event.update`: the fields to change; `null` removes an optional one |
+| `EventMovePayload` | `event.move`: `{ eventId, start, allDay? }` or `{ eventId, delta }` |
+| `MoveDelta` | a move's `{ days?, minutes? }` |
+| `EventResizePayload` | `event.resize`: `{ eventId, edge, to }` |
+| `EventSetDataPayload` | `event.set-data` |
+| `EventSetFlagsPayload` | `event.set-flags`: a flag's value, or `null` to remove it |
+| `CalendarUpdatePayload` | `calendar.update` |
+| `SettingsPatch` | `settings.set`: each field replaces the setting; `null` removes an optional one |
+| `DateInput` | `view.go-to`'s date: `YYYY-MM-DD` or a `PlainDate` |
+| `DaysPayload` | a range of days, `end` exclusive |
+| `OccurrenceTarget` | `occurrenceId` and `scope` of an edit (`recurrence()`) |
+| `EditScope` | `"this"`, `"following"` or `"all"` |
+| `NoPayload` | `{}`: a command or key that takes nothing |
+| `EventTimesResult` | where an event is after a move or a resize |
+| `ViewResult` | the view a `view.*` command leaves |
+| `EventPermissions` | an event's flags in effect (`"event-permissions-by"`) |

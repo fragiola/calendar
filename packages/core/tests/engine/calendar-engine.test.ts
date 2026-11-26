@@ -3,7 +3,7 @@
 // midnight refresh from the injected clock, `dayMaxEvents: "auto"` from measured sizes, and
 // hit-testing.
 import { afterEach, describe, expect, it } from "vitest";
-import { createCalendarEngine } from "../../src/index";
+import { createCalendarEngine, partAttributes } from "../../src/index";
 import { allDay, modelOf, timed } from "../fixture";
 import { type Mounted, mount, unmountAll } from "./harness";
 
@@ -497,9 +497,350 @@ describe("attributes (D17)", () => {
             occurrenceId: "t",
             date: "2026-11-26",
         });
-        expect(event.role).toBeUndefined();
         expect(event["data-event-id"]).toBe("t");
         // no drag feature: no touch-action written
         expect(m.element("event t 2026-11-26").style.touchAction).toBe("");
+    });
+
+    it("gives a time grid rows of slots, a gridcell per day, and each column's events as a list", () => {
+        const m = mount({
+            events: [
+                timed("t", "09:00", "10:00"),
+                allDay("a", "2026-11-26", "2026-11-27"),
+            ],
+            view: { type: "week", anchorDate: "2026-11-26" },
+        });
+        const { attributes } = m.engine.adapter;
+        const day = { date: "2026-11-26" };
+        // the header row and the all-day row come first; then a row per slot, its label a rowheader
+        expect(attributes("column-headers", {})).toEqual({
+            "data-calendar-part": "column-headers",
+            role: "row",
+        });
+        expect(attributes("column-header", day)).toMatchObject({
+            role: "columnheader",
+            "data-date": "2026-11-26",
+        });
+        expect(attributes("all-day-row", { weekId: "2026-11-22" })).toEqual({
+            "data-calendar-part": "all-day-row",
+            role: "row",
+        });
+        expect(attributes("day", day)).toMatchObject({ role: "gridcell" });
+        expect(attributes("slot-row", { time: "09:00" })).toEqual({
+            "data-calendar-part": "slot-row",
+            "data-time": "09:00",
+            role: "row",
+        });
+        expect(attributes("slot-label", { time: "09:00" })).toEqual({
+            "data-calendar-part": "slot-label",
+            "data-time": "09:00",
+            role: "rowheader",
+        });
+        // the columns' layer is the grid's last row, each column a cell holding its events' list
+        expect(attributes("columns", {})).toEqual({
+            "data-calendar-part": "columns",
+            role: "row",
+        });
+        const column = attributes("column", day);
+        expect(column).toMatchObject({
+            role: "gridcell",
+            "data-calendar-part": "column",
+            "data-date": "2026-11-26",
+            "data-today": "",
+        });
+        expect(attributes("column-events", day)).toEqual({
+            "data-calendar-part": "column-events",
+            "data-date": "2026-11-26",
+            role: "list",
+        });
+        expect(
+            attributes("event", { occurrenceId: "t", date: "2026-11-26" }),
+        ).toMatchObject({
+            "data-calendar-part": "time-event",
+            role: "listitem",
+            tabindex: "-1",
+        });
+        expect(
+            attributes("event", { occurrenceId: "a", date: "2026-11-26" }),
+        ).toMatchObject({ "data-calendar-part": "segment", role: "listitem" });
+        // decorations are hidden from assistive technology
+        expect(attributes("selection", {})["aria-hidden"]).toBe("true");
+        expect(
+            attributes("resize-handle", {
+                occurrenceId: "t",
+                date: "2026-11-26",
+                edge: "end",
+            })["aria-hidden"],
+        ).toBe("true");
+    });
+
+    it("names a month's and a list's events, and gives week numbers a rowheader", () => {
+        const m = mount({
+            events: [timed("t", "09:00", "10:00")],
+            view: { type: "month", anchorDate: "2026-11-26" },
+        });
+        const { attributes } = m.engine.adapter;
+        expect(
+            attributes("event", { occurrenceId: "t", date: "2026-11-26" }),
+        ).toMatchObject({ "data-calendar-part": "segment", role: "listitem" });
+        expect(attributes("week", { weekId: "2026-11-22" }).role).toBe("row");
+        expect(attributes("week-number", { weekId: "2026-11-22" }).role).toBe(
+            "rowheader",
+        );
+        m.model.run("view.set", { type: "list" });
+        expect(
+            attributes("event", { occurrenceId: "t", date: "2026-11-26" }),
+        ).toMatchObject({
+            "data-calendar-part": "list-event",
+            role: "listitem",
+            tabindex: "0",
+        });
+        expect(attributes("list-day", { date: "2026-11-26" })).toEqual({
+            "data-calendar-part": "list-day",
+            "data-date": "2026-11-26",
+            role: "list",
+        });
+    });
+
+    it("marks the navigation buttons by what their command can do", () => {
+        const m = mount({
+            settings: {
+                validRange: { start: "2026-11-01", end: "2026-12-01" },
+            },
+            view: { type: "month", anchorDate: "2026-11-26" },
+        });
+        const { attributes } = m.engine.adapter;
+        expect(attributes("previous", {})).toEqual({
+            "data-calendar-part": "previous",
+            "data-disabled": "",
+        });
+        expect(attributes("next", {})["data-disabled"]).toBe("");
+        expect(attributes("today", {})["data-disabled"]).toBeUndefined();
+        expect(attributes("view-button", { type: "month" })).toEqual({
+            "data-calendar-part": "view-button",
+            "aria-pressed": "true",
+            "data-pressed": "",
+        });
+        expect(attributes("view-button", { type: "week" })).toEqual({
+            "data-calendar-part": "view-button",
+            "aria-pressed": "false",
+        });
+        expect(
+            attributes("view-button", { type: "days", days: 3 })[
+                "aria-pressed"
+            ],
+        ).toBe("false");
+    });
+});
+
+describe('"+N more" on the keyboard (D12)', () => {
+    /** A month with three events on 2026-11-26 and room for one: a "+2 more" link. */
+    function moreMonth(auto = false) {
+        const m = mount({
+            ...(auto ? { dayEventsHeight: 20 } : {}),
+            events: [
+                allDay("a", "2026-11-26", "2026-11-27"),
+                allDay("b", "2026-11-26", "2026-11-27"),
+                allDay("c", "2026-11-26", "2026-11-27"),
+            ],
+            settings: { dayMaxEvents: auto ? "auto" : 1 },
+            view: { type: "month", anchorDate: "2026-11-26" },
+        });
+        const more = document.createElement("button");
+        more.tabIndex = -1;
+        m.element("day 2026-11-26").append(more);
+        m.engine.adapter.register("more", { date: "2026-11-26" }, more);
+        return { m, more };
+    }
+
+    it("is the last item of its day's events: Down from the last event, Up back, Escape to the day", () => {
+        const { m, more } = moreMonth();
+        m.engine.run("focus", { date: "2026-11-26" });
+        m.key("Enter");
+        expect(document.activeElement).toBe(m.element("event a 2026-11-26"));
+        expect(m.key("ArrowDown").defaultPrevented).toBe(true);
+        expect(document.activeElement).toBe(more);
+        expect(m.key("Enter").defaultPrevented).toBe(true);
+        expect(m.events.at(-1)).toEqual({
+            type: "more-click",
+            date: "2026-11-26",
+            occurrenceIds: ["b", "c"],
+        });
+        m.key("ArrowUp");
+        expect(document.activeElement).toBe(m.element("event a 2026-11-26"));
+        m.key("ArrowDown");
+        m.key("Escape");
+        expect(document.activeElement).toBe(m.element("day 2026-11-26"));
+    });
+
+    it("takes the focus on Enter from a day whose events all are hidden", () => {
+        // a cell of one lane's height: the lane is kept for the link, every event hidden
+        const { m, more } = moreMonth(true);
+        expect(m.engine.get("max-lanes")).toBe(0);
+        m.engine.run("focus", { date: "2026-11-26" });
+        expect(m.key("Enter").defaultPrevented).toBe(true);
+        expect(document.activeElement).toBe(more);
+        m.key("ArrowUp");
+        expect(document.activeElement).toBe(m.element("day 2026-11-26"));
+    });
+});
+
+describe("a multi-day segment on the keyboard (D12)", () => {
+    it("moves among the events of the day the focus entered it from", () => {
+        const m = mount({
+            events: [
+                allDay("long", "2026-11-24", "2026-11-27"),
+                allDay("first", "2026-11-24", "2026-11-25"),
+                allDay("later", "2026-11-26", "2026-11-27"),
+            ],
+            view: { type: "month", anchorDate: "2026-11-26" },
+        });
+        m.engine.run("focus", { date: "2026-11-26" });
+        m.key("Enter");
+        // one element for the three days, registered with its first: the adapter's next commit
+        // focuses it
+        m.engine.adapter.committed();
+        expect(document.activeElement).toBe(m.element("event long 2026-11-24"));
+        m.key("ArrowDown");
+        expect(document.activeElement).toBe(
+            m.element("event later 2026-11-26"),
+        );
+        m.key("ArrowUp");
+        m.key("Escape");
+        expect(document.activeElement).toBe(m.element("day 2026-11-26"));
+    });
+    it("marks the segment focused from another of its days, and Up from More comes back to it", () => {
+        const m = mount({
+            events: [
+                allDay("first", "2026-11-24", "2026-11-27"),
+                allDay("long", "2026-11-25", "2026-11-28"),
+                allDay("hidden", "2026-11-26", "2026-11-27"),
+            ],
+            settings: { dayMaxEvents: 2 },
+            view: { type: "month", anchorDate: "2026-11-26" },
+        });
+        const more = document.createElement("button");
+        m.element("day 2026-11-26").append(more);
+        m.engine.adapter.register("more", { date: "2026-11-26" }, more);
+        m.engine.run("focus", { date: "2026-11-26" });
+        m.key("Enter");
+        m.key("ArrowDown");
+        const long = m.element("event long 2026-11-25");
+        expect(document.activeElement).toBe(long);
+        expect(
+            m.engine.adapter.attributes("event", {
+                occurrenceId: "long",
+                date: "2026-11-25",
+            })["data-focused"],
+        ).toBe("");
+        m.key("ArrowDown");
+        expect(document.activeElement).toBe(more);
+        m.key("ArrowUp");
+        expect(document.activeElement).toBe(long);
+    });
+
+    it("focuses the part of a multi-week event in the row of the day", () => {
+        const m = mount({
+            events: [allDay("span", "2026-11-26", "2026-12-02")],
+            view: { type: "month", anchorDate: "2026-11-26" },
+        });
+        m.engine.run("focus", { date: "2026-11-30" });
+        m.key("Enter");
+        m.engine.adapter.committed();
+        expect(document.activeElement).toBe(m.element("event span 2026-11-29"));
+    });
+});
+
+describe("partAttributes (before an engine)", () => {
+    it("gives what the engine gives while nothing is focused, the tab stop on today", () => {
+        const model = modelOf(
+            [timed("t", "09:00", "10:00")],
+            {},
+            {
+                view: { type: "week", anchorDate: "2026-11-26" },
+            },
+        );
+        const engine = createCalendarEngine(model);
+        const parts = [
+            ["root", {}],
+            ["time-grid", {}],
+            ["slot-row", { time: "00:00" }],
+            ["slot", { date: "2026-11-26", time: "00:00" }],
+            ["slot", { date: "2026-11-25", time: "00:00" }],
+            ["column", { date: "2026-11-26" }],
+            ["event", { occurrenceId: "t", date: "2026-11-26" }],
+            ["view-button", { type: "week" }],
+        ] as const;
+        for (const [part, payload] of parts) {
+            expect(partAttributes(model, part, payload as never)).toEqual(
+                engine.adapter.attributes(part, payload as never),
+            );
+        }
+        expect(
+            partAttributes(model, "slot", { date: "2026-11-26", time: "00:00" })
+                .tabindex,
+        ).toBe("0");
+        engine.destroy();
+    });
+});
+
+describe("buttons inside the root", () => {
+    it("leaves a navigation button's keys to it, and takes a \"+N more\" link's Enter as its tap", () => {
+        const m = mount({ view: { type: "month", anchorDate: "2026-11-26" } });
+        const button = (part: "previous" | "more") => {
+            const element = document.createElement("button");
+            m.root.append(element);
+            m.engine.adapter.register(
+                part,
+                part === "more" ? { date: "2026-11-26" } : {},
+                element,
+            );
+            element.focus();
+            return element;
+        };
+        // a cell held the focus before
+        m.engine.run("focus", { date: "2026-11-25" });
+        button("previous");
+        expect(m.key("ArrowRight").defaultPrevented).toBe(false);
+        expect(m.key("Enter").defaultPrevented).toBe(false);
+        expect(m.engine.get("focused")).toEqual({
+            kind: "day",
+            date: "2026-11-25",
+        });
+        button("more");
+        expect(m.key("Enter").defaultPrevented).toBe(true);
+        expect(m.events.at(-1)).toEqual({
+            type: "more-click",
+            date: "2026-11-26",
+            occurrenceIds: [],
+        });
+    });
+
+    it('leaves an app\'s own control inside a part its keys, and takes an assistive click on "+N more"', () => {
+        const m = mount({
+            events: [allDay("a", "2026-11-26", "2026-11-27")],
+            view: { type: "month", anchorDate: "2026-11-26" },
+        });
+        const control = document.createElement("button");
+        m.element("event a 2026-11-26").append(control);
+        control.focus();
+        expect(m.key("ArrowRight").defaultPrevented).toBe(false);
+        expect(m.key("Enter").defaultPrevented).toBe(false);
+        const more = document.createElement("button");
+        m.root.append(more);
+        m.engine.adapter.register("more", { date: "2026-11-27" }, more);
+        more.dispatchEvent(
+            new MouseEvent("click", { bubbles: true, detail: 0 }),
+        );
+        expect(m.events.at(-1)).toMatchObject({
+            type: "more-click",
+            date: "2026-11-27",
+        });
+        const count = m.events.length;
+        // a pointer's click (detail 1) was its tap already
+        more.dispatchEvent(
+            new MouseEvent("click", { bubbles: true, detail: 1 }),
+        );
+        expect(m.events).toHaveLength(count);
     });
 });

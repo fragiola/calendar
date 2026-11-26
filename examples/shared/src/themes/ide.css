@@ -1,0 +1,137 @@
+/* Theme "ide" — A dense code-editor planner: hairline grid, square events with a stripe.
+
+   One file per theme, selected by data-example-theme="ide" on any element (the embed puts it
+   on <body>, as an app would). A theme only sets values; it styles no markup. It declares:
+     1. shape tokens (--cal-*) that the examples' class names read: the font and its size
+        (--cal-font, --cal-size), the radius of a frame and of an event (--cal-radius,
+        --cal-event-radius), a slot's height in the time grid (--cal-slot-height), a day-grid
+        lane's height (--cal-lane-size, which the examples hand to the adapter's
+        --calendar-lane-size) and an event's padding (--cal-event-padding): the event density,
+        the stripe at an event's inline start (--cal-event-stripe, a width: 0px for none), the
+        grid lines (--cal-grid-width, --cal-grid-style), the column headers (--cal-header-weight,
+        --cal-header-case), today's marker (--cal-today-radius, --cal-today-size), the now
+        indicator's line and dot (--cal-now-width, --cal-now-dot), the frame's shadow
+        (--cal-shadow), motion (--cal-motion) and the focus ring's width (--cal-focus-width);
+     2. the Fragiola palettes the examples use, each with all SIX roles (base, soft, line,
+        contrast, accent, ring). A palette that omitted one would inherit it from the page and
+        leak across the theme boundary;
+     3. on every palette, the colours that depend on it: the grid lines (--cal-line), an event
+        (--cal-event-bg, --cal-event-fg, --cal-event-stripe-color), today's marker
+        (--cal-today-bg, --cal-today-fg), a selected range (--cal-selected-bg), a weekend day
+        (--cal-weekend-bg) and a hovered slot or day (--cal-hover-bg). They are declared per
+        palette so that var(--palette-…) resolves against the palette the element sits in (an
+        event's calendar picks its palette).
+
+   Dense and square: short slots and lanes, a stripe on each event in its calendar's colour,
+   uppercase headers, a square today marker, a thin now line with no dot.
+
+   Specificity: the palette rules are ":root [data-example-theme="ide"] .palette-x", which ties
+   with Fragiola's own ":root[data-theme] .palette-x" and wins by coming later in the cascade, so
+   a theme overrides the page's light/dark. */
+
+[data-example-theme="ide"] {
+    color-scheme: dark;
+    --palette-state-shift: 0.1;
+    --cal-font: "Segoe UI", ui-sans-serif, system-ui, sans-serif;
+    --cal-size: 0.8125rem;
+    --cal-radius: 0px;
+    --cal-event-radius: 2px;
+    --cal-slot-height: 1.5rem;
+    --cal-lane-size: 1.25rem;
+    --cal-event-padding: 0 0.25rem;
+    --cal-event-stripe: 3px;
+    --cal-grid-width: 1px;
+    --cal-grid-style: solid;
+    --cal-header-weight: 600;
+    --cal-header-case: uppercase;
+    --cal-today-radius: 2px;
+    --cal-today-size: 1.5rem;
+    --cal-now-width: 1px;
+    --cal-now-dot: 0px;
+    --cal-shadow: none;
+    --cal-motion: 0ms;
+    --cal-focus-width: 1px;
+}
+
+:root [data-example-theme="ide"] .palette-surface,
+:root [data-example-theme="ide"].palette-surface {
+    --palette-base: oklch(0.2 0.006 260);
+    --palette-soft: oklch(0.26 0.008 260);
+    --palette-line: oklch(0.32 0.008 260);
+    --palette-contrast: oklch(0.9 0.005 260);
+    --palette-accent: oklch(0.82 0.006 260);
+    --palette-ring: var(--palette-accent);
+}
+
+:root [data-example-theme="ide"] .palette-raised,
+:root [data-example-theme="ide"].palette-raised {
+    --palette-base: oklch(0.235 0.006 260);
+    --palette-soft: oklch(0.19 0.006 260);
+    --palette-line: oklch(0.32 0.008 260);
+    --palette-contrast: oklch(0.92 0.005 260);
+    --palette-accent: oklch(0.8 0.006 260);
+    --palette-ring: var(--palette-accent);
+}
+
+:root [data-example-theme="ide"] .palette-blue,
+:root [data-example-theme="ide"].palette-blue {
+    --palette-base: oklch(0.55 0.16 245);
+    --palette-soft: oklch(0.3 0.08 245);
+    --palette-line: oklch(0.42 0.1 245);
+    --palette-contrast: oklch(0.99 0 0);
+    --palette-accent: oklch(0.75 0.13 245);
+    --palette-ring: var(--palette-accent);
+}
+
+:root [data-example-theme="ide"] .palette-orange,
+:root [data-example-theme="ide"].palette-orange {
+    --palette-base: oklch(0.72 0.15 60);
+    --palette-soft: oklch(0.3 0.07 60);
+    --palette-line: oklch(0.42 0.09 60);
+    --palette-contrast: oklch(0.18 0.03 60);
+    --palette-accent: oklch(0.8 0.13 60);
+    --palette-ring: var(--palette-accent);
+}
+
+:root [data-example-theme="ide"] .palette-green,
+:root [data-example-theme="ide"].palette-green {
+    --palette-base: oklch(0.68 0.15 150);
+    --palette-soft: oklch(0.3 0.07 150);
+    --palette-line: oklch(0.42 0.09 150);
+    --palette-contrast: oklch(0.15 0.03 150);
+    --palette-accent: oklch(0.76 0.13 150);
+    --palette-ring: var(--palette-accent);
+}
+
+:root [data-example-theme="ide"] .palette-danger,
+:root [data-example-theme="ide"].palette-danger {
+    --palette-base: oklch(0.66 0.18 25);
+    --palette-soft: oklch(0.3 0.08 25);
+    --palette-line: oklch(0.42 0.1 25);
+    --palette-contrast: oklch(0.14 0.03 25);
+    --palette-accent: oklch(0.76 0.15 25);
+    --palette-ring: var(--palette-accent);
+}
+
+:root [data-example-theme="ide"] .palette-purple,
+:root [data-example-theme="ide"].palette-purple {
+    --palette-base: oklch(0.68 0.16 300);
+    --palette-soft: oklch(0.3 0.08 300);
+    --palette-line: oklch(0.42 0.1 300);
+    --palette-contrast: oklch(0.14 0.03 300);
+    --palette-accent: oklch(0.78 0.14 300);
+    --palette-ring: var(--palette-accent);
+}
+
+:root [data-example-theme="ide"] [class*="palette-"],
+:root [data-example-theme="ide"][class*="palette-"] {
+    --cal-line: oklch(from var(--palette-line) l c h / 0.8);
+    --cal-event-bg: oklch(from var(--palette-base) l c h / 0.22);
+    --cal-event-fg: var(--palette-accent);
+    --cal-event-stripe-color: var(--palette-base);
+    --cal-today-bg: var(--palette-accent);
+    --cal-today-fg: var(--palette-soft);
+    --cal-selected-bg: oklch(from var(--palette-line) l c h / 0.5);
+    --cal-weekend-bg: oklch(from var(--palette-soft) l c h / 0.5);
+    --cal-hover-bg: oklch(from var(--palette-soft) l c h / 0.7);
+}

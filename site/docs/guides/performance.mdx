@@ -1,0 +1,128 @@
+---
+title: Performance
+description: How the calendar re-renders only what changed, and how to pass stable children functions so moving an event re-renders the rows it touches.
+---
+
+A busy week shows thousands of elements: slots, columns, events. The core keeps the layout's
+unchanged parts as the same objects, previews are engine view state, and each collection part
+calls your children function again only when it has to. What stays yours is React's usual rule:
+pass a stable function where a re-render of your component should not re-render the calendar's
+rows.
+
+## The layout keeps its identity
+
+`model.get("day-grid")`, `model.get("time-grid")` and `model.get("list")` return layout objects
+that keep their identity while nothing in them changed: a week row, a time-grid column, a slot, a
+list day and a segment are the same object after an unrelated command. Moving an event makes new
+objects only for the rows or columns it leaves and enters; a title change makes new objects for
+the rows that show it.
+
+Each part reads its value through `useSyncExternalStore`, the last object kept while it is equal,
+so a part re-renders only when what it shows changed.
+
+## When a children function is called again
+
+A collection part (`Weeks`, `Days`, `SlotRows`, `Slots`, `Columns`, `ColumnEvents`, `DayEvents`,
+`ListDays`, `ListDay`, `ColumnHeaders`) calls its children function once per entity, and calls it
+again for an entity when either changes:
+
+- the entity's layout object (a week row moved an event in), or
+- the children function itself (a new function: every entity of the part).
+
+That is React's contract: app state a children function closes over is never stale. An inline
+function is a new one on every render of the component that writes it, so that render re-renders
+every row of the part. When the component re-renders often (a live region, a field, a status line),
+make the function stable.
+
+## Stable children functions
+
+A function that reads only its arguments can live outside the component. It never changes, so a
+re-render of the component re-renders no row:
+
+```tsx
+import { Calendar, type TimeGridColumn } from "@fragiola/calendar-react";
+
+function dayColumn(column: TimeGridColumn) {
+    return (
+        <Calendar.Column column={column} className="relative flex-1">
+            <Calendar.ColumnEvents>
+                {(segment) => <Calendar.TimeEvent segment={segment} />}
+            </Calendar.ColumnEvents>
+        </Calendar.Column>
+    );
+}
+
+function Week() {
+    return (
+        <Calendar.TimeGrid aria-label="Week">
+            {/* slot rows */}
+            <Calendar.Columns>{dayColumn}</Calendar.Columns>
+        </Calendar.TimeGrid>
+    );
+}
+```
+
+A function that reads app state takes `useCallback` with that state as a dependency: the rows
+re-render when it changes, and only the touched rows when the layout does.
+
+```tsx
+import { Calendar, type DayGridWeek } from "@fragiola/calendar-react";
+import { useCallback } from "react";
+
+function Month({ highlighted }: { highlighted: string | null }) {
+    const week = useCallback(
+        (week: DayGridWeek) => (
+            <Calendar.Week week={week}>
+                {(day) => (
+                    <Calendar.Day day={day}>
+                        <Calendar.DayEvents>
+                            {(segment) => (
+                                <Calendar.Segment
+                                    segment={segment}
+                                    data-highlighted={
+                                        segment.eventId === highlighted
+                                            ? ""
+                                            : undefined
+                                    }
+                                />
+                            )}
+                        </Calendar.DayEvents>
+                    </Calendar.Day>
+                )}
+            </Calendar.Week>
+        ),
+        [highlighted],
+    );
+    return (
+        <Calendar.DayGrid aria-label="Month">
+            <Calendar.Weeks>{week}</Calendar.Weeks>
+        </Calendar.DayGrid>
+    );
+}
+```
+
+The functions nested inside a row (`Days`, `DayEvents` here) can stay inline: they are written
+again only when their row is.
+
+## Previews cost nothing to the model
+
+A drag, a resize and a selection preview through engine view state (`engine.get("drag-preview")`,
+`"resize-preview"`, `"selection-preview"`): no command runs while the pointer moves, and only the
+parts that show the preview (`DragPreview`, `Selection`) re-render. The model receives one
+command on the drop. Hit-testing reads boxes measured once per press.
+
+## Measured
+
+The playground's stress fixture holds 2 000 events with every feature installed, with stable row
+and column functions and a counter in each. Moving one event in the month view re-renders the two
+week rows it leaves and enters; in the week view, the two columns. No other row or column renders
+again, and the end-to-end tests check those counts.
+
+## Other costs that are yours
+
+- `dayMaxEvents` caps a day's lanes (`"auto"` measures them), so a busy month renders a few events
+  a day and a "+N more".
+- The time grid's slot range (`slotMinTime`, `slotMaxTime`) and `slotDuration` decide how many
+  slot rows there are.
+- Event content is your component: keep it light, and read the model through `useCalendar` in the
+  component rather than in the function that renders it.

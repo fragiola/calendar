@@ -1,0 +1,131 @@
+---
+title: List view
+description: Show a range of days as an agenda, each day that has events under a heading you write, its events as a list, and an empty state of your own.
+---
+
+The list view is an agenda: the days of the range that have events, each with its occurrences in
+order. The core lays it out (`model.get("list")`) and says when it is empty
+(`model.is("list-empty")`); the package renders the lists and their keyboard. The day headings,
+the times, the empty state and the look are yours.
+
+<Example id="list" />
+
+## A month as an agenda
+
+`Calendar.List` holds the view; its children are elements or a function of its state, whose
+`empty` says whether the range has any event. `Calendar.ListDays` calls your function per day,
+`Calendar.ListDay` is that day's list (`role="list"`), and `Calendar.ListEvent` an item.
+
+```tsx
+import {
+    Calendar,
+    createCalendarModel,
+    type ListItem,
+    useCalendar,
+} from "@fragiola/calendar-react";
+import { useState } from "react";
+
+/** A day in words, for its heading (the day is data: the words are yours). */
+function dayText(date: string, locale: string): string {
+    return new Intl.DateTimeFormat(locale, {
+        weekday: "long",
+        month: "long",
+        day: "numeric",
+        timeZone: "UTC",
+    }).format(Date.parse(`${date}T00:00:00Z`));
+}
+
+export function Agenda() {
+    const [model] = useState(() =>
+        createCalendarModel({
+            version: 1,
+            events: [],
+            calendars: [],
+            settings: { locale: "en-US" },
+            view: { type: "list", anchorDate: "2026-11-26" },
+        }),
+    );
+    const { locale } = model.state.settings;
+    return (
+        <Calendar.Root model={model}>
+            <Calendar.List className="agenda">
+                {({ empty }) =>
+                    empty ? (
+                        <p>Nothing planned this month.</p>
+                    ) : (
+                        <Calendar.ListDays>
+                            {(day) => (
+                                <section key={day.date}>
+                                    <h3 id={`day-${day.date}`}>
+                                        {dayText(day.date, locale)}
+                                    </h3>
+                                    <Calendar.ListDay
+                                        day={day}
+                                        aria-labelledby={`day-${day.date}`}
+                                    >
+                                        {(item) => <Item item={item} />}
+                                    </Calendar.ListDay>
+                                </section>
+                            )}
+                        </Calendar.ListDays>
+                    )
+                }
+            </Calendar.List>
+        </Calendar.Root>
+    );
+}
+
+function Item({ item }: { item: ListItem }) {
+    const { model } = useCalendar();
+    const occurrence = model.get("occurrence-by", { id: item.occurrenceId });
+    // an occurrence renamed alone has its own title (recurrence()), else its event's
+    const title =
+        occurrence?.title ?? model.get("event-by", { id: item.eventId })?.title;
+    const { locale, timeZone } = model.state.settings;
+    const time =
+        occurrence && !item.allDay
+            ? new Intl.DateTimeFormat(locale, {
+                  hour: "numeric",
+                  minute: "2-digit",
+                  timeZone: timeZone === "local" ? undefined : timeZone,
+              }).format(Date.parse(occurrence.start))
+            : "All day";
+    return (
+        <Calendar.ListEvent item={item} className="item">
+            <span>{time}</span>
+            <span>{title}</span>
+        </Calendar.ListEvent>
+    );
+}
+```
+
+A list view covers the anchor date's month, or `duration` days from it when the view has one
+(`view: { type: "list", anchorDate, duration: 14 }`); Previous and Next step by the same. Name each day's list by its heading (`aria-labelledby`): the library sets no name.
+
+A list day is `{ date, today, past, items }`, and each item `{ eventId, occurrenceId, allDay,
+continuesBefore, continuesAfter }`: an event over several days is an item of each of its days,
+and the flags say whether it started before or goes on after.
+
+## Any view's days as a list
+
+`model.get("list")` lists the visible days of every view, not only the list view's. The month
+example opens a day as an agenda from its "+N more": it switches to the `day` view and renders
+`Calendar.List` instead of a time grid.
+
+```tsx
+import { useCalendarView } from "@fragiola/calendar-react";
+
+function MonthOrDay() {
+    const { type } = useCalendarView();
+    return type === "day" ? <DayAgenda /> : <MonthGrid />;
+}
+```
+
+`DayAgenda` is the `Calendar.List` above; `MonthGrid` is the month of
+[Month view](/docs/guides/month-view).
+
+## The keyboard
+
+Each list event is a tab stop (`tabindex="0"`), in document order: Tab goes through the agenda,
+and Enter on an event is its `event-click` (`onEventClick`). See
+[Keyboard](/docs/guides/keyboard).

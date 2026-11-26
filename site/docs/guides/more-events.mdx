@@ -1,0 +1,168 @@
+---
+title: More events and "+N more"
+description: Limit how many events a day shows, render the "+N more" button, and open your own popover with the day's events from the press or the keyboard.
+---
+
+When a day of a month (or of the all-day row) holds more events than it should show, the core
+hides the rest and says how many: each day's `hiddenCount` and its `hiddenOccurrenceIds`. The
+package renders `Calendar.More`, a button that is there only while something is hidden, and
+reports its press as the engine's `more-click`. The popover, its list and its words are yours.
+
+<Example id="more-events" />
+
+## Limiting a day's events
+
+`dayMaxEvents` decides how many lanes a day shows:
+
+| value | what a day shows |
+| --- | --- |
+| `null` | every event (the default): rows grow |
+| a number | that many lanes; the others are hidden |
+| `"auto"` | as many lanes as fit the room the day gives its events, measured by the engine |
+
+```ts
+model.run("settings.set", { settings: { dayMaxEvents: 2 } });
+```
+
+With a number, a week row grows to hold its lanes: let it (`flex: 1 0 auto` in a column of rows)
+and let the grid scroll. With `"auto"`, the engine measures each day's room and the event height,
+so give `Calendar.DayEvents` the height the day leaves (a flex child that grows, `min-height: 0`):
+it then holds no lanes of its own, and a resize of the calendar measures again.
+
+## The "+N more" button
+
+`Calendar.More` goes in a `Calendar.Day`. It renders only while `hiddenCount` is more than zero,
+and its children are elements or a function of its state (`hiddenCount`, `hiddenOccurrenceIds`,
+`date`):
+
+```tsx
+<Calendar.Day day={day} className="day">
+    <Calendar.DayEvents className="events">
+        {(segment) => <EventSegment segment={segment} />}
+    </Calendar.DayEvents>
+    <Calendar.More className="more">
+        {({ hiddenCount }) => `+${hiddenCount} more`}
+    </Calendar.More>
+</Calendar.Day>
+```
+
+On the keyboard it is the last item of the day's events: Down from the day's last event focuses
+it, Enter on a day whose events are all hidden focuses it, Up goes back and Escape returns to the
+day. It stays outside the roving focus (`tabindex="-1"`), so Tab never stops on it.
+
+## Opening a popover from `onMoreClick`
+
+A press on the button, Enter on it, or an assistive technology's click is the engine's
+`more-click`, which the root reports as `onMoreClick` with the day and the hidden occurrences.
+The popover opens from that callback. With Fragiola UI's popover, `Calendar.More` is the
+trigger it is anchored to (`render`), and the trigger's own toggle is cancelled, since the
+engine's event already says when to open:
+
+```tsx
+import {
+    Calendar,
+    createCalendarModel,
+    useCalendar,
+} from "@fragiola/calendar-react";
+import { useState } from "react";
+import { Popover } from "#/components/ui/popover";
+
+export function BusyMonth() {
+    const [model] = useState(() =>
+        createCalendarModel({
+            version: 1,
+            events: [],
+            calendars: [],
+            settings: { dayMaxEvents: 2 },
+            view: { type: "month", anchorDate: "2026-11-26" },
+        }),
+    );
+    // the day whose popover is open
+    const [open, setOpen] = useState<string | null>(null);
+    return (
+        <Calendar.Root model={model} onMoreClick={(event) => setOpen(event.date)}>
+            <Calendar.DayGrid aria-label="Month">
+                <Calendar.Weeks>
+                    {(week) => (
+                        <Calendar.Week week={week} className="week">
+                            {(day) => (
+                                <Calendar.Day day={day} className="day">
+                                    <Calendar.DayEvents>
+                                        {(segment) => (
+                                            <Calendar.Segment segment={segment} />
+                                        )}
+                                    </Calendar.DayEvents>
+                                    <MorePopover
+                                        date={day.date}
+                                        open={open === day.date}
+                                        onClose={() => setOpen(null)}
+                                    />
+                                </Calendar.Day>
+                            )}
+                        </Calendar.Week>
+                    )}
+                </Calendar.Weeks>
+            </Calendar.DayGrid>
+        </Calendar.Root>
+    );
+}
+
+function MorePopover(props: { date: string; open: boolean; onClose: () => void }) {
+    const { model } = useCalendar();
+    const items =
+        model.get("list").days.find((day) => day.date === props.date)?.items ?? [];
+    return (
+        <Popover.Root
+            open={props.open}
+            onOpenChange={(next, details) => {
+                // the engine's more-click opens it: the trigger's own toggle would undo it
+                if (details.reason === "trigger-press") details.cancel();
+                else if (!next) props.onClose();
+            }}
+        >
+            <Popover.Trigger
+                render={
+                    <Calendar.More className="more">
+                        {({ hiddenCount }) => `+${hiddenCount} more`}
+                    </Calendar.More>
+                }
+            />
+            <Popover.Content align="start">
+                <ul>
+                    {items.map((item) => (
+                        <li key={item.occurrenceId}>
+                            {model.get("event-by", { id: item.eventId })?.title}
+                        </li>
+                    ))}
+                </ul>
+            </Popover.Content>
+        </Popover.Root>
+    );
+}
+```
+
+The popover lists every event of the day, not only the hidden ones: `model.get("list")` gives
+any view's visible days with their occurrences. Escape and a press outside close it.
+
+The children function of `Calendar.Weeks` closes over `open`: when it changes, the rows render
+again with the new value, so the right day's popover opens. See
+[Composition](/docs/concepts/composition) for when a children function is called again.
+
+## Opening the day instead
+
+A popover is one choice. The month example switches to the `day` view on the day and shows it as
+an agenda:
+
+```tsx
+<Calendar.Root
+    model={model}
+    onMoreClick={({ date }) => {
+        model.run("view.set", { type: "day" });
+        model.run("view.go-to", { date });
+    }}
+>
+    {/* the month, or the day as a Calendar.List */}
+</Calendar.Root>
+```
+
+See [List view](/docs/guides/list-view) for the agenda's parts.

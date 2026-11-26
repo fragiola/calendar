@@ -15,9 +15,16 @@ import type {
     eventSourcesSetLoading,
 } from "../../src/event-sources/commands/source-commands";
 import { eventSources } from "../../src/event-sources/index";
-import { createCalendarModel } from "../../src/index";
+import {
+    type CalendarEngineEventType,
+    type CalendarFeatures,
+    type CalendarModel,
+    createCalendarModel,
+    type EngineEventTypeOf,
+} from "../../src/index";
 import type { eventSetRecurrence } from "../../src/recurrence/commands/event-set-recurrence";
 import { recurrence } from "../../src/recurrence/index";
+import type { resize } from "../../src/resize/index";
 import type { FromSchema } from "../../src/schema/from-schema";
 import type {
     selectionClear,
@@ -97,3 +104,18 @@ export type FeatureSchemasMatchTypes = [
     : never;
 
 export const featureSchemasMatchTypes: FeatureSchemasMatchTypes = true;
+
+// the engine events a feature's gestures emit are typed only with it (an adapter's callbacks)
+type Bare = typeof bare extends CalendarModelOf<infer F> ? F : never;
+type CalendarModelOf<F extends CalendarFeatures> = CalendarModel<AnyTypes, F>;
+const bareClick: EngineEventTypeOf<Bare, CalendarEngineEventType> =
+    "event-click";
+void bareClick;
+// @ts-expect-error: selection()'s event
+const bareSelect: EngineEventTypeOf<Bare, CalendarEngineEventType> = "select";
+void bareSelect;
+const resizes: EngineEventTypeOf<
+    readonly [ReturnType<typeof resize>],
+    CalendarEngineEventType
+> = "drop";
+void resizes;

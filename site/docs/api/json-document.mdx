@@ -1,0 +1,211 @@
+---
+title: The JSON document
+description: The calendar document, version 1, with its events, calendars, settings and view, every field, the JSON Schema and the validation that names each problem.
+---
+
+A calendar is one JSON document: what `createCalendarModel` loads, what
+`model.get("calendar-json")` writes, what a server stores and an assistant writes. It is plain
+JSON, so you persist it, send it and diff it as you like; where it lives and when it is saved is
+yours ([Saving and restoring](/docs/guides/persistence)).
+
+```json title="calendar.json"
+{
+    "version": 1,
+    "events": [
+        {
+            "id": "offsite",
+            "title": "Team offsite",
+            "start": "2026-11-30",
+            "end": "2026-12-02",
+            "allDay": true,
+            "calendarId": "team"
+        },
+        {
+            "id": "review",
+            "kind": "meeting",
+            "title": "Design review",
+            "start": "2026-11-26T14:00:00-05:00",
+            "end": "2026-11-26T15:00:00-05:00",
+            "allDay": false,
+            "timeZone": "America/New_York",
+            "calendarId": "team",
+            "data": { "room": "Blue" }
+        }
+    ],
+    "calendars": [{ "id": "team", "title": "Team", "data": { "color": "teal" } }],
+    "settings": { "timeZone": "America/New_York", "locale": "en-US" }
+}
+```
+
+The offsite is two days: ends are exclusive, so `"2026-12-02"` is the first day it does not
+cover. A timed value is an RFC 3339 date-time with its offset, an instant whatever the reader's
+zone ([Dates and time zones](/docs/concepts/dates-and-time-zones)).
+
+## The document
+
+`CalendarDocument<T>`, typed by your registry ([Typed data](/docs/concepts/typed-data)):
+
+| field | type | description |
+| --- | --- | --- |
+| `version` | `1` | the document's version |
+| `events` | `CalendarEventJson<T>[]` | the events |
+| `calendars` | `CalendarInfoJson<T>[]` | the calendars (categories of events) |
+| `settings` | `CalendarSettingsJson` | the settings; the defaults fill the rest ([Settings](/docs/api/settings)) |
+| `view` | `ViewJson` | the view: model state, written only by `get("calendar-json", { includeView: true })` |
+
+## The registry
+
+Your data is typed by one registry, a `CalendarTypes`: `events` maps each event kind to its
+`data` type, `calendar` is a calendar's `data` type. Without one, `AnyTypes` allows any kind and
+`unknown` data. The helpers read it: `KindOf<T>` (the kinds), `EventDataOf<T, K>` (a kind's
+data), `CalendarDataOf<T>` (a calendar's data) and `DataField<D>` (`data`, required unless its
+type allows `undefined`).
+
+```ts
+import type { CalendarDocument } from "@fragiola/calendar-react";
+
+type Types = {
+    events: { meeting: { room: string }; reminder: undefined };
+    calendar: { color: string };
+};
+
+const json: CalendarDocument<Types> = {
+    version: 1,
+    events: [
+        {
+            kind: "meeting",
+            title: "Design review",
+            start: "2026-11-26T14:00:00-05:00",
+            end: "2026-11-26T15:00:00-05:00",
+            allDay: false,
+            data: { room: "Blue" }, // checked for "meeting"
+        },
+    ],
+};
+```
+
+## Events
+
+An event is written with `CalendarEventInit` fields (`CalendarEventJson<T>` is their union over
+your registry's kinds, so `data` is checked per kind). `event.add` takes the same fields, its
+`end` optional.
+
+| field | type | description |
+| --- | --- | --- |
+| `id` | `string` | its id; generated with `createId` when missing |
+| `kind` | `string` | what the event is: the registry key that types `data` |
+| `title` | `string` | its title: model data no primitive renders |
+| `start` | `string` | `YYYY-MM-DD` when `allDay`, an RFC 3339 date-time with its offset otherwise |
+| `end` | `string` | the same form, exclusive; not before `start` (a timed event may last no time) |
+| `allDay` | `boolean` | an all-day event, or a timed one |
+| `timeZone` | `string` | its home zone, an IANA name: wall-clock moves and recurrence; else the display zone |
+| `calendarId` | `string` | its calendar |
+| `recurrence` | `RecurrenceJson` | how it repeats (`recurrence()`) |
+| `sourceId` | `string` | the event source it came from (`eventSources()`) |
+| `data` | your registry's | the app's data, any JSON (`DataField`) |
+
+and the permission flags, `EventFlags`, each one left out taking its calendar's, then the
+settings':
+
+| field | type | description |
+| --- | --- | --- |
+| `editable` | `boolean` | whether it can change at all (`event.update`), and the default of the others |
+| `startEditable` | `boolean` | whether its start can move (`event.move`, a resize of the start) |
+| `durationEditable` | `boolean` | whether its duration can change (a resize of the end) |
+| `deletable` | `boolean` | whether it can be removed |
+
+A field of a feature that is not installed (`recurrence`, `sourceId`) is a validation issue that
+names the feature: never dropped silently.
+
+### Recurrence
+
+`RecurrenceJson`, with `recurrence()` ([Recurring events](/docs/guides/recurring-events)):
+
+| field | type | description |
+| --- | --- | --- |
+| `rule` | `string` | an RFC 5545 RRULE subset: `FREQ=WEEKLY;BYDAY=MO,WE;UNTIL=20270101T000000Z` |
+| `exdates` | `string[]` | the original starts of the occurrences left out |
+| `overrides` | `Record<string, object>` | occurrences changed one by one, keyed by their original start |
+
+## Calendars
+
+`CalendarInfoJson<T>`: a category of events (a person, a room, a project).
+
+| field | type | description |
+| --- | --- | --- |
+| `id` | `string` | its id; generated when missing |
+| `title` | `string` | its title (never rendered by a primitive) |
+| `editable` | `boolean` | the default of its events' `editable` |
+| `visible` | `boolean` | whether its events show (default `true`) |
+| `data` | your registry's `calendar` | the app's data (a colour, an avatar) |
+
+## Event sources
+
+`EventSource`, in `settings.eventSources` with `eventSources()`
+([Loading events from a server](/docs/guides/loading-events)):
+
+| field | type | description |
+| --- | --- | --- |
+| `id` | `string` | the source's id, named by its events' `sourceId` |
+| `calendarId` | `string` | the calendar its events go to when they name none |
+
+## The view
+
+`ViewJson`, and `ValidRangeJson` for the setting that bounds navigation:
+
+| field | type | description |
+| --- | --- | --- |
+| `type` | `ViewType` | `"month"`, `"week"`, `"day"`, `"days"` or `"list"` |
+| `anchorDate` | `string` | the date the view is built around, `YYYY-MM-DD` |
+| `days` | `number` | a `days` view's number of days, 1 to 14 |
+| `duration` | `number` | a `list` view's number of days; without it, the anchor's month |
+| `start` | `string` | `validRange`: the first date the calendar may show (open when absent) |
+
+`ValidRangeJson`'s `end` is the first date it may not show (exclusive, open when absent).
+
+## Validating
+
+`validateCalendar(json, options?)` returns the problems of a document, each a `ValidationIssue`
+(`{ path, message }`, the path a JSON pointer); an empty list is a valid document. Its
+`ValidateCalendarOptions` take the `features` the document is for: a field of a feature not
+listed is an issue. `createCalendarModel` throws the same problems as a
+`CalendarValidationError` (its `issues`).
+
+```ts
+import {
+    CalendarValidationError,
+    createCalendarModel,
+    validateCalendar,
+} from "@fragiola/calendar-react";
+
+const issues = validateCalendar(untrusted);
+if (issues.length > 0) {
+    for (const issue of issues) console.warn(issue.path, issue.message);
+}
+
+try {
+    createCalendarModel(untrusted as never);
+} catch (error) {
+    if (error instanceof CalendarValidationError) error.issues.length;
+}
+
+declare const untrusted: unknown;
+```
+
+`calendarSchema` is the document's JSON Schema (a `JsonSchema`), for a server or a form that
+validates the same document. The parsers of the [date helpers](/docs/api/date-helpers) return a
+`ValidationResult<T>`: `{ ok: true, value }` or `{ ok: false, issues }`.
+
+## Reading it back
+
+`model.get("calendar-json")` writes the document as the model holds it: every event and
+calendar, ids filled in, and every setting, so a round trip is stable. `{ includeView: true }`
+adds the view. The entities of the state (`model.state.events`) are frozen `CalendarEvent`
+objects; the document is a writable copy.
+
+```ts
+const json = model.get("calendar-json", { includeView: true });
+localStorage.setItem("calendar", JSON.stringify(json));
+
+declare const model: import("@fragiola/calendar-react").CalendarModel;
+```

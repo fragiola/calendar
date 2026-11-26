@@ -20,9 +20,12 @@
 #                     examples/angular: examples angular; anything else (the core,
 #                     examples/shared, the playground, the lockfile, root configs, .github,
 #                     scripts, site) and a manual run: every suite. A renamed file counts under
-#                     both its paths. No suite exists yet: the E2E jobs, which run in Playwright's
-#                     image (no browser install), and the Site export job arrive with the
-#                     React Epic.
+#                     both its paths.
+#   E2E               the playground's suite and each examples app's (a matrix), in Playwright's
+#                     image (no browser install), when Changes selects them.
+#   Site export       fragiola.com will build /calendar from `pnpm site:export` (contract v1.7,
+#                     fragiola/www CONTRACT.md), built and validated the way www's deploy runs it:
+#                     it fails on anything www would reject.
 #
 # Tests run only on pull requests (and on a manual run). A push to main runs nothing: main is what
 # its PR tested, and the www trigger comes once the project is registered on fragiola.com.
@@ -110,9 +113,9 @@ jobs:
           BASE_REF: ${{ github.base_ref }}
         run: pnpm changeset status --since="origin/$BASE_REF"
 
-  # The E2E suites the pull request can affect (scripts/e2e-suites.ts): the E2E jobs (from the
-  # React Epic) run only what it selects. It also lists the frameworks with an examples app (every
-  # examples/<framework> with a playwright.config.ts): none yet.
+  # The E2E suites the pull request can affect (scripts/e2e-suites.ts): the E2E jobs run only what
+  # it selects. It also lists the frameworks with an examples app (every examples/<framework> with
+  # a playwright.config.ts).
   changes:
     name: Changes
     runs-on: ubuntu-latest
@@ -136,3 +139,95 @@ jobs:
           else
             node scripts/e2e-suites.ts --all
           fi
+
+  # The E2E jobs run in Playwright's image, whose browsers and system libraries match
+  # @playwright/test's version (site/tests/ci-workflow.test.ts ties the tag to it): the
+  # browsers are never installed. The user 1001 is the image's, so the checkout and pnpm's store are
+  # writable.
+  e2e-playground:
+    name: E2E (playground)
+    needs: changes
+    if: needs.changes.outputs.playground == 'true'
+    runs-on: ubuntu-latest
+    container:
+      image: mcr.microsoft.com/playwright:v1.65.1-noble
+      options: --user 1001
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Run Playwright
+        run: pnpm --filter playground run e2e
+
+      - name: Upload Playwright report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-playground
+          path: apps/playground/playwright-report/
+          retention-days: 14
+
+  e2e-examples:
+    name: E2E (examples ${{ matrix.framework }})
+    needs: changes
+    if: needs.changes.outputs.examples != '[]' && needs.changes.outputs.examples != ''
+    runs-on: ubuntu-latest
+    container:
+      image: mcr.microsoft.com/playwright:v1.65.1-noble
+      options: --user 1001
+    strategy:
+      fail-fast: false
+      matrix:
+        framework: ${{ fromJson(needs.changes.outputs.examples) }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      # The examples suite builds the embed against the packages' dist.
+      - name: Build the packages
+        run: pnpm --filter "./packages/*" build
+
+      - name: Run Playwright
+        run: pnpm --filter examples-${{ matrix.framework }} run e2e
+
+      - name: Upload Playwright report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-examples-${{ matrix.framework }}
+          path: examples/${{ matrix.framework }}/playwright-report/
+          retention-days: 14
+
+  site-export:
+    name: Site export
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      # builds the packages and the embed, writes the export, validates it against the contract
+      - run: pnpm site:export --base /calendar --out "$RUNNER_TEMP/site-export"

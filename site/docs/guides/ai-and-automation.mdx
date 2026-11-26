@@ -1,0 +1,112 @@
+---
+title: AI and automation
+description: Hand the calendar's commands to an AI agent as tool definitions, run its untrusted calls with dispatch, and decide on them in a middleware.
+---
+
+Every change of a calendar is a named command with JSON Schemas for its payload and its result,
+and every question is a key of `get` or `is`. That makes the calendar drivable without a screen:
+by a server, a script or an assistant, through the same rules a click goes through. The language
+model, its prompt and what it may touch are yours.
+
+<Example id="ai-commands" />
+
+## The commands as tools
+
+`model.get("commands")` lists every command the model installs (the features' too): its `name`,
+its `description`, its `payloadSchema` and `resultSchema`, plain JSON Schema. Map them onto your
+provider's tool definitions:
+
+```ts
+import type { CalendarModel } from "@fragiola/calendar-react";
+
+export function toolsOf(model: CalendarModel) {
+    return model
+        .get("commands")
+        .filter((command) => !command.name.startsWith("view."))
+        .map((command) => ({
+            // most providers want names without dots
+            name: command.name.replaceAll(".", "_"),
+            description: command.description,
+            input_schema: command.payloadSchema,
+        }));
+}
+```
+
+The [Commands](/docs/api/commands) page is generated from the same catalogue.
+
+## Running an agent's calls
+
+A tool call is untrusted JSON. `model.dispatch` takes it as `{ command, payload }`, validates it
+against the command's schema and runs it like `run` would, through the middleware. It never
+throws: it returns a `CommandResult` the agent can read and retry on.
+
+```ts
+import type { CalendarModel } from "@fragiola/calendar-react";
+
+export function runToolCall(
+    model: CalendarModel,
+    call: { name: string; input: unknown },
+): string {
+    const result = model.dispatch(
+        { command: call.name.replaceAll("_", "."), payload: call.input },
+        // who asked: never read from the untrusted input
+        { meta: { source: "assistant" } },
+    );
+    return result.ok
+        ? JSON.stringify(result.value)
+        : `${result.error.code}: ${result.error.message}`;
+}
+```
+
+Nonsense is refused, never repaired: an event resized to end before it starts is
+`invalid_payload` with a JSON path, an edit the rules forbid is `refused` with the reason (which
+flag of the event, its calendar or the settings), an unknown command is `unknown_command`. The
+example's scripted assistant makes one such mistake on purpose and shows the error it gets back.
+
+## Deciding in a middleware
+
+`meta` reaches every middleware, so the app can treat an assistant's calls differently from the
+reader's: ask first, limit what it may touch, log it.
+
+```ts
+import { veto } from "@fragiola/calendar-react";
+
+model.use((ctx, next) => {
+    if (ctx.meta?.source !== "assistant") return next();
+    // the assistant may add and move events, not remove them
+    if (ctx.command === "event.remove" || ctx.command === "calendar.remove") {
+        return veto("the assistant may not remove anything");
+    }
+    return next();
+});
+```
+
+A vetoed call returns `vetoed` with your message, which the agent reads like any other result. A
+middleware may also rewrite the payload (assign `ctx.payload`, then call `next`); it is validated
+again before it runs.
+
+## Asking before running
+
+`model.check` returns what `run` would return, without committing, and `model.can` answers yes or
+no. An agent loop can check its whole plan first, or an app can show the reader a preview of what
+the assistant wants to do:
+
+```ts
+const move = { eventId: "retro", delta: { minutes: -60 } };
+const answer = model.check("event.move", move);
+if (answer.ok) {
+    // where it would land: answer.value.start, answer.value.end
+    model.run("event.move", move, { meta: { source: "assistant" } });
+}
+```
+
+Several calls that must succeed together go as one `batch`: either every step commits, or none.
+
+## Reading the calendar
+
+The same model answers the agent's questions as data: `model.get("events")`,
+`model.get("occurrences-in", { range })`, `model.get("visible-range")`,
+`model.is("event-editable", { eventId })`, and the whole document with
+`model.get("calendar-json")`. The [Model](/docs/api/model) page lists every key.
+
+For a full app driven by the same commands, open the [team planner](/examples/team-planner).
