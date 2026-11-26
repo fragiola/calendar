@@ -294,3 +294,32 @@ describe("the keyboard (D13)", () => {
         );
     });
 });
+
+describe("the selection's highlight", () => {
+    it("lays out the selected range as an event: time-grid fractions, day-grid segments", () => {
+        const m = mount({ view: week, features: [selection()] });
+        expect(m.engine.get("selection-segments")).toBeNull();
+        m.model.run("selection.set", {
+            start: "2026-11-26T09:00:00Z",
+            end: "2026-11-26T10:30:00Z",
+            allDay: false,
+        });
+        const shown = m.engine.get("selection-segments");
+        expect(shown?.columns).toHaveLength(1);
+        expect(shown?.columns[0]).toMatchObject({
+            date: "2026-11-26",
+            segments: [{ top: 0.375, height: 0.0625 }],
+        });
+        // the same object while the range stays
+        expect(m.engine.get("selection-segments")).toBe(shown);
+        m.model.run("selection.set", {
+            start: "2026-11-24",
+            end: "2026-11-26",
+            allDay: true,
+        });
+        expect(m.engine.get("selection-segments")?.weeks[0]).toMatchObject({
+            weekId: "2026-11-22",
+            segments: [{ startColumn: 2, span: 2 }],
+        });
+    });
+});

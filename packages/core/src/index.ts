@@ -103,10 +103,12 @@ export type {
     EngineHost,
     ResizeObserverConstructor,
 } from "./engine/engine-host";
-export type {
-    Announcement,
-    CalendarEngineEvent,
-    CalendarEngineEventType,
+export {
+    type Announcement,
+    type CalendarEngineEvent,
+    type CalendarEngineEventOf,
+    type CalendarEngineEventType,
+    ENGINE_EVENT_CALLBACKS,
 } from "./engine/events";
 export type {
     CellPosition,
@@ -142,7 +144,11 @@ export type {
     MutablePartAttributes,
     PressTarget,
 } from "./features/engine-types";
-export { FEATURE_KEYS, type FeatureName } from "./features/keys";
+export {
+    emittersOf,
+    FEATURE_KEYS,
+    type FeatureName,
+} from "./features/keys";
 export type {
     AnyCalendarFeature,
     AnyFeatures,
@@ -152,6 +158,7 @@ export type {
     CalendarStateOf,
     EditRequest,
     EditWrite,
+    EngineEventTypeOf,
     EngineGetKeyOf,
     EngineIsKeyOf,
     EngineRunKeyOf,

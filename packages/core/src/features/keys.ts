@@ -1,7 +1,7 @@
 // What each opt-in feature owns, by name only (Tree's table, fragiola/tree,
 // packages/core/src/features/keys.ts): its commands, its `get` / `is` keys on the model and the
 // engine, its document fields (top-level and an event's), the payload fields it adds to the core's
-// commands, its settings and its root props. The core reads it to refuse what belongs to a feature
+// commands, its settings, its root props and the engine events only its gestures emit. The core reads it to refuse what belongs to a feature
 // that is not installed (a `not_found` result, a document issue naming the feature) and to type the
 // verbs from the installed features; the code of a feature lives only in its own entry
 // (`@fragiola/calendar/<feature>`), which nothing in the main entry imports. Each feature's Issue
@@ -17,13 +17,15 @@ export const FEATURE_KEYS = Object.freeze({
         is: [],
         engineRun: [],
         // the range a pointer or Shift + arrows is selecting, before it is set
-        engineGet: ["selection-preview"],
+        engineGet: ["selection-preview", "selection-segments"],
         engineIs: [],
         fields: [],
         eventFields: [],
         payloadFields: [],
         settings: [],
         rootProps: [],
+        // the engine events only its gestures emit (an adapter types their callbacks by them)
+        engineEvents: ["select"],
     },
     "drag-and-drop": {
         commands: [],
@@ -38,6 +40,8 @@ export const FEATURE_KEYS = Object.freeze({
         payloadFields: [],
         settings: [],
         rootProps: [],
+        // a drop (a move); `resize()` emits it too, for a resize
+        engineEvents: ["drop"],
     },
     resize: {
         commands: [],
@@ -51,6 +55,7 @@ export const FEATURE_KEYS = Object.freeze({
         payloadFields: [],
         settings: [],
         rootProps: [],
+        engineEvents: ["drop"],
     },
     recurrence: {
         // a rule set, changed or removed
@@ -67,6 +72,7 @@ export const FEATURE_KEYS = Object.freeze({
         payloadFields: ["occurrenceId", "scope"],
         settings: [],
         rootProps: [],
+        engineEvents: [],
     },
     "now-indicator": {
         commands: [],
@@ -81,6 +87,7 @@ export const FEATURE_KEYS = Object.freeze({
         payloadFields: [],
         settings: [],
         rootProps: [],
+        engineEvents: [],
     },
     constraints: {
         commands: [],
@@ -99,6 +106,7 @@ export const FEATURE_KEYS = Object.freeze({
             "overlap",
         ],
         rootProps: [],
+        engineEvents: [],
     },
     "external-drop": {
         commands: [],
@@ -117,6 +125,7 @@ export const FEATURE_KEYS = Object.freeze({
         payloadFields: [],
         settings: [],
         rootProps: [],
+        engineEvents: ["external-drop"],
     },
     "event-sources": {
         commands: [
@@ -135,6 +144,7 @@ export const FEATURE_KEYS = Object.freeze({
         payloadFields: [],
         settings: ["eventSources"],
         rootProps: [],
+        engineEvents: [],
     },
 } as const);
 
@@ -170,6 +180,18 @@ export function ownerOf(
     key: string,
 ): FeatureName | undefined {
     return owners.get(`${kind}:${key}`);
+}
+
+/** The features that emit an engine event (`drop`: drag and drop's moves, resize's resizes). */
+export function emittersOf(type: string): FeatureName[] {
+    return (
+        Object.entries(FEATURE_KEYS) as [
+            FeatureName,
+            (typeof FEATURE_KEYS)[FeatureName],
+        ][]
+    ).flatMap(([name, keys]) =>
+        (keys.engineEvents as readonly string[]).includes(type) ? [name] : [],
+    );
 }
 
 /** The message of a key or field whose feature is not installed. */

@@ -8,7 +8,7 @@ import type { AnyTypes, CalendarTypes } from "../document/calendar-types";
 import type { SelectionRange } from "../features/types";
 import type { DayGrid } from "../layout/day-grid";
 import type { FocusPosition, GridPoint } from "./grid-point";
-import type { DragPreview } from "./preview";
+import type { DragPreview, PreviewSegments } from "./preview";
 
 /** Where `focus` takes focus: a day, a slot (`time`), or an occurrence (in the cell of `date`). */
 export type FocusTarget =
@@ -86,6 +86,14 @@ export interface EngineGetMap {
     "resize-preview": { payload: NoPayload; result: DragPreview | null };
     /** the range a pointer or Shift + arrows is selecting (`null`: none, or refused) */
     "selection-preview": { payload: NoPayload; result: SelectionRange | null };
+    /**
+     * the range a highlight shows (the one being selected, else the selected one) laid out as the
+     * layouts lay out an event: day-grid rows and time-grid columns (`null`: none)
+     */
+    "selection-segments": {
+        payload: NoPayload;
+        result: PreviewSegments | null;
+    };
     /** the current time's place in the time grid (`null`: not in view) */
     "now-position": { payload: NoPayload; result: NowPosition | null };
 }

@@ -295,7 +295,8 @@ type Allowed<
         | "is"
         | "engineRun"
         | "engineGet"
-        | "engineIs",
+        | "engineIs"
+        | "engineEvents",
     All extends string,
     F extends CalendarFeatures,
 > =
@@ -331,6 +332,12 @@ export type EngineGetKeyOf<
     F extends CalendarFeatures,
     All extends string,
 > = Allowed<"engineGet", All, F>;
+
+/** The engine events an engine whose model has the features `F` emits: the core's and theirs. */
+export type EngineEventTypeOf<
+    F extends CalendarFeatures,
+    All extends string,
+> = Allowed<"engineEvents", All, F>;
 
 /** The `engine.is` keys of an engine whose model has the features `F`. */
 export type EngineIsKeyOf<

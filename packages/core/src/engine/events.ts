@@ -102,3 +102,25 @@ export type CalendarEngineEvent =
 
 /** An engine event's type. */
 export type CalendarEngineEventType = CalendarEngineEvent["type"];
+
+/**
+ * The name of each engine event's callback in an adapter (`on` + it in React: `onEventClick`), so
+ * every adapter names them alike. A feature's event (`select`, `drop`, `external-drop`) is typed
+ * only with its feature (`FEATURE_KEYS[name].engineEvents`).
+ */
+export const ENGINE_EVENT_CALLBACKS = Object.freeze({
+    "event-click": "EventClick",
+    "date-click": "DateClick",
+    "more-click": "MoreClick",
+    select: "Select",
+    drop: "EventDrop",
+    "external-drop": "ExternalDrop",
+    "today-change": "TodayChange",
+    announce: "Announce",
+} as const satisfies Record<CalendarEngineEventType, string>);
+
+/** An engine event of a type. */
+export type CalendarEngineEventOf<K extends CalendarEngineEventType> = Extract<
+    CalendarEngineEvent,
+    { readonly type: K }
+>;
