@@ -92,6 +92,50 @@ describe("a server render", () => {
         });
     }
 
+    it("hydrates the model's state, and applies a controlled prop that differs once mounted", async () => {
+        // the server and the client each load the same document; the controlled date is another
+        // month: the server shows the model's, so the client hydrates it first (React's layout
+        // effect), then goes to the controlled date
+        const controlled = () =>
+            createSSRApp({
+                render: () =>
+                    h(
+                        Calendar.Root,
+                        {
+                            model: modelOf(EVENTS, {
+                                view: {
+                                    type: "month",
+                                    anchorDate: "2026-11-26",
+                                },
+                            }),
+                            date: "2027-01-15",
+                        },
+                        () => h(MonthGrid),
+                    ),
+            });
+        const html = await renderToString(controlled());
+        expect(html).toContain('data-date="2026-11-26"');
+        const container = document.createElement("div");
+        container.innerHTML = html;
+        document.body.append(container);
+        const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+        const error = vi.spyOn(console, "error").mockImplementation(() => {});
+        const client = controlled();
+        client.mount(container);
+        await flush();
+        expect(warn).not.toHaveBeenCalled();
+        expect(error).not.toHaveBeenCalled();
+        warn.mockRestore();
+        error.mockRestore();
+        expect(
+            container.querySelector(
+                '[data-calendar-part="day"][data-date="2027-01-15"]',
+            ),
+        ).not.toBeNull();
+        client.unmount();
+        container.remove();
+    });
+
     it("has the grid's roles, its ARIA and its one tab stop before any engine", async () => {
         const html = await renderToString(app("week"));
         expect(html).toContain('role="grid"');

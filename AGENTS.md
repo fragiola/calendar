@@ -910,7 +910,8 @@ from React is an adapter bug or a missing core key.
   `update:view`, the type), `v-model:date` (`date` + `update:date`, the anchor date), with
   `@events-change`, `@view-change` (`{ type, days? }`) and `@date-change` beside them; sent, not
   enforced, with `meta: { source: "controlled" }`, as React's. A server render shows the model's
-  state (the controlled props are applied before mount, on the client).
+  state, and the client hydrates it: the controlled props are applied in `onMounted`, before paint
+  (applied before the mount they would be a hydration mismatch, `tests/ssr.test.ts`).
 - **Engine and feature events are fallthrough attributes** the root reads (`onEventClick`, …: every
   `ENGINE_EVENT_CALLBACKS` name), never put on its element (`@select` is not the DOM's `select`):
   `@event-click`, `@date-click`, `@more-click`, `@today-change`, `@announce`, and with their

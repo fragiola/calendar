@@ -563,8 +563,10 @@ const RootCalendar = definePrimitive<
                 );
             }
         };
-        // on the client only, as React's layout effects: a server render shows the model's state
-        onClient(sync);
+        // once mounted, as React's layout effects: a server render shows the model's state, so the
+        // client hydrates it first (a prop applied before the mount would be a hydration mismatch,
+        // which Vue never rectifies in production), then renders the controlled values before paint
+        onMounted(sync);
         watch(
             () => {
                 const next = sentOf(model, props);

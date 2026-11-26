@@ -257,7 +257,7 @@ model.use((ctx, next) => {
 A model has its own features, clock and id generator: the root's `features`, `now` and
 `createId` are for the model it creates. A new model identity creates a new engine (in Vue, it
 remounts the root). Controlled props given with a `model` bring it to them on the client before
-the first paint (React's first layout effect, before mount in Vue), so a server render shows the
+the first paint (React's first layout effect, `onMounted` in Vue), so a server render shows the
 model's state as it is: give a model that already matches.
 
 ## Reaching the calendar from outside the root
