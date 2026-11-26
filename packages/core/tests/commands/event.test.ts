@@ -11,6 +11,29 @@ const times = (model: ReturnType<typeof modelOf>, id: string) => {
 };
 
 describe("event.add", () => {
+    it("refuses an unknown home zone without an end instead of throwing", () => {
+        const model = modelOf();
+        for (const timeZone of ["Nope/Zone", "local"]) {
+            const payload = {
+                title: "Review",
+                start: "2026-11-26T14:00:00Z",
+                allDay: false,
+                timeZone,
+            };
+            expect(() => model.run("event.add", payload)).not.toThrow();
+            expect(model.run("event.add", payload)).toMatchObject({
+                ok: false,
+                error: { code: "invalid_payload", path: "/timeZone" },
+            });
+            expect(
+                model.run("batch", {
+                    commands: [{ command: "event.add", payload }],
+                }),
+            ).toMatchObject({ ok: false, error: { code: "invalid_payload" } });
+        }
+        expect(model.get("events")).toHaveLength(0);
+    });
+
     it("adds an event with a generated id", () => {
         const model = modelOf();
         const result = model.run("event.add", {

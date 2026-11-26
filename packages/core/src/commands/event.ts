@@ -19,7 +19,11 @@ import type { Instant } from "../time/instant";
 import { parseDateTime } from "../time/parse-date-time";
 import { parsePlainDate } from "../time/parse-plain-date";
 import { formatInstant } from "../time-zone/format-instant";
-import { resolveTimeZone } from "../time-zone/resolve-time-zone";
+import {
+    LOCAL_TIME_ZONE,
+    resolveTimeZone,
+} from "../time-zone/resolve-time-zone";
+import { validateTimeZone } from "../time-zone/validate-time-zone";
 import { applyEdit, moveContextOf } from "./apply-edit";
 import { defineCommand, fail, invalid, ok } from "./define";
 import { isWritable, movedBy, movedTo, resizedTo } from "./event-moves";
@@ -65,12 +69,15 @@ function defaultEnd(
     const start = parseDateTime(event.start);
     if (!start.ok) return event.start;
     const end = start.value.instant + settings.defaultTimedDuration * 60_000;
-    return isWritable(end)
-        ? formatInstant(
-              end as Instant,
-              event.timeZone ?? resolveTimeZone(settings.timeZone),
-          )
-        : undefined;
+    // a home zone the rules will refuse prints the end in the display zone (the same instant), so
+    // the refusal names `/timeZone` instead of `Intl` throwing out of the command
+    const zone =
+        event.timeZone !== undefined &&
+        event.timeZone !== LOCAL_TIME_ZONE &&
+        validateTimeZone(event.timeZone).ok
+            ? event.timeZone
+            : resolveTimeZone(settings.timeZone);
+    return isWritable(end) ? formatInstant(end as Instant, zone) : undefined;
 }
 
 /** A permission flag of `event.set-flags`: a value, or `null` to remove the event's own. */
