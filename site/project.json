@@ -1,0 +1,19 @@
+{
+    "contract": 1,
+    "slug": "calendar",
+    "title": "Calendar",
+    "description": "A headless, accessible event calendar for React: month, week, day and list views, drag and resize, recurring events and time zones, driven by a JSON model.",
+    "frameworks": ["react"],
+    "defaultFramework": "react",
+    "repository": "https://github.com/fragiola/calendar",
+    "keywords": [
+        "event calendar",
+        "headless ui",
+        "react",
+        "scheduler",
+        "recurring events",
+        "time zones",
+        "drag and drop",
+        "accessibility"
+    ]
+}
