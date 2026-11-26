@@ -1,0 +1,41 @@
+{
+    // TypeScript 6.0.3, pinned in this app only: the Angular compiler (ngc, the Analog Vite plugin)
+    // supports `typescript >=6.0 <6.1`. In dev the adapter's sources compile with the app (the
+    // source condition), so its entries' folders are part of the program.
+    "extends": "../../tsconfig.base.json",
+    "compilerOptions": {
+        "customConditions": ["@fragiola/source"],
+        "types": ["node", "vite/client"],
+        "allowImportingTsExtensions": true,
+        "useDefineForClassFields": false,
+        "paths": {
+            "#/*": ["./src/*"]
+        }
+    },
+    "angularCompilerOptions": {
+        "strictTemplates": true,
+        "strictInjectionParameters": true,
+        "strictInputAccessModifiers": true,
+        "strictStandalone": true,
+        "typeCheckHostBindings": true,
+        "extendedDiagnostics": {
+            "defaultCategory": "error"
+        }
+    },
+    "include": [
+        "src/**/*.ts",
+        "../../packages/angular/src/**/*.ts",
+        "../../packages/angular/internal/**/*.ts",
+        "../../packages/angular/selection/**/*.ts",
+        "../../packages/angular/drag-and-drop/**/*.ts",
+        "../../packages/angular/resize/**/*.ts",
+        "../../packages/angular/external-drop/**/*.ts",
+        "../../packages/angular/now-indicator/**/*.ts",
+        "../../packages/angular/constraints/**/*.ts",
+        "../../packages/angular/recurrence/**/*.ts",
+        "../../packages/angular/event-sources/**/*.ts",
+        "tests",
+        "*.config.ts",
+        "vite.shared.ts"
+    ]
+}
