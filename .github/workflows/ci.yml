@@ -20,9 +20,12 @@
 #                     examples/angular: examples angular; anything else (the core,
 #                     examples/shared, the playground, the lockfile, root configs, .github,
 #                     scripts, site) and a manual run: every suite. A renamed file counts under
-#                     both its paths. No suite exists yet: the E2E jobs, which run in Playwright's
-#                     image (no browser install), and the Site export job arrive with the
-#                     React Epic.
+#                     both its paths.
+#   E2E               the playground's suite and each examples app's (a matrix), in Playwright's
+#                     image (no browser install), when Changes selects them.
+#   Site export       fragiola.com will build /calendar from `pnpm site:export` (contract v1.7,
+#                     fragiola/www CONTRACT.md), built and validated the way www's deploy runs it:
+#                     it fails on anything www would reject.
 #
 # Tests run only on pull requests (and on a manual run). A push to main runs nothing: main is what
 # its PR tested, and the www trigger comes once the project is registered on fragiola.com.
@@ -210,3 +213,21 @@ jobs:
           name: playwright-report-examples-${{ matrix.framework }}
           path: examples/${{ matrix.framework }}/playwright-report/
           retention-days: 14
+
+  site-export:
+    name: Site export
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      # builds the packages and the embed, writes the export, validates it against the contract
+      - run: pnpm site:export --base /calendar --out "$RUNNER_TEMP/site-export"

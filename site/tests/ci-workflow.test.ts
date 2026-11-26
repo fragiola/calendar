@@ -120,4 +120,19 @@ describe("the CI workflow", () => {
         expect(on).toContain("workflow_dispatch:");
         expect(on).not.toContain("push:");
     });
+
+    it("exports the site the way www builds it, and triggers no www build yet", () => {
+        const workflow = read(".github/workflows/ci.yml");
+        const job =
+            /\n {2}site-export:\n((?: {4}.*\n|\n)+)/.exec(
+                `${workflow}\n`,
+            )?.[1] ?? "";
+        expect(job).toContain("name: Site export");
+        expect(job).toContain(
+            'pnpm site:export --base /calendar --out "$RUNNER_TEMP/site-export"',
+        );
+        expect(workflow).not.toContain("trigger-www-build");
+        expect(workflow).not.toContain("repository_dispatch");
+        expect(workflow).not.toContain("WWW_DISPATCH_TOKEN");
+    });
 });
