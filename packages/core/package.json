@@ -36,6 +36,24 @@
             "import": "./dist/index.js",
             "default": "./dist/index.js"
         },
+        "./recurrence": {
+            "@fragiola/source": "./src/recurrence/index.ts",
+            "types": "./dist/recurrence.d.ts",
+            "import": "./dist/recurrence.js",
+            "default": "./dist/recurrence.js"
+        },
+        "./constraints": {
+            "@fragiola/source": "./src/constraints/index.ts",
+            "types": "./dist/constraints.d.ts",
+            "import": "./dist/constraints.js",
+            "default": "./dist/constraints.js"
+        },
+        "./event-sources": {
+            "@fragiola/source": "./src/event-sources/index.ts",
+            "types": "./dist/event-sources.d.ts",
+            "import": "./dist/event-sources.js",
+            "default": "./dist/event-sources.js"
+        },
         "./package.json": "./package.json"
     },
     "files": [
@@ -50,6 +68,21 @@
                 "types": "./dist/index.d.ts",
                 "import": "./dist/index.js",
                 "default": "./dist/index.js"
+            },
+            "./recurrence": {
+                "types": "./dist/recurrence.d.ts",
+                "import": "./dist/recurrence.js",
+                "default": "./dist/recurrence.js"
+            },
+            "./constraints": {
+                "types": "./dist/constraints.d.ts",
+                "import": "./dist/constraints.js",
+                "default": "./dist/constraints.js"
+            },
+            "./event-sources": {
+                "types": "./dist/event-sources.d.ts",
+                "import": "./dist/event-sources.js",
+                "default": "./dist/event-sources.js"
             },
             "./package.json": "./package.json"
         }

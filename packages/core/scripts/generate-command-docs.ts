@@ -7,7 +7,7 @@
 // It reads the built package (`dist/index.js`, `pnpm --filter @fragiola/calendar build`). Every
 // example runs on a sample calendar: one the bus refuses as malformed fails the script, so the page
 // never shows a payload that does not work. A feature's commands get their own section, with how
-// to install the feature, when the features have commands (Issues #4, #5).
+// to install the feature (each feature's built entry, `dist/<subpath>.js`).
 //
 //   node packages/core/scripts/generate-command-docs.ts [--check]
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
@@ -44,16 +44,34 @@ interface CommandResult {
 interface Core {
     createCalendarModel(
         json?: unknown,
-        options?: { now?: () => number },
+        options?: { now?: () => number; features?: readonly unknown[] },
     ): {
         get(key: "commands"): readonly CommandInfo[];
         dispatch(input: unknown): CommandResult;
     };
+    /** the names each feature owns */
+    readonly FEATURE_KEYS: Readonly<
+        Record<string, { readonly commands: readonly string[] }>
+    >;
 }
 
 const ROOT = join(import.meta.dirname, "../../..");
 const OUT = join(ROOT, "site/docs/api/commands.mdx");
 const ENTRY = join(import.meta.dirname, "../dist/index.js");
+
+/** The features that have commands: their entry, factory and section title. */
+const FEATURE_SECTIONS: readonly {
+    readonly subpath: string;
+    readonly factory: string;
+    readonly title: string;
+}[] = [
+    { subpath: "recurrence", factory: "recurrence", title: "Recurrence" },
+    {
+        subpath: "event-sources",
+        factory: "eventSources",
+        title: "Event sources",
+    },
+];
 
 /** The sections of the page, and the commands in each. */
 const GROUPS: readonly [title: string, prefix: string][] = [
@@ -86,6 +104,12 @@ const SAMPLE = {
         },
     ],
     settings: { timeZone: "America/Sao_Paulo", locale: "pt-BR" },
+};
+
+/** The sample with what the features' examples read: an event source. */
+const FEATURE_SAMPLE = {
+    ...SAMPLE,
+    settings: { ...SAMPLE.settings, eventSources: [{ id: "holidays" }] },
 };
 
 /** The sample's clock: 2026-11-26 12:00 UTC. */
@@ -125,6 +149,32 @@ const EXAMPLES: Record<string, unknown> = {
             { command: "view.set", payload: { type: "week" } },
             { command: "view.next", payload: {} },
         ],
+    },
+    "event.set-recurrence": {
+        eventId: "standup",
+        recurrence: {
+            rule: "FREQ=WEEKLY;BYDAY=MO,WE,FR",
+            exdates: ["2026-11-27T09:30:00-03:00"],
+        },
+    },
+    "event-sources.receive": {
+        sourceId: "holidays",
+        range: { start: "2026-11-01", end: "2026-12-01" },
+        events: [
+            {
+                id: "republic-day",
+                title: "Republic Day",
+                start: "2026-11-15",
+                end: "2026-11-16",
+                allDay: true,
+            },
+        ],
+    },
+    "event-sources.invalidate": { sourceId: "holidays" },
+    "event-sources.set-loading": {
+        sourceId: "holidays",
+        range: { start: "2026-11-01", end: "2026-12-01" },
+        loading: true,
     },
 };
 
@@ -221,8 +271,19 @@ function section(command: CommandInfo): string[] {
     ];
 }
 
-/** The page for a catalogue: the commands by section. */
-export function renderPage(commands: readonly CommandInfo[]): string {
+/** A feature's commands, as the page lists them. */
+export interface FeatureCommands {
+    readonly title: string;
+    readonly subpath: string;
+    readonly factory: string;
+    readonly commands: readonly CommandInfo[];
+}
+
+/** The page for a catalogue: the core's commands by section, then each feature's. */
+export function renderPage(
+    commands: readonly CommandInfo[],
+    features: readonly FeatureCommands[] = [],
+): string {
     const listed = new Set<string>();
     const body = GROUPS.flatMap(([title, prefix]) => {
         const members = commands.filter((command) =>
@@ -235,6 +296,21 @@ export function renderPage(commands: readonly CommandInfo[]): string {
             ? []
             : [`## ${title}`, "", ...members.flatMap(section)];
     });
+    const featureBody = features.flatMap((feature) => [
+        `## ${feature.title}`,
+        "",
+        `With the \`${feature.factory}()\` feature installed:`,
+        "",
+        "```ts",
+        `import { ${feature.factory} } from "@fragiola/calendar/${feature.subpath}";`,
+        "",
+        `const model = createCalendarModel(json, { features: [${feature.factory}()] });`,
+        "```",
+        "",
+        "Without it, its commands are `not_found`.",
+        "",
+        ...feature.commands.flatMap(section),
+    ]);
     const unlisted = commands.filter((command) => !listed.has(command.name));
     if (unlisted.length > 0) {
         throw new Error(
@@ -257,16 +333,24 @@ export function renderPage(commands: readonly CommandInfo[]): string {
         "JSON Schemas, ready to become an assistant's tools.",
         "",
         ...body,
+        ...featureBody,
     ].join("\n");
 }
 
 /** Runs every example on the sample: a malformed one is the script's bug. */
-function checkExamples(core: Core, commands: readonly CommandInfo[]): void {
+function checkExamples(
+    core: Core,
+    commands: readonly CommandInfo[],
+    features: readonly unknown[] = [],
+): void {
     for (const command of commands) {
         if (!(command.name in EXAMPLES)) {
             throw new Error(`no example for "${command.name}"`);
         }
-        const model = core.createCalendarModel(SAMPLE, { now: () => NOW });
+        const model = core.createCalendarModel(
+            features.length === 0 ? SAMPLE : FEATURE_SAMPLE,
+            { now: () => NOW, features },
+        );
         const result = model.dispatch({
             command: command.name,
             payload: EXAMPLES[command.name],
@@ -285,7 +369,37 @@ async function expectedPage(): Promise<string> {
         .createCalendarModel(SAMPLE, { now: () => NOW })
         .get("commands");
     checkExamples(core, commands);
-    return renderPage(commands);
+    const all = await Promise.all(
+        FEATURE_SECTIONS.map(async (feature) => {
+            const entry = (await import(
+                pathToFileURL(
+                    join(import.meta.dirname, `../dist/${feature.subpath}.js`),
+                ).href
+            )) as Record<string, () => unknown>;
+            const make = entry[feature.factory];
+            if (typeof make !== "function") {
+                throw new Error(
+                    `dist/${feature.subpath}.js exports no ${feature.factory}()`,
+                );
+            }
+            return make();
+        }),
+    );
+    const coreNames = new Set(commands.map((command) => command.name));
+    const featureCommands = core
+        .createCalendarModel(FEATURE_SAMPLE, { now: () => NOW, features: all })
+        .get("commands")
+        .filter((command) => !coreNames.has(command.name));
+    checkExamples(core, featureCommands, all);
+    const sections = FEATURE_SECTIONS.map((feature) => ({
+        ...feature,
+        commands: featureCommands.filter((command) =>
+            (core.FEATURE_KEYS[feature.subpath]?.commands ?? []).includes(
+                command.name,
+            ),
+        ),
+    }));
+    return renderPage(commands, sections);
 }
 
 async function main(check: boolean): Promise<void> {

@@ -31,6 +31,7 @@ Add an event. An all-day event takes YYYY-MM-DD dates, a timed one RFC 3339 date
 | `timeZone` | `string` | no | an IANA time zone name (America/Sao_Paulo) |
 | `calendarId` | `string` | no |  |
 | `recurrence` | `object` | no | the occurrences of a recurring event (requires recurrence()) |
+| `sourceId` | `string` | no | the event source it came from (requires eventSources()) |
 | `data` | `JSON` | no | the app's data (any JSON) |
 | `editable` | `boolean` | no |  |
 | `startEditable` | `boolean` | no |  |
@@ -316,7 +317,7 @@ model.dispatch({"command":"calendar.set-visible","payload":{"calendarId":"work",
 
 ### `settings.set`
 
-Change settings: each field given replaces the setting (the display `timeZone`, IANA or "local"; `locale`; `firstDayOfWeek`; `hiddenDays`; the time grid's slots; `validRange`; `dayMaxEvents`; `eventOrder`; the default durations; the edit flags). `null` removes an optional one (`firstDayOfWeek`, `snapDuration`, `validRange`, `startEditable`, `durationEditable`, `deletable`) so its default applies.
+Change settings: each field given replaces the setting (the display `timeZone`, IANA or "local"; `locale`; `firstDayOfWeek`; `hiddenDays`; the time grid's slots; `validRange`; `dayMaxEvents`; `eventOrder`; the default durations; the edit flags; with their features, `businessHours`, `eventConstraint`, `selectConstraint`, `overlap`, `eventSources`). `null` removes an optional one (`firstDayOfWeek`, `snapDuration`, `validRange`, `startEditable`, `durationEditable`, `deletable`, and the settings of features) so its default applies.
 
 **Payload**
 
@@ -461,4 +462,120 @@ It may run as a transient step (`{ transient: true }`).
 ```ts
 model.run("batch", {"commands":[{"command":"view.set","payload":{"type":"week"}},{"command":"view.next","payload":{}}]});
 model.dispatch({"command":"batch","payload":{"commands":[{"command":"view.set","payload":{"type":"week"}},{"command":"view.next","payload":{}}]}});
+```
+
+## Recurrence
+
+With the `recurrence()` feature installed:
+
+```ts
+import { recurrence } from "@fragiola/calendar/recurrence";
+
+const model = createCalendarModel(json, { features: [recurrence()] });
+```
+
+Without it, its commands are `not_found`.
+
+### `event.set-recurrence`
+
+Make an event recurring, change its recurrence, or (`null`) make it a single event again. `rule` is an RFC 5545 RRULE of the subset FREQ (DAILY, WEEKLY, MONTHLY, YEARLY), INTERVAL, COUNT, UNTIL, BYDAY (2TU, -1FR in monthly and yearly rules), BYMONTHDAY, BYMONTH, WKST, expanded from the event's start at its wall-clock time in its zone; `exdates` are the original starts left out; `overrides` change one occurrence's `title`, or its `start` and `end` (and `allDay`), by its original start. Needs the event to be editable.
+
+**Payload**
+
+| field | type | required | description |
+| --- | --- | --- | --- |
+| `eventId` | `string` | yes | the event |
+| `recurrence` | `object \| null` | yes |  |
+
+**Result**
+
+| field | type | required | description |
+| --- | --- | --- | --- |
+| `eventId` | `string` | yes |  |
+
+```ts
+model.run("event.set-recurrence", {"eventId":"standup","recurrence":{"rule":"FREQ=WEEKLY;BYDAY=MO,WE,FR","exdates":["2026-11-27T09:30:00-03:00"]}});
+model.dispatch({"command":"event.set-recurrence","payload":{"eventId":"standup","recurrence":{"rule":"FREQ=WEEKLY;BYDAY=MO,WE,FR","exdates":["2026-11-27T09:30:00-03:00"]}}});
+```
+
+## Event sources
+
+With the `eventSources()` feature installed:
+
+```ts
+import { eventSources } from "@fragiola/calendar/event-sources";
+
+const model = createCalendarModel(json, { features: [eventSources()] });
+```
+
+Without it, its commands are `not_found`.
+
+### `event-sources.receive`
+
+Merge the events a source returned for a range of days (YYYY-MM-DD, end exclusive): the source's events touching the range (or with a received id) are replaced by `events`, atomically, and the range is marked fetched (and no longer loading). Events without a `calendarId` take the source's; their `sourceId` is the source.
+
+**Payload**
+
+| field | type | required | description |
+| --- | --- | --- | --- |
+| `sourceId` | `string` | yes | the event source |
+| `range` | `object` | yes |  |
+| `events` | `object[]` | yes |  |
+
+**Result**
+
+| field | type | required | description |
+| --- | --- | --- | --- |
+| `sourceId` | `string` | yes |  |
+| `eventIds` | `string[]` | yes |  |
+| `removedEventIds` | `string[]` | yes |  |
+
+```ts
+model.run("event-sources.receive", {"sourceId":"holidays","range":{"start":"2026-11-01","end":"2026-12-01"},"events":[{"id":"republic-day","title":"Republic Day","start":"2026-11-15","end":"2026-11-16","allDay":true}]});
+model.dispatch({"command":"event-sources.receive","payload":{"sourceId":"holidays","range":{"start":"2026-11-01","end":"2026-12-01"},"events":[{"id":"republic-day","title":"Republic Day","start":"2026-11-15","end":"2026-11-16","allDay":true}]}});
+```
+
+### `event-sources.invalidate`
+
+Forget what was fetched, so `ranges-to-fetch` asks for it again (a refetch): of one source or of every source, within a range of days or all of it. Events stay until the next `event-sources.receive` replaces them.
+
+**Payload**
+
+| field | type | required | description |
+| --- | --- | --- | --- |
+| `sourceId` | `string` | no | the event source |
+| `range` | `object` | no |  |
+
+**Result**
+
+| field | type | required | description |
+| --- | --- | --- | --- |
+| `sourceIds` | `string[]` | yes |  |
+
+```ts
+model.run("event-sources.invalidate", {"sourceId":"holidays"});
+model.dispatch({"command":"event-sources.invalidate","payload":{"sourceId":"holidays"}});
+```
+
+### `event-sources.set-loading`
+
+Mark a range of days of a source as being fetched (`loading: true`, so `ranges-to-fetch` leaves it out) or not any more (`loading: false`: the fetch failed or was cancelled).
+
+**Payload**
+
+| field | type | required | description |
+| --- | --- | --- | --- |
+| `sourceId` | `string` | yes | the event source |
+| `range` | `object` | yes |  |
+| `loading` | `boolean` | yes |  |
+
+**Result**
+
+| field | type | required | description |
+| --- | --- | --- | --- |
+| `sourceId` | `string` | yes |  |
+
+```ts
+model.run("event-sources.set-loading", {"sourceId":"holidays","range":{"start":"2026-11-01","end":"2026-12-01"},"loading":true});
+model.dispatch({"command":"event-sources.set-loading","payload":{"sourceId":"holidays","range":{"start":"2026-11-01","end":"2026-12-01"},"loading":true}});
 ```

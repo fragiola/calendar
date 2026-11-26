@@ -27,8 +27,31 @@ const SELECTION: FeatureMarkers = {
 const built = (files: Record<string, string>) => (name: string) => files[name];
 
 describe("the features' bundle guard", () => {
-    it("has no feature to guard yet", () => {
-        expect(FEATURES).toEqual([]);
+    it("guards the model features, each its subpath and factory", () => {
+        expect(FEATURES).toEqual([
+            { subpath: "recurrence", factory: "recurrence" },
+            { subpath: "constraints", factory: "constraints" },
+            { subpath: "event-sources", factory: "eventSources" },
+        ]);
+    });
+
+    it("fails a planted import of each feature: its entry, or a source of its folder", () => {
+        for (const { subpath } of FEATURES) {
+            const feature = { subpath, markers: [] };
+            const read = built({
+                "index.js": `import { f } from "@fragiola/calendar/${subpath}";\nimport { g } from "./shared-1.js";\nexport { f, g };`,
+                "shared-1.js": "export const g = 1;",
+            });
+            const maps = built({
+                "shared-1.js": JSON.stringify({
+                    sources: [`../src/${subpath}/index.ts`],
+                }),
+            });
+            expect(featureLeaks("index.js", read, [feature], maps)).toEqual([
+                `index.js: imports the ${subpath} entry`,
+                `shared-1.js: ${subpath}'s ../src/${subpath}/index.ts`,
+            ]);
+        }
     });
 
     it("reads a feature's markers: its command, get and is keys", () => {

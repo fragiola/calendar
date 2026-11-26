@@ -3,6 +3,7 @@ import {
     ADAPTERS,
     corePinProblem,
     exportProblems,
+    featureExportProblems,
     publishedExportsProblems,
     unlistedPackages,
 } from "../../scripts/check-package.ts";
@@ -47,6 +48,37 @@ describe("the package check", () => {
                 ".": { default: "./dist/index.js" },
             }),
         ).toHaveLength(1);
+    });
+
+    it("wants the core to publish every feature's subpath, its targets packed", () => {
+        const files = new Set([
+            "./dist/recurrence.js",
+            "./dist/recurrence.d.ts",
+        ]);
+        const exports = {
+            "./recurrence": {
+                types: "./dist/recurrence.d.ts",
+                import: "./dist/recurrence.js",
+            },
+            "./constraints": {
+                types: "./dist/constraints.d.ts",
+                import: "./dist/constraints.js",
+            },
+        };
+        expect(featureExportProblems(exports, ["recurrence"], files)).toEqual(
+            [],
+        );
+        expect(
+            featureExportProblems(
+                exports,
+                ["constraints", "event-sources"],
+                files,
+            ),
+        ).toEqual([
+            'exports["./constraints"].types: ./dist/constraints.d.ts is not packed',
+            'exports["./constraints"].import: ./dist/constraints.js is not packed',
+            'exports: no "./event-sources" (the event-sources feature)',
+        ]);
     });
 
     it("wants an adapter to pin the core's exact version", () => {

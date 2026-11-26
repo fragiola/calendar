@@ -6,6 +6,8 @@
 // - its packed `exports` (from `publishConfig.exports`) are the repo's `exports` without the source
 //   condition, and use only the `types`, `import` and `default` conditions, with targets in `dist`;
 // - publint (strict) and attw (`esm-only` profile) pass on the tarball;
+// - the core's tarball exports every feature's subpath (`FEATURES` of `check-features.ts`), its
+//   `types` and `import` targets packed;
 // - every adapter (`ADAPTERS`: each package under packages/ but the core; none yet, they come with
 //   the React, Vue and Angular Epics, and a package missing from the list fails) depends on the
 //   core at its exact version, and passes its smoke test: a scratch app outside the workspace that
@@ -23,6 +25,7 @@ import { execFileSync } from "node:child_process";
 import { mkdtempSync, readdirSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
+import { FEATURES } from "./check-features.ts";
 import { SOURCE_CONDITION } from "./source-condition.ts";
 
 const root = join(import.meta.dirname, "..");
@@ -202,10 +205,48 @@ function lint(name: string, tarball: string): string[] {
                       manifest.exports,
                   ),
               ]
-    ).map((problem) => `${manifest.name}: ${problem}`);
+    )
+        .concat(
+            name === "core"
+                ? featureExportProblems(
+                      manifest.exports,
+                      FEATURES.map((feature) => feature.subpath),
+                      files,
+                  )
+                : [],
+        )
+        .map((problem) => `${manifest.name}: ${problem}`);
     run("pnpm", ["exec", "publint", tarball, "--strict"], root);
     run("pnpm", ["exec", "attw", tarball, "--profile", "esm-only"], root);
     return problems;
+}
+
+/**
+ * The features a packed manifest does not export, or exports with a `types` or `import` target
+ * the tarball does not hold (`./dist/recurrence.js`): every feature subpath is published.
+ */
+export function featureExportProblems(
+    exports: unknown,
+    subpaths: readonly string[],
+    files: ReadonlySet<string>,
+): string[] {
+    const map = (exports ?? {}) as Record<string, unknown>;
+    return subpaths.flatMap((subpath) => {
+        const entry = map[`./${subpath}`] as
+            | Record<string, unknown>
+            | undefined;
+        if (entry === undefined || typeof entry !== "object") {
+            return [`exports: no "./${subpath}" (the ${subpath} feature)`];
+        }
+        return (["types", "import"] as const).flatMap((condition) => {
+            const target = entry[condition];
+            return typeof target === "string" && files.has(target)
+                ? []
+                : [
+                      `exports["./${subpath}"].${condition}: ${String(target)} is not packed`,
+                  ];
+        });
+    });
 }
 
 /** The frameworks an adapter is written for. */
