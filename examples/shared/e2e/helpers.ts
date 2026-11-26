@@ -81,11 +81,12 @@ export async function openExample(
 
 /**
  * Opens an example as fragiola.com shows it: in an iframe of a same-origin page (serve.ts,
- * /host.html). Skips the test when the framework has no such example.
+ * /host.html; `promote: "1"`: a host that promotes the frame over its page while a modal overlay
+ * is open). Skips the test when the framework has no such example.
  */
 export async function openHosted(
     page: Page,
-    query: { id: string; theme?: string },
+    query: { id: string; theme?: string; promote?: "1" },
 ): Promise<FrameLocator> {
     requireExamples(query.id);
     await fixClock(page);

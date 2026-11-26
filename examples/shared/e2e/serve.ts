@@ -7,6 +7,10 @@
 //   /host.html?id=<id>&theme=<t>    one iframe on ./?id=<id>&theme=<t>; it records the
 //                                   embed's messages in `window.messages` and stays transparent
 //                                   until `ready`, like the site
+//   …&promote=1                     the host promotes the frame over its page while a modal
+//                                   overlay is open, as fragiola.com does (contract §5.4):
+//                                   `host` after ready, `promote` on `overlay` open, `promoted`
+//                                   on `armed`, back in place on `overlay` closed
 
 import { createReadStream } from "node:fs";
 import { stat } from "node:fs/promises";
@@ -31,7 +35,10 @@ const TYPES: Record<string, string> = {
     ".woff2": "font/woff2",
 };
 
-function host(query: string): string {
+function host(params: URLSearchParams): string {
+    const promote = params.get("promote") === "1";
+    params.delete("promote");
+    const query = params.toString();
     return `<!doctype html>
 <html lang="en">
     <head>
@@ -48,12 +55,51 @@ function host(query: string): string {
         <script>
             window.messages = [];
             const frame = document.querySelector("iframe");
+            const promote = ${promote};
+            const send = (message) =>
+                frame.contentWindow.postMessage(message, location.origin);
+            let inline;
+            const geometry = () => ({
+                rect: inline,
+                viewport: { width: innerWidth, height: innerHeight },
+            });
             addEventListener("message", (event) => {
                 if (event.origin !== location.origin) return;
                 if (event.source !== frame.contentWindow) return;
-                window.messages.push(event.data);
-                if (event.data && event.data.type === "fragiola:example:ready") {
+                const data = event.data || {};
+                window.messages.push(data);
+                if (data.type === "fragiola:example:ready") {
                     frame.style.opacity = "1";
+                    if (promote) send({ type: "fragiola:example:host", overlay: true });
+                }
+                if (!promote) return;
+                if (data.type === "fragiola:example:overlay" && data.open) {
+                    const box = frame.getBoundingClientRect();
+                    inline = { x: box.x, y: box.y, width: box.width, height: box.height };
+                    send({ type: "fragiola:example:promote", ...geometry() });
+                }
+                if (data.type === "fragiola:example:armed") {
+                    frame.dataset.promoted = "";
+                    Object.assign(frame.style, {
+                        position: "fixed",
+                        inset: "0",
+                        width: "100vw",
+                        height: "100vh",
+                        zIndex: "1000",
+                    });
+                    requestAnimationFrame(() =>
+                        send({ type: "fragiola:example:promoted", ...geometry() }),
+                    );
+                }
+                if (data.type === "fragiola:example:overlay" && !data.open) {
+                    delete frame.dataset.promoted;
+                    Object.assign(frame.style, {
+                        position: "",
+                        inset: "",
+                        width: "900px",
+                        height: "600px",
+                        zIndex: "",
+                    });
                 }
             });
         </script>
@@ -81,7 +127,7 @@ createServer(async (request, response) => {
     const url = new URL(request.url ?? "/", "http://localhost");
     if (url.pathname === "/host.html") {
         response.writeHead(200, { "content-type": TYPES[".html"] });
-        response.end(host(url.searchParams.toString()));
+        response.end(host(new URLSearchParams(url.searchParams)));
         return;
     }
     const found = url.pathname.startsWith(BASE)
