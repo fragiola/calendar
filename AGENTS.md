@@ -17,7 +17,7 @@ the core**.
 
 | package | name | contains | depends on |
 |---|---|---|---|
-| `packages/core` | `@fragiola/calendar` | the calendar document (v1) and its JSON Schemas, the date and time-zone engine (`Intl` only), the model and its command bus (commands with JSON Schemas, `get`/`is` queries, middleware, events), the views, ranges and layout, the feature registry and every opt-in feature on its own subpath (D2), and the engine (keyboard, gestures, measurement). Today: the date and time-zone engine (`time/`, `time-zone/`, `locale/`, Issue #2) and the model (`schema/`, `document/`, `state/`, `commands/`, `view/`, `layout/`, `attributes/`, `features/`, `model/`, Issue #3) | DOM only, zero runtime deps |
+| `packages/core` | `@fragiola/calendar` | the calendar document (v1) and its JSON Schemas, the date and time-zone engine (`Intl` only), the model and its command bus (commands with JSON Schemas, `get`/`is` queries, middleware, events), the views, ranges and layout, the feature registry and every opt-in feature on its own subpath (D2), and the engine (keyboard, gestures, measurement). Today: the date and time-zone engine (`time/`, `time-zone/`, `locale/`, Issue #2) and the model (`schema/`, `document/`, `state/`, `commands/`, `view/`, `layout/`, `attributes/`, `features/`, `model/`, `format/`, Issue #3; formatting keys, Issue #4) and the model features `recurrence/`, `constraints/`, `event-sources/` (Issue #4), each on its subpath | DOM only, zero runtime deps |
 | `packages/react` | `@fragiola/calendar-react` | the `Calendar.*` primitives and hooks over the core, and the core re-exported (React Epic) | the core (`workspace:*`, published as the exact version); peer `react`, `react-dom` (^19) |
 | `packages/vue` | `@fragiola/calendar-vue` | the same primitives in Vue (Vue Epic) | the core; peer `vue` (^3.5) |
 | `packages/angular` | `@fragiola/calendar-angular` | the same primitives as Angular directives (Angular Epic) | the core; peer `@angular/core` |
@@ -132,7 +132,9 @@ drag and ranges; RFC 5545 for recurrence; FullCalendar's documented default for 
   is generated and checked.)
 - **Issue #1.** `check-features.ts` uses Data Grid's string markers (each feature's command, `get`
   and `is` keys read from its built factory) with an empty `FEATURES` list; each feature adds its
-  `{ subpath, factory }` there with its entry in `tsdown.config.ts` and both `exports`.
+  `{ subpath, factory }` there with its entry in `tsdown.config.ts` and both `exports` (Issue #4:
+  `recurrence`, `constraints`, `event-sources`; `check-package.ts` fails when the core's tarball
+  does not export one of them with its targets packed).
 - **Issue #1.** `check-package.ts` keeps the packing, the exports checks, publint and attw, the
   core pin check and the `ADAPTERS` list (empty) from Tree's; the smoke apps (React, Vue, Angular)
   come back with their adapters. A package under `packages/` that is neither the core nor listed
@@ -237,7 +239,7 @@ drag and ranges; RFC 5545 for recurrence; FullCalendar's documented default for 
   engine (#5).
 - **Issue #3.** `occurrenceId` and `scope` are in the edit commands' schemas and types now
   (`OccurrenceTarget`), owned by `recurrence` in `FEATURE_KEYS.payloadFields`: without the feature
-  the bus refuses them (`not_found`, naming it) before the schema. The document schema has the
+  the bus refuses them (`invalid_payload` since Issue #4, naming it) before the schema. The document schema has the
   event's `recurrence` field, refused the same way without the feature.
 - **Issue #3.** The model type has Data Grid's two forms: `CalendarModel<T>` (any features: the
   core's keys) and `CalendarModel<T, typeof features>`; every model is assignable to the first. The
@@ -253,8 +255,71 @@ drag and ranges; RFC 5545 for recurrence; FullCalendar's documented default for 
   place).
 - **Issue #3.** The command reference (`site/docs/api/commands.mdx`) shows each command's payload
   and result fields from its schemas and an example that the generator runs on a sample calendar
-  (a malformed example fails it). Formatting as data (`title-parts`, `day-header-by`, D4) is not in
-  this Issue: the adapter Epics add it with the parts that render it.
+  (a malformed example fails it), each feature's commands in a section of its own. Formatting as
+  data (D4) came with Issue #4.
+
+- **Issue #4.** A payload field, an event field or a setting of a feature that is not installed
+  is `invalid_payload` naming the feature (the Issue's criterion: it is no field of that model's
+  schema); a command of one stays `not_found`. Payload fields stay typed in the core's payloads.
+- **Issue #4.** New contribution points: `settingsIssues` (a feature's settings in the document and
+  in `settings.set`), `occurrenceById` (`get("occurrence-by")` finds any occurrence of a series),
+  `checkSelection` (`selectConstraint`, for `selection()` in #5), `slotAttributes`
+  (`get("slot-attributes-by", { date, time })`: `data-date`, `data-time`, the features'), and the
+  `FeatureReads` lent to `checkEvent` / `checkSelection` (every event's occurrences, one event's).
+  `EventChange.occurrence` is the occurrence an edit started from. A feature's `writeEdit` value
+  is merged into the command's result (`following` names the new event). The core checks an
+  occurrence a feature took as an event of its own (no `recurrence`, its override's title).
+- **Issue #4.** Formatting as data (D4) is in the core: `get("title-parts", { format? })` (a
+  month view's month, otherwise the visible days, `formatRangeToParts`), `get("day-header-by",
+  { date, format? })` (the weekday in month and list views, the weekday and day in time grids),
+  `get("slot-label-by", { time, format? })` (`{ hour: "numeric", minute: "2-digit" }`), frozen and
+  reused per locale.
+- **Issue #4, recurrence.** `occurrence-by` keeps the core's `{ id }` (model-api naming), not
+  `{ occurrenceId }`; `get("occurrences-in", { range })` lists every shown event's occurrences
+  touching a range; `is("event-recurring")`; `event.set-recurrence { eventId, recurrence | null }`
+  (needs `editable`) is the one way to give or change a rule. RRULE names and values are
+  case-insensitive (RFC 5545), `RRULE:` is refused; UNTIL is a date or a UTC date-time (a local one
+  refused), a date-time UNTIL on an all-day event refused; the event's start is always the first
+  occurrence (RFC 5545 §3.8.5.3), even off-rule. Occurrence ids write the original start in the
+  event's zone; any offset of it finds the occurrence (keys are instants). Overrides change
+  `title` and the times as a pair (`start` + `end`, `allDay`); their keys must be occurrences of
+  the rule (checked where the zone is known: the document and `event.set-recurrence`).
+- **Issue #4, scopes.** On a non-recurring event `scope` is ignored. Without `occurrenceId` an
+  edit of a series is `all` from its first start (`this` / `following` then need one:
+  `invalid_payload`). `this` refuses a `timeZone` or `calendarId` change (the series'). `all` and
+  `following` measure the delta from the edited occurrence's current times (an override's when it
+  has one) on the event zone's wall clock and apply it to the rule's starts; a day shift keeps the
+  rule only when its days come from its start, or from a BYDAY without ordinals every week
+  (DAILY/WEEKLY, INTERVAL=1, weekdays shifted); otherwise `refused`. A series never turns all-day
+  ⇄ timed (`refused`; `this` may). `following` from the first occurrence is `all`; otherwise the
+  old rule ends with UNTIL one second (a day) before it, COUNT becoming the remaining count on the
+  new series. Excluded dates and overrides move with their occurrences (a zone change re-keys
+  them by day). A display-zone change re-expands a series without its own `timeZone`; its keys
+  are not re-written (give a recurring event a `timeZone`).
+- **Issue #4, constraints.** Settings `businessHours` (`{ daysOfWeek, startTime, endTime }[]`,
+  display zone, touching rules merged), `eventConstraint` / `selectConstraint`
+  (`"business-hours"`, which needs `businessHours`, or a non-empty list of ranges of dates or
+  date-times, open ends allowed; the event within one), `overlap` (`true` default, `false`, or
+  `{ [calendarId]: boolean }`: either event's calendar refusing is enough; an event never overlaps
+  itself; touching is no overlap). An all-day event under `"business-hours"` must fall on days
+  with business hours. Checked on `event.add`, a move, a resize, `event.update` and
+  `event.set-recurrence` when the times, calendar or rule change (a rename is not checked, nor a
+  removal, nor `event-sources.receive`); a series added or given a rule has each occurrence
+  checked over a year from its start, an occurrence edit (any scope) its new times. The refusal is
+  `refused`, its message naming the setting. `get("business-hours-in", { range? })` (default the
+  visible days) gives each day's hours as instants and time-grid fractions; `data-business-hours`
+  marks days with hours and slots whose start is within them.
+- **Issue #4, event sources.** A state feature with no `/local` entry: the fetch is the app's,
+  and events in memory need no source. Sources are `settings.eventSources` (`{ id, calendarId? }`);
+  an event's `sourceId` (event field) names one (document issue, `not_found` in `event.add`).
+  State `eventSourceStates` (per source, `fetched` and `loading` day ranges, merged) is model state,
+  not document. `get("ranges-to-fetch", { range? })` gives, per source, the days neither fetched
+  nor loading; `event-sources.receive` replaces the source's events whose own times touch the
+  range (or that share a received id) atomically, the edit flags and constraints not applied, ids
+  of another source's or a local event refused; give a recurring source event an id, so a refetch
+  replaces it. `invalidate` forgets fetched ranges (events stay until the next receive);
+  `set-loading` marks or clears a loading range. Removing a source from the settings removes its
+  events and its state. `is("event-source-loading", { sourceId? })` (none: any source).
 
 ## Commands
 
