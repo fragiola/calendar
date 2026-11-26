@@ -685,6 +685,42 @@ describe('"+N more" on the keyboard (D12)', () => {
     });
 });
 
+describe("a multi-day segment on the keyboard (D12)", () => {
+    it("moves among the events of the day the focus entered it from", () => {
+        const m = mount({
+            events: [
+                allDay("long", "2026-11-24", "2026-11-27"),
+                allDay("first", "2026-11-24", "2026-11-25"),
+                allDay("later", "2026-11-26", "2026-11-27"),
+            ],
+            view: { type: "month", anchorDate: "2026-11-26" },
+        });
+        m.engine.run("focus", { date: "2026-11-26" });
+        m.key("Enter");
+        // one element for the three days, registered with its first: the adapter's next commit
+        // focuses it
+        m.engine.adapter.committed();
+        expect(document.activeElement).toBe(m.element("event long 2026-11-24"));
+        m.key("ArrowDown");
+        expect(document.activeElement).toBe(
+            m.element("event later 2026-11-26"),
+        );
+        m.key("ArrowUp");
+        m.key("Escape");
+        expect(document.activeElement).toBe(m.element("day 2026-11-26"));
+    });
+    it("focuses the part of a multi-week event in the row of the day", () => {
+        const m = mount({
+            events: [allDay("span", "2026-11-26", "2026-12-02")],
+            view: { type: "month", anchorDate: "2026-11-26" },
+        });
+        m.engine.run("focus", { date: "2026-11-30" });
+        m.key("Enter");
+        m.engine.adapter.committed();
+        expect(document.activeElement).toBe(m.element("event span 2026-11-29"));
+    });
+});
+
 describe("partAttributes (before an engine)", () => {
     it("gives what the engine gives while nothing is focused, the tab stop on today", () => {
         const model = modelOf(

@@ -573,21 +573,35 @@ class Engine<T extends CalendarTypes, F extends CalendarFeatures> {
         if (exact || !loose || position.kind !== "event") {
             return exact?.element;
         }
+        // a segment over several days is registered with its first day in its row: the element
+        // that starts last at or before the cell is the one the cell shows, else any of its own
+        let best: Registration | undefined;
+        let any: Registration | undefined;
         for (const registration of this.registry.values()) {
             if (
-                registration.part === "event" &&
-                registration.payload.occurrenceId === position.occurrenceId
+                registration.part !== "event" ||
+                registration.payload.occurrenceId !== position.occurrenceId
             ) {
-                return registration.element;
+                continue;
+            }
+            any ??= registration;
+            const date = String(registration.payload.date);
+            if (
+                date <= position.cell.date &&
+                (!best || date > String(best.payload.date))
+            ) {
+                best = registration;
             }
         }
-        return undefined;
+        return (best ?? any)?.element;
     }
 
     /** Moves the roving focus, and DOM focus once the position's element is registered. */
     private focusOn(position: FocusPosition): void {
         const before = this.focusPosition;
         this.focusPosition = position;
+        // exact: a loose match could be an element the commit under way removes (a dropped
+        // event's old place); the adapter's `committed()` resolves a pending focus loosely
         const element = this.elementOf(position, false);
         if (element) {
             this.pendingFocus = false;
@@ -723,7 +737,9 @@ class Engine<T extends CalendarTypes, F extends CalendarFeatures> {
             }
             return;
         }
-        const fromElement = registration ? this.positionOf(registration) : null;
+        const fromElement = registration
+            ? this.keptCell(this.positionOf(registration))
+            : null;
         if (fromElement) this.focusPosition = fromElement;
         const position = fromElement ?? this.focusPosition;
         const taken = this.keyChain(event, position);
@@ -853,6 +869,24 @@ class Engine<T extends CalendarTypes, F extends CalendarFeatures> {
         return true;
     }
 
+    /**
+     * The focus position of an element, keeping the cell the focus entered it from: a segment over
+     * several days is one element, registered with its first day, and the keys move among the
+     * events of the day the focus came from (D12).
+     */
+    private keptCell(position: FocusPosition | null): FocusPosition | null {
+        const current = this.focusPosition;
+        if (
+            position?.kind === "event" &&
+            current?.kind === "event" &&
+            current.occurrenceId === position.occurrenceId &&
+            this.eventsIn(current.cell).includes(position.occurrenceId)
+        ) {
+            return current;
+        }
+        return position;
+    }
+
     /** Focuses a day's "+N more" link, when the day has one: whether it did. */
     private focusMore(cell: CellPosition): boolean {
         if (cell.kind !== "day") return false;
@@ -896,7 +930,7 @@ class Engine<T extends CalendarTypes, F extends CalendarFeatures> {
         const registration = this.registrationOf(event.target);
         if (!registration || !FOCUSABLE.has(registration.part)) return;
         if (registration.element !== event.target) return;
-        const position = this.positionOf(registration);
+        const position = this.keptCell(this.positionOf(registration));
         if (!position) return;
         const before = this.focusPosition;
         this.focusPosition = position;
