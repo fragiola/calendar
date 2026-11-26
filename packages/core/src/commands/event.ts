@@ -1,6 +1,7 @@
 // The event commands (D8): add, update, move, resize, remove, set-data, set-flags. Their rules
 // live here (D9, D10, `apply-edit.ts`), so `model.can` / `check` answer the same as `run`.
 import type { CalendarEvent } from "../document/calendar-event";
+import { EVENT_SCHEMA } from "../document/calendar-schema";
 import type { CalendarSettings } from "../document/calendar-settings";
 import { toEvent } from "../document/entities";
 import { eventIssues } from "../document/event-issues";
@@ -449,5 +450,96 @@ export const eventSetFlags = defineCommand({
         }
         draft.putEvent(toEvent({ ...event, ...flags }, event.id));
         return ok({ eventId: event.id });
+    },
+});
+
+export const eventSetAll = defineCommand({
+    name: "event.set-all",
+    description:
+        "Replace every event with `events` (an app's controlled list: give each its `id`). An event object the calendar already holds is kept as it is; the others are validated like the document's. The edit flags and the constraints, which guard the user's edits, do not apply.",
+    payloadSchema: {
+        type: "object",
+        properties: { events: { type: "array", items: EVENT_SCHEMA } },
+        required: ["events"],
+        additionalProperties: false,
+    },
+    resultSchema: {
+        type: "object",
+        properties: {
+            eventIds: { type: "array", items: ID },
+            removedEventIds: { type: "array", items: ID },
+        },
+        required: ["eventIds", "removedEventIds"],
+        additionalProperties: false,
+    },
+    transient: false,
+    reduce: (payload, { draft, features }) => {
+        const ids = new Set<string>();
+        const events: CalendarEvent[] = [];
+        for (const [i, json] of payload.events.entries()) {
+            const at = `/events/${i}`;
+            if (json.id === undefined) {
+                return fail(
+                    "invalid_payload",
+                    "give every event of the list its id",
+                    `${at}/id`,
+                );
+            }
+            if (ids.has(json.id)) {
+                return fail(
+                    "invalid_payload",
+                    `"${json.id}" is the id of another event of the list`,
+                    `${at}/id`,
+                );
+            }
+            ids.add(json.id);
+            const held = draft.event(json.id);
+            if (held !== undefined && (held as unknown) === json) {
+                events.push(held);
+                continue;
+            }
+            for (const key of Object.keys(json)) {
+                const owner = features.missing("eventFields", key);
+                if (owner !== undefined) {
+                    return fail(
+                        "invalid_payload",
+                        `"${key}" ${requiresFeature(owner)}`,
+                        `${at}/${key}`,
+                    );
+                }
+            }
+            if (
+                json.calendarId !== undefined &&
+                !draft.calendar(json.calendarId)
+            ) {
+                return fail(
+                    "not_found",
+                    `no calendar has the id "${json.calendarId}"`,
+                    `${at}/calendarId`,
+                );
+            }
+            const failed = invalid(
+                eventIssues(
+                    json as Readonly<Record<string, unknown>> & typeof json,
+                    at,
+                    features,
+                ),
+            );
+            if (failed) return failed;
+            events.push(
+                toEvent(
+                    json as unknown as Readonly<Record<string, unknown>>,
+                    json.id,
+                ),
+            );
+        }
+        const removedEventIds = draft.state.events
+            .filter((event) => !ids.has(event.id))
+            .map((event) => event.id);
+        const same =
+            events.length === draft.state.events.length &&
+            events.every((event, i) => event === draft.state.events[i]);
+        if (!same) draft.set({ events: Object.freeze(events) });
+        return ok({ eventIds: [...ids], removedEventIds });
     },
 });

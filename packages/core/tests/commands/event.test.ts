@@ -572,3 +572,79 @@ describe("occurrences without recurrence()", () => {
         }
     });
 });
+
+describe("event.set-all (an app's controlled list)", () => {
+    it("replaces every event, keeping the objects it holds and ignoring the edit flags", () => {
+        const model = modelOf(
+            [
+                allDay("a", "2026-11-26", "2026-11-27"),
+                allDay("b", "2026-11-27", "2026-11-28", { deletable: false }),
+            ],
+            { editable: false },
+        );
+        const [a] = model.state.events;
+        const result = model.run("event.set-all", {
+            events: [a as never, timed("c", "09:00", "10:00")],
+        });
+        expect(result).toEqual({
+            ok: true,
+            value: { eventIds: ["a", "c"], removedEventIds: ["b"] },
+        });
+        expect(model.state.events[0]).toBe(a);
+        expect(model.get("event-by", { id: "c" })?.start).toBe(
+            "2026-11-26T09:00:00Z",
+        );
+    });
+
+    it("commits nothing new for the list it holds", () => {
+        const model = modelOf([allDay("a", "2026-11-26", "2026-11-27")]);
+        const before = model.state.events;
+        expect(
+            model.run("event.set-all", { events: [...before] as never }).ok,
+        ).toBe(true);
+        expect(model.state.events).toBe(before);
+    });
+
+    it("refuses an event without an id, a repeated id, an unknown calendar and nonsense", () => {
+        const model = modelOf([allDay("a", "2026-11-26", "2026-11-27")]);
+        const { id: _, ...noId } = allDay("x", "2026-11-26", "2026-11-27");
+        const cases = [
+            [[noId], "invalid_payload", "/events/0/id"],
+            [
+                [
+                    allDay("a", "2026-11-26", "2026-11-27"),
+                    allDay("a", "2026-11-26", "2026-11-27"),
+                ],
+                "invalid_payload",
+                "/events/1/id",
+            ],
+            [
+                [allDay("a", "2026-11-26", "2026-11-27", { calendarId: "no" })],
+                "not_found",
+                "/events/0/calendarId",
+            ],
+            [
+                [allDay("a", "2026-11-27", "2026-11-26")],
+                "invalid_payload",
+                undefined,
+            ],
+            [
+                [
+                    allDay("a", "2026-11-26", "2026-11-27", {
+                        recurrence: { rule: "FREQ=DAILY" },
+                    }),
+                ],
+                "invalid_payload",
+                "/events/0/recurrence",
+            ],
+        ] as const;
+        for (const [events, code, path] of cases) {
+            const result = model.run("event.set-all", {
+                events: events as never,
+            });
+            expect(result).toMatchObject({ ok: false, error: { code } });
+            if (path && !result.ok) expect(result.error.path).toBe(path);
+        }
+        expect(model.state.events.map((event) => event.id)).toEqual(["a"]);
+    });
+});
