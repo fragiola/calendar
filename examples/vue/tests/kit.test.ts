@@ -278,7 +278,7 @@ describe("Select", () => {
 });
 
 describe("Popover", () => {
-    it("is a dialog with Base UI's data-open, its title an h2", async () => {
+    it("is a dialog with Base UI's data-open, labelled by its title and described by its description", async () => {
         await render(() =>
             h(
                 Popover.Root,
@@ -287,10 +287,14 @@ describe("Popover", () => {
                     default: () => [
                         h(Popover.Trigger, null, { default: () => "+5 more" }),
                         h(Popover.Content, null, {
-                            default: () =>
+                            default: () => [
                                 h(Popover.Title, null, {
                                     default: () => "Thursday, November 26",
                                 }),
+                                h(Popover.Description, null, {
+                                    default: () => "7 events",
+                                }),
+                            ],
                         }),
                     ],
                 },
@@ -299,7 +303,13 @@ describe("Popover", () => {
         const popup = $('[role="dialog"]');
         expect(popup?.getAttribute("data-slot")).toBe("popover-content");
         expect(popup?.hasAttribute("data-open")).toBe(true);
-        expect($('[data-slot="popover-title"]')?.tagName).toBe("H2");
+        const title = $('[data-slot="popover-title"]');
+        expect(title?.tagName).toBe("H2");
+        expect(title?.id).toBeTruthy();
+        expect(popup?.getAttribute("aria-labelledby")).toBe(title?.id);
+        expect(popup?.getAttribute("aria-describedby")).toBe(
+            $('[data-slot="popover-description"]')?.id,
+        );
     });
 });
 
@@ -344,6 +354,24 @@ describe("Calendar (the date picker)", () => {
         cell?.click();
         expect(picked).toEqual([{ year: 2026, month: 11, day: 27 }]);
         $('[data-slot="calendar-next-button"]')?.click();
+        await settle();
+        expect($('[data-slot="calendar-heading"]')?.textContent).toBe(
+            "December 2026",
+        );
+    });
+
+    it("keeps its page when the parent passes the same day as a new object", async () => {
+        const renders = ref(0);
+        await render(() =>
+            h(DatePicker.Template.Simple, {
+                locale: "en-US",
+                "data-renders": renders.value,
+                value: { year: 2026, month: 11, day: 25 },
+            }),
+        );
+        $('[data-slot="calendar-next-button"]')?.click();
+        await settle();
+        renders.value++;
         await settle();
         expect($('[data-slot="calendar-heading"]')?.textContent).toBe(
             "December 2026",

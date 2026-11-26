@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { SelectionRange } from "@fragiola/calendar-vue";
-import { ref } from "vue";
+import { type ComponentPublicInstance, ref, useTemplateRef } from "vue";
 import { Clickable } from "#/components/atoms/clickable";
 import { Input } from "#/components/atoms/fields";
 import { Dialog } from "#/components/ui/dialog";
@@ -28,6 +28,13 @@ const emit = defineEmits<{ save: [event: NewEvent]; close: [] }>();
 const title = ref("");
 const calendarId = ref("ada");
 
+// React's `autoFocus`: the dialog focuses the title as it opens, not its first button (Close)
+const titleInput = useTemplateRef<ComponentPublicInstance>("title-input");
+function focusTitle(event: Event) {
+    event.preventDefault();
+    (titleInput.value?.$el as HTMLInputElement | undefined)?.focus();
+}
+
 function submit() {
     if (!props.range) return;
     emit("save", {
@@ -51,7 +58,7 @@ function onCalendar(value: unknown) {
     <Dialog.Root :open="range !== null" @update:open="onOpenChange">
         <Dialog.Portal>
             <Dialog.Backdrop />
-            <Dialog.Content>
+            <Dialog.Content @open-auto-focus="focusTitle">
                 <form :class="styles.form" @submit.prevent="submit">
                     <Dialog.Header>
                         <Dialog.Title>New event</Dialog.Title>
@@ -63,8 +70,8 @@ function onCalendar(value: unknown) {
                             <Field.Row>
                                 <Field.Body>
                                     <Input
+                                        ref="title-input"
                                         v-model="title"
-                                        autofocus
                                         placeholder="New event"
                                     />
                                 </Field.Body>

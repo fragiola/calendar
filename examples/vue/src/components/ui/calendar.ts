@@ -202,12 +202,17 @@ const CalendarRoot = defineComponent({
             }
         };
 
-        // a value set from outside (the calendar's anchor) is shown and focused
-        watch(selected, (date) => {
-            if (!date) return;
-            focused.value = date;
-            reveal(date);
-        });
+        // a value set from outside (the calendar's anchor) is shown and focused: by its day, not
+        // its object (a parent passes a new one on each render, which must not undo a paging)
+        watch(
+            () => (selected.value ? keyOf(selected.value) : null),
+            () => {
+                const date = selected.value;
+                if (!date) return;
+                focused.value = date;
+                reveal(date);
+            },
+        );
 
         const context: CalendarContext = {
             locale: computed(() => locale.value || "en-US"),

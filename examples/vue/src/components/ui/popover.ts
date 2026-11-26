@@ -11,7 +11,9 @@
 //     variables. The content adds Base UI's attributes and maps the variables, so the `popup`
 //     family's classes apply unchanged.
 //   - Reka UI's Popover has no title nor description: `Popover.Title` and `Popover.Description`
-//     are the text atoms (an `h2`, a `p`), and Reka UI labels the popup by its trigger.
+//     are the text atoms (an `h2`, a `p`) with an id of their own, and once mounted they label and
+//     describe the popup (`aria-labelledby` / `aria-describedby` on it, as Fragiola Primitives'):
+//     Reka UI labels it by its trigger, and sets that attribute only while its value changes.
 
 import { XIcon } from "@lucide/vue";
 import {
@@ -22,7 +24,19 @@ import {
     PopoverRoot as PopoverRootPrimitive,
     PopoverTrigger as PopoverTriggerPrimitive,
 } from "reka-ui";
-import { defineComponent, h, type PropType, type StyleValue } from "vue";
+import {
+    type Component,
+    type ComponentPublicInstance,
+    defineComponent,
+    h,
+    onBeforeUnmount,
+    onMounted,
+    onUpdated,
+    type PropType,
+    ref,
+    type StyleValue,
+    useId,
+} from "vue";
 import { Clickable } from "#/components/atoms/clickable";
 import { Text } from "#/components/atoms/text";
 import { popup } from "#/components/families/popup";
@@ -131,40 +145,72 @@ const PopoverContent = defineComponent({
     },
 });
 
-const PopoverTitle = defineComponent({
-    name: "PopoverTitle",
-    inheritAttrs: false,
-    setup(_, { attrs, slots }) {
-        return () =>
-            h(
-                Text.Heading,
-                {
-                    "data-slot": "popover-title",
-                    as: "h2",
-                    ...attrs,
-                    class: cn("text-palette-contrast", attrs.class as string),
-                },
-                slots,
-            );
-    },
-});
+/**
+ * A text part that names its popup: its id on the content's `attribute` after each render (the
+ * popup is its ancestor, under the portal), removed when it unmounts.
+ */
+function popupText(
+    name: string,
+    slot: string,
+    atom: Component,
+    atomProps: Record<string, unknown>,
+    classes: string,
+    attribute: "aria-labelledby" | "aria-describedby",
+) {
+    return defineComponent({
+        name,
+        inheritAttrs: false,
+        setup(_, { attrs, slots }) {
+            const own = useId();
+            const element = ref<ComponentPublicInstance | null>(null);
+            let popup: Element | null = null;
+            const id = () => (attrs.id as string | undefined) ?? own;
+            const name = () => {
+                const el = element.value?.$el as Element | undefined;
+                popup = el?.closest('[data-slot="popover-content"]') ?? null;
+                popup?.setAttribute(attribute, id());
+            };
+            onMounted(name);
+            onUpdated(name);
+            onBeforeUnmount(() => {
+                if (popup?.getAttribute(attribute) === id()) {
+                    popup.removeAttribute(attribute);
+                }
+            });
+            return () =>
+                h(
+                    atom,
+                    {
+                        ref: element,
+                        "data-slot": slot,
+                        ...atomProps,
+                        ...attrs,
+                        id: id(),
+                        class: cn(classes, attrs.class as string),
+                    },
+                    slots,
+                );
+        },
+    });
+}
 
-const PopoverDescription = defineComponent({
-    name: "PopoverDescription",
-    inheritAttrs: false,
-    setup(_, { attrs, slots }) {
-        return () =>
-            h(
-                Text.Paragraph,
-                {
-                    "data-slot": "popover-description",
-                    ...attrs,
-                    class: cn("text-palette-accent/85", attrs.class as string),
-                },
-                slots,
-            );
-    },
-});
+const PopoverTitle = popupText(
+    "PopoverTitle",
+    "popover-title",
+    Text.Heading,
+    { as: "h2" },
+    "text-palette-contrast",
+    "aria-labelledby",
+);
+
+const PopoverDescription = popupText(
+    "PopoverDescription",
+    "popover-description",
+    Text.Paragraph,
+    {},
+    "text-palette-accent/85",
+    "aria-describedby",
+);
 
 const PopoverClose = defineComponent({
     name: "PopoverClose",
