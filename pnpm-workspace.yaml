@@ -10,3 +10,10 @@ packages:
 # Dependencies allowed to run install scripts (pnpm refuses an ignored build script in CI).
 allowBuilds:
   esbuild: true
+
+# Fragiola UI's vendored components (examples/react) run on Fragiola Primitives, the ecosystem's own
+# package, published the day the examples were vendored: the release-age gate (D22's seven days)
+# is waived for it alone, by name and exact version.
+minimumReleaseAgeExclude:
+  - "@fragiola/primitives-react@0.2.0"
+  - "@fragiola/primitives@0.2.0"
