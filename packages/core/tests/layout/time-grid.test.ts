@@ -313,6 +313,30 @@ describe("occurrences across days and DST", () => {
         expect(placed(grid?.columns[0]?.segments)).toEqual(["a 0/1+1 30..180"]);
     });
 
+    it("keeps an occurrence whose end reads before its start in the repeated hour", () => {
+        // 01:30 EDT to 01:10 EST is 40 minutes, though 01:10 reads earlier on the wall clock
+        const grid = gridOf(
+            [
+                timed(
+                    "a",
+                    "2026-11-01T01:30:00-04:00",
+                    "2026-11-01T01:10:00-05:00",
+                ),
+                timed(
+                    "b",
+                    "2026-11-01T01:00:00-04:00",
+                    "2026-11-01T01:00:00-05:00",
+                ),
+            ],
+            { timeZone: "America/New_York" },
+            "2026-11-01",
+        );
+        expect(placed(grid?.columns[0]?.segments)).toEqual([
+            "b 0/2+1 60..120",
+            "a 1/2+1 90..130",
+        ]);
+    });
+
     it("has no occurrence on a skipped day", () => {
         // Samoa skipped 2011-12-30: the 29th ends where the 31st starts
         const model = modelOf(

@@ -171,10 +171,13 @@ function buildColumn(
             continue;
         }
         const from = start <= dayStart ? 0 : wallMinutes(start, day, timeZone);
+        const wallTo = end >= dayEnd ? 1440 : wallMinutes(end, day, timeZone);
+        // in the hour a fall-back repeats, an end can read earlier than its start on the wall
+        // clock: the piece keeps its real length then, instead of collapsing and vanishing
         const to =
-            end >= dayEnd
-                ? 1440
-                : Math.max(from, wallMinutes(end, day, timeZone));
+            wallTo > from || zeroLength
+                ? Math.max(from, wallTo)
+                : Math.min(1440, from + (end - start) / 60_000);
         const clippedFrom = Math.min(Math.max(from, min), max);
         const clippedTo = Math.min(Math.max(to, min), max);
         // outside the slots shown: only a zero-length occurrence at the very start stays
