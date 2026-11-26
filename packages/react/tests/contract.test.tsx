@@ -91,6 +91,13 @@ describe("the primitive contract", () => {
             "width",
             "pointer-events",
             "touch-action",
+            // a day grid's segments and lanes, on logical properties
+            "inset-block-start",
+            "inset-block-end",
+            "inset-block",
+            "block-size",
+            "inline-size",
+            "min-block-size",
         ]);
         for (const element of container.querySelectorAll<HTMLElement>(
             "[style]",
@@ -254,8 +261,9 @@ describe("the time grid's accessibility structure", () => {
         );
         const grid = container.querySelector('[role="grid"]') as HTMLElement;
         const rows = [...grid.querySelectorAll('[role="row"]')];
-        // the header row, the all-day row, then one row per 30-minute slot
-        expect(rows).toHaveLength(2 + 48);
+        // the header row, the all-day row, one row per 30-minute slot, then the columns' layer
+        expect(rows).toHaveLength(2 + 48 + 1);
+        expect(rows.at(-1)?.getAttribute("data-calendar-part")).toBe("columns");
         expect(rows[0]?.getAttribute("data-calendar-part")).toBe(
             "column-headers",
         );
@@ -269,11 +277,12 @@ describe("the time grid's accessibility structure", () => {
         );
         expect(nine?.querySelector('[role="rowheader"]')).not.toBeNull();
         expect(nine?.querySelectorAll('[role="gridcell"]')).toHaveLength(7);
-        // a column is a layer with no role; its events a list of list items
+        // a column is the layer's cell for its day; its events a list of list items in it
         const column = container.querySelector(
             '[data-calendar-part="column"][data-date="2026-11-26"]',
         ) as HTMLElement;
-        expect(column.getAttribute("role")).toBeNull();
+        expect(column.getAttribute("role")).toBe("gridcell");
+        expect(column.parentElement?.getAttribute("role")).toBe("row");
         const list = column.querySelector('[role="list"]');
         expect(list?.querySelectorAll('[role="listitem"]')).toHaveLength(1);
         // one tab stop: today's first slot

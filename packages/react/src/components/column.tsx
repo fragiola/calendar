@@ -22,9 +22,9 @@ export interface ColumnProps extends DivPrimitiveProps<ColumnState> {
 }
 
 /**
- * A day's positioned layer over the slot rows (`data-date`, `data-today`, …; no role: its events
- * are a list, its slots the grid's cells). The engine hit-tests on it: give it the day's full
- * height. It is the containing block of its events (`position: relative`).
+ * A day's positioned layer over the slot rows (`role="gridcell"` of the columns' row, `data-date`,
+ * `data-today`, …; outside the roving focus: the slots are). The engine hit-tests on it: give it
+ * the day's full height. It is the containing block of its events (`position: relative`).
  */
 export function Column(props: ColumnProps) {
     const { column, children, ...rest } = props;

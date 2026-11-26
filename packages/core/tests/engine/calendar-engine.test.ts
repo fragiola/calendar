@@ -536,10 +536,14 @@ describe("attributes (D17)", () => {
             "data-time": "09:00",
             role: "rowheader",
         });
-        // the column is a positioned layer with no role; its events are a list of list items
+        // the columns' layer is the grid's last row, each column a cell holding its events' list
+        expect(attributes("columns", {})).toEqual({
+            "data-calendar-part": "columns",
+            role: "row",
+        });
         const column = attributes("column", day);
-        expect(column.role).toBeUndefined();
         expect(column).toMatchObject({
+            role: "gridcell",
             "data-calendar-part": "column",
             "data-date": "2026-11-26",
             "data-today": "",
@@ -626,6 +630,58 @@ describe("attributes (D17)", () => {
                 "aria-pressed"
             ],
         ).toBe("false");
+    });
+});
+
+describe('"+N more" on the keyboard (D12)', () => {
+    /** A month with three events on 2026-11-26 and room for one: a "+2 more" link. */
+    function moreMonth(auto = false) {
+        const m = mount({
+            ...(auto ? { dayEventsHeight: 20 } : {}),
+            events: [
+                allDay("a", "2026-11-26", "2026-11-27"),
+                allDay("b", "2026-11-26", "2026-11-27"),
+                allDay("c", "2026-11-26", "2026-11-27"),
+            ],
+            settings: { dayMaxEvents: auto ? "auto" : 1 },
+            view: { type: "month", anchorDate: "2026-11-26" },
+        });
+        const more = document.createElement("button");
+        more.tabIndex = -1;
+        m.element("day 2026-11-26").append(more);
+        m.engine.adapter.register("more", { date: "2026-11-26" }, more);
+        return { m, more };
+    }
+
+    it("is the last item of its day's events: Down from the last event, Up back, Escape to the day", () => {
+        const { m, more } = moreMonth();
+        m.engine.run("focus", { date: "2026-11-26" });
+        m.key("Enter");
+        expect(document.activeElement).toBe(m.element("event a 2026-11-26"));
+        expect(m.key("ArrowDown").defaultPrevented).toBe(true);
+        expect(document.activeElement).toBe(more);
+        expect(m.key("Enter").defaultPrevented).toBe(true);
+        expect(m.events.at(-1)).toEqual({
+            type: "more-click",
+            date: "2026-11-26",
+            occurrenceIds: ["b", "c"],
+        });
+        m.key("ArrowUp");
+        expect(document.activeElement).toBe(m.element("event a 2026-11-26"));
+        m.key("ArrowDown");
+        m.key("Escape");
+        expect(document.activeElement).toBe(m.element("day 2026-11-26"));
+    });
+
+    it("takes the focus on Enter from a day whose events all are hidden", () => {
+        // a cell of one lane's height: the lane is kept for the link, every event hidden
+        const { m, more } = moreMonth(true);
+        expect(m.engine.get("max-lanes")).toBe(0);
+        m.engine.run("focus", { date: "2026-11-26" });
+        expect(m.key("Enter").defaultPrevented).toBe(true);
+        expect(document.activeElement).toBe(more);
+        m.key("ArrowUp");
+        expect(document.activeElement).toBe(m.element("day 2026-11-26"));
     });
 });
 

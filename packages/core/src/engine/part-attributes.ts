@@ -9,8 +9,9 @@
 //   `list` (its events) > `listitem` (a segment);
 // - a time grid: `grid` > `row` of `columnheader`s, the all-day `row` of `gridcell` days (each with
 //   its `list` of segments), then one `row` per slot (`rowheader` label, a `gridcell` per day);
-//   each day's timed events are a `list` of `listitem`s in a positioned column layer, which has no
-//   role of its own;
+//   the positioned layer of columns over the slot rows is the grid's last `row` (`columns`), a
+//   `gridcell` per day (`column`) holding its timed events, a `list` of `listitem`s (Issue #8: a
+//   list must sit in a cell, never beside the rows);
 // - a list view: a `list` per day, its events `listitem`s that are each a tab stop.
 import type { CalendarTypes } from "../document/calendar-types";
 import type {
@@ -91,6 +92,7 @@ export function attributesOf(
         case "week":
         case "all-day-row":
         case "column-headers":
+        case "columns":
             into.role = "row";
             break;
         case "slot-row":
@@ -124,6 +126,7 @@ export function attributesOf(
             break;
         case "column":
             Object.assign(into, dayAttributes());
+            into.role = "gridcell";
             break;
         case "day-events":
         case "column-events":
