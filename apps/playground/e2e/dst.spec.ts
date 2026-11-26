@@ -3,7 +3,6 @@ import {
     column,
     drag,
     event,
-    log,
     openFixture,
     pointIn,
     scrollTo,
@@ -47,9 +46,11 @@ test("a drag by one day across the change keeps 09:00 on the wall clock", async 
         await pointIn(event(page, "before"), 0.5, 0.25),
         await pointIn(slot(page, "2026-11-01", "09:00"), 0.5, 0.25),
     );
-    await expect(log(page)).toHaveCount(0);
-    await expect(event(page, "before")).toBeVisible();
-    const box = await event(page, "before").boundingBox();
+    // the event left Saturday's column for Sunday's: the same y on both days proves nothing alone
+    await expect(event(column(page, "2026-10-31"), "before")).toHaveCount(0);
+    const moved = event(column(page, "2026-11-01"), "before");
+    await expect(moved).toBeVisible();
+    const box = await moved.boundingBox();
     const nine = await slot(page, "2026-11-01", "09:00").boundingBox();
     if (!box || !nine) throw new Error("no boxes");
     expect(Math.abs(box.y - nine.y)).toBeLessThanOrEqual(1);
