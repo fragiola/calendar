@@ -1,0 +1,67 @@
+---
+title: Calendar.Slot
+description: A day's cell of a slot row, a cell of the grid's roving focus, marked with its date, its time and its selected or business-hours state.
+---
+
+`Calendar.Slot` is one cell of the time grid: a day at a slot's time. It renders a `div` with
+`role="gridcell"`, `data-date` and `data-time`. A press on it is a `date-click` (with the time),
+selects from it with `selection()`, and is where a drag drops. Its look, and any text inside it,
+are yours.
+
+## Behaviour
+
+- A cell of the APG [grid pattern](https://www.w3.org/WAI/ARIA/apg/patterns/grid/): the slots
+  are the time grid's roving focus (`tabindex` `0` on the tab stop, `-1` on the others,
+  `data-focused` on the focused one).
+- Enter on a focused slot moves the focus into the events that start in it.
+- With `selection()`, a press and drag selects a range, Shift + arrows extend it from the focused
+  slot, Enter confirms it; the covered slots carry `data-selected`.
+- With `constraints()`, a slot whose start is within the day's business hours carries
+  `data-business-hours`.
+- A day outside `validRange` carries `data-disabled`.
+- Its date is data for your visually hidden text: the library names no cell. Give it an
+  `aria-label` (or hidden text) when your design has no visible date in it.
+
+## Usage
+
+```tsx
+import { Calendar } from "@fragiola/calendar-react";
+
+export function Cell(props: { date: string; time: string }) {
+    return (
+        <Calendar.Slot
+            date={props.date}
+            aria-label={`${props.date} ${props.time}`}
+            className={(state) =>
+                [
+                    "slot",
+                    state.selected ? "slot-selected" : "",
+                    state.businessHours ? "" : "slot-closed",
+                ].join(" ")
+            }
+        />
+    );
+}
+```
+
+The cell's state (`SlotState`, on the [hooks page](/docs/api/hooks)) styles it; or style
+`[data-selected]` and `[data-business-hours]` in CSS. `useSlot` gives the same props for an
+element of your own.
+
+## Attributes
+
+| attribute | value |
+| --- | --- |
+| `data-calendar-part` | `data-calendar-part="slot"` |
+| `data-date`, `data-time` | its day (`YYYY-MM-DD`) and its start (`HH:mm`) |
+| `data-focused`, `data-selected`, `data-business-hours`, `data-disabled` | present when on |
+| `role`, `tabindex` | `gridcell`, the roving focus |
+
+## Props
+
+`SlotProps` takes the [common props](/docs/api/root#common-props) and any `div` attribute, and:
+
+| prop | type | description |
+| --- | --- | --- |
+| `date` | `string` | its day, from `Calendar.SlotRow`'s children function (`column.date`) |
+| `children` | `ReactNode`, or `(state: SlotState) => ReactNode` | what it shows: elements, or a function of its state |

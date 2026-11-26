@@ -1,0 +1,78 @@
+---
+title: DragPreview
+description: Where a drag, a resize or a drop from outside would put the event, laid out as the event in a column or over a day-grid row, for you to draw.
+---
+
+`DragPreview` shows where an event would land during a gesture: a move with `dragAndDrop()`, a
+resize with `resize()`, or a drop from outside with `externalDrop()`. It is exported by
+`@fragiola/calendar-react/drag-and-drop` and by `@fragiola/calendar-react/resize` (a resize
+previews through it). It is laid out as the event: in a `Calendar.Column` positioned like a timed
+event, in a `Calendar.Week` or `Calendar.AllDayRow` over the row's days. Its look, and the new
+times it may show, are yours.
+
+## Behaviour
+
+- It renders only while a gesture has a target the model accepts: each candidate target is asked
+  with `model.check` first, so a refused one (an edit rule, a constraint) shows no preview, and its
+  release runs nothing.
+- The preview is engine view state (`engine.get("drag-preview")`, `"resize-preview"`): the model
+  receives one command on drop, never a stream while dragging.
+- It is `aria-hidden`; `onAnnounce` reports the moves as data for your live region.
+- In a row it is positioned over its days after `--calendar-row-inset`; the row is its containing
+  block.
+
+## Usage
+
+```tsx
+import { Calendar } from "@fragiola/calendar-react";
+import { DragPreview } from "@fragiola/calendar-react/drag-and-drop";
+
+export function Previewed() {
+    return (
+        <Calendar.Columns>
+            {(column) => (
+                <Calendar.Column column={column}>
+                    <Calendar.ColumnEvents>
+                        {(segment) => <Calendar.TimeEvent segment={segment} />}
+                    </Calendar.ColumnEvents>
+                    <DragPreview className="preview">
+                        {({ preview }) => (preview.allDay ? "All day" : preview.start)}
+                    </DragPreview>
+                </Calendar.Column>
+            )}
+        </Calendar.Columns>
+    );
+}
+```
+
+Render one in every column and in the rows (the all-day row, a month's weeks): each shows the
+preview's part in its own place. `useDragPreview` (on the [hooks page](/docs/api/hooks)) gives the
+preview itself.
+
+<Example id="drag-and-resize" />
+
+## Attributes
+
+| attribute | value |
+| --- | --- |
+| `data-calendar-part` | `data-calendar-part="drag-preview"` |
+| `aria-hidden` | `true` |
+| `style` | positioned as the event in a column, over its days in a row (structural) |
+
+## Props
+
+`DragPreviewProps` takes the [common props](/docs/api/root#common-props) and any `div`
+attribute, and:
+
+| prop | type | description |
+| --- | --- | --- |
+| `children` | `ReactNode`, or `(state: DragPreviewState) => ReactNode` | what it shows (the event's look, its new times): elements, or a function of its state |
+
+## State
+
+`DragPreviewState`:
+
+| field | type | description |
+| --- | --- | --- |
+| `preview` | `DragPreview` | the moved, resized or dropped-in occurrence where it would land: its times, its `kind` (`"move"`, `"resize"`, `"external"`), `keyboard` |
+| `segment` | `TimeSegment` or `Segment` | its part here: a time-grid segment (in a column) or a day-grid segment (in a row) |

@@ -1,0 +1,56 @@
+---
+title: Calendar.ColumnHeader
+description: A column's header cell, with its day as data-date and today, weekend and past as state; the text in it is yours, from Intl parts.
+---
+
+`Calendar.ColumnHeader` is one header cell (`role="columnheader"`). It renders a `div` with what
+you give it and marks its day; the words come from you (`useDayHeader(date)` gives the `Intl`
+parts in the calendar's locale).
+
+## Behaviour
+
+- It carries the day's attributes: `data-date`, and `data-today`, `data-weekend`, `data-past`
+  present or absent.
+- In a month view its date is a day of the first row: it stands for the weekday.
+- It is not in the roving focus.
+
+It renders `data-calendar-part="column-header"`.
+
+## Usage
+
+```tsx
+import { Calendar, useDayHeader } from "@fragiola/calendar-react";
+
+function Weekday({ date }: { date: string }) {
+    const parts = useDayHeader(date, { weekday: "short" });
+    return (
+        <Calendar.ColumnHeader
+            date={date}
+            className={(state) => (state.today ? "header today" : "header")}
+        >
+            {parts.map((part) => part.value).join("")}
+        </Calendar.ColumnHeader>
+    );
+}
+```
+
+## Props
+
+`ColumnHeaderProps`; it also takes the [common props](/docs/api/root#common-props) and every `div`
+attribute.
+
+| prop | type | description |
+| --- | --- | --- |
+| `date` | `string` | the day, from `Calendar.ColumnHeaders`' children function |
+| `children` | `ReactNode \| (state) => ReactNode` | what it shows, or a function of its state |
+
+## State
+
+`ColumnHeaderState`:
+
+| field | type | description |
+| --- | --- | --- |
+| `date` | `string` | its day, `YYYY-MM-DD` |
+| `today` | `boolean` | it is today (`data-today`) |
+| `weekend` | `boolean` | a weekend day of the locale (`data-weekend`) |
+| `past` | `boolean` | before today (`data-past`) |

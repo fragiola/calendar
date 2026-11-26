@@ -1,0 +1,70 @@
+---
+title: Calendar.ColumnEvents
+description: A day's timed events as a list positioned over its column, calling your function once per timed segment of the day.
+---
+
+`Calendar.ColumnEvents` is the list of a day's timed events, inside a `Calendar.Column`: a `div`
+with `role="list"` and `data-date`, laid over the column (`position: absolute; inset: 0`, the
+containing block of the events' percentages). It calls its children function once per timed
+segment of the day, usually a `Calendar.TimeEvent`.
+
+## Behaviour
+
+- A `list` inside the column's `gridcell`: Enter on a focused slot moves the focus
+  to the events that start in it, Up and Down move between them, Escape returns to the slot.
+- The segments come from the time grid's overlap layout: a multi-day timed event is split
+  per column; overlapping events share the width by their `column`, `columns` and `span`.
+- A segment's call runs again only when the segment object or the children function changes. See
+  [Performance](/docs/guides/performance).
+
+## Usage
+
+```tsx
+import { Calendar, type TimeSegment, useCalendar } from "@fragiola/calendar-react";
+
+function TimedEvent(props: { segment: TimeSegment }) {
+    const { model } = useCalendar();
+    const title = model.get("event-by", { id: props.segment.eventId })?.title;
+    return (
+        <Calendar.TimeEvent segment={props.segment} className="event">
+            {title}
+        </Calendar.TimeEvent>
+    );
+}
+
+export function Events() {
+    return (
+        <Calendar.ColumnEvents className="events">
+            {(segment) => <TimedEvent segment={segment} />}
+        </Calendar.ColumnEvents>
+    );
+}
+```
+
+The title is model data: the event component reads it, the library renders no text.
+
+## Attributes
+
+| attribute | value |
+| --- | --- |
+| `data-calendar-part` | `data-calendar-part="column-events"` |
+| `data-date` | its day, `YYYY-MM-DD` |
+| `role` | `list` |
+| `style` | `position: absolute; inset: 0` (structural) |
+
+## Props
+
+`ColumnEventsProps` takes the [common props](/docs/api/root#common-props) and any `div`
+attribute, and:
+
+| prop | type | description |
+| --- | --- | --- |
+| `children` | `(segment: TimeSegment) => ReactNode` | called per timed segment of the day (`<Calendar.TimeEvent segment={segment} />`) |
+
+## State
+
+`ColumnEventsState`:
+
+| field | type | description |
+| --- | --- | --- |
+| `segments` | `readonly TimeSegment[]` | the column's timed segments |

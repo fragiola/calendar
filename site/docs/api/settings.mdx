@@ -1,0 +1,142 @@
+---
+title: Settings
+description: Every setting of the calendar document, with its default, from the display zone and locale, the weeks, the time grid's slots, the edit rules and the features'.
+---
+
+The settings are part of the document (`settings`), each one optional: the defaults fill the
+rest. The model holds them resolved (`model.state.settings`, `model.get("settings")`, a
+`CalendarSettings`), and `settings.set` changes them with a `SettingsPatch`. Which settings a user
+may change, and the controls for them, are yours.
+
+```ts
+import { createCalendarModel } from "@fragiola/calendar-react";
+
+const model = createCalendarModel({
+    version: 1,
+    events: [],
+    settings: {
+        timeZone: "Europe/London",
+        locale: "en-GB",
+        firstDayOfWeek: 1,
+        slotMinTime: "07:00",
+        slotMaxTime: "20:00",
+        dayMaxEvents: 3,
+    },
+});
+
+model.run("settings.set", { settings: { hiddenDays: [0, 6] } }); // a work week
+model.run("settings.set", { settings: { firstDayOfWeek: null } }); // back to the locale's
+```
+
+A `null` in a patch removes an optional setting, so its default applies again. With the React
+root, the `settings` prop sends the changed value as a whole patch
+([Controlled state](/docs/guides/controlled-state)).
+
+## Defaults
+
+`DEFAULT_SETTINGS` holds the settings of a document that gives none (FullCalendar's documented
+defaults where the calendar decides nothing of its own). A setting the table says has no default
+stays absent: its default is another value (the locale's first day, the slot, no limit).
+
+## Display and weeks
+
+| setting | type | default | description |
+| --- | --- | --- | --- |
+| `timeZone` | `string` | `"local"` | the display zone: an IANA name, or `"local"` (the host's, `LOCAL_TIME_ZONE`) |
+| `locale` | `string` | `"en-US"` | BCP 47: formatting and the week's rules |
+| `firstDayOfWeek` | `Weekday` | the locale's | the first day of a week, 0 = Sunday |
+| `hiddenDays` | `Weekday[]` | `[]` | days of the week no view shows |
+| `weekNumbers` | `"iso" \| "locale"` | `"locale"` | how weeks are numbered |
+| `fixedWeekCount` | `boolean` | `true` | whether a month view always shows six weeks |
+| `validRange` | `ValidRangeJson` | none | the dates the calendar may navigate to |
+
+## Time grid
+
+| setting | type | default | description |
+| --- | --- | --- | --- |
+| `slotDuration` | `number` | `30` | a slot, in minutes |
+| `slotMinTime` | `string` | `"00:00"` | the first time shown, `HH:mm` |
+| `slotMaxTime` | `string` | `"24:00"` | the end of what is shown, `HH:mm` up to `24:00` |
+| `snapDuration` | `number` | the slot | the step a drag or a selection snaps to, in minutes |
+| `eventMinDuration` | `number` | `15` | the least minutes an occurrence counts for in the overlap layout |
+| `nextDayThreshold` | `string` | `"00:00"` | the wall clock a timed end must reach to show on its last day |
+
+## Day grid and order
+
+| setting | type | default | description |
+| --- | --- | --- | --- |
+| `dayMaxEvents` | `number \| "auto" \| null` | `null` | the occurrences a day shows before "+N more"; `"auto"`: what fits (measured); `null`: all |
+| `eventOrder` | `string` | `"start,-duration,allDay,title"` | how occurrences tie-break: fields, `-` for descending, an unknown one read from `data` |
+
+## Durations
+
+| setting | type | default | description |
+| --- | --- | --- | --- |
+| `defaultTimedDuration` | `number` | `60` | minutes: a timed event made from an all-day one, or added without an end |
+| `defaultAllDayDuration` | `number` | `1` | days: an all-day event made from a timed one, or added without an end |
+| `allDayMaintainDuration` | `boolean` | `false` | whether a move between all-day and timed keeps the duration |
+
+## Edit rules
+
+The defaults of every event's flags. For each flag the chain is: the event's flag, the event's
+`editable`, its calendar's `editable`, the settings' flag, the settings' `editable`
+([Drag and drop](/docs/guides/drag-and-drop)).
+
+| setting | type | default | description |
+| --- | --- | --- | --- |
+| `editable` | `boolean` | `true` | the default of every event's `editable` |
+| `startEditable` | `boolean` | `editable` | the default of `startEditable` |
+| `durationEditable` | `boolean` | `editable` | the default of `durationEditable` |
+| `deletable` | `boolean` | `editable` | the default of `deletable` |
+
+## The features' settings
+
+A feature's setting in a model without the feature is `invalid_payload` (in `settings.set`) or a
+document issue, naming the feature.
+
+| setting | type | feature | description |
+| --- | --- | --- | --- |
+| `businessHours` | `BusinessHours[]` | `constraints()` | the working hours, in the display zone |
+| `eventConstraint` | `EventConstraint` | `constraints()` | where events may be added, moved and resized to |
+| `selectConstraint` | `EventConstraint` | `constraints()` | where a range may be selected |
+| `overlap` | `boolean \| Record<string, boolean>` | `constraints()` | whether events may overlap: all of them, or per calendar id (default `true`) |
+| `eventSources` | `EventSource[]` | `eventSources()` | the event sources ([The JSON document](/docs/api/json-document)) |
+
+`BusinessHours`, one rule of `businessHours`:
+
+| field | type | description |
+| --- | --- | --- |
+| `daysOfWeek` | `Weekday[]` | the days it covers, 0 = Sunday |
+| `startTime` | `string` | `HH:mm` |
+| `endTime` | `string` | `HH:mm`, after `startTime`, up to `24:00` |
+
+An `EventConstraint` is `"business-hours"` (which needs `businessHours`) or a non-empty list of
+`ConstraintRange`, the event within one of them:
+
+| field | type | description |
+| --- | --- | --- |
+| `start` | `string` | a date (that day's start in the display zone) or a date-time; open when absent |
+| `end` | `string` | the same, exclusive; open when absent |
+
+```ts
+import { createCalendarModel } from "@fragiola/calendar-react";
+import { constraints } from "@fragiola/calendar-react/constraints";
+
+const model = createCalendarModel(
+    {
+        version: 1,
+        events: [],
+        settings: {
+            businessHours: [
+                { daysOfWeek: [1, 2, 3, 4, 5], startTime: "09:00", endTime: "17:00" },
+            ],
+            eventConstraint: "business-hours",
+            overlap: { focus: false },
+        },
+    },
+    { features: [constraints()] },
+);
+```
+
+Here events stay within weekday working hours, and no event may overlap one of the `focus`
+calendar ([Constraints and business hours](/docs/guides/constraints-and-business-hours)).

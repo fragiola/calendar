@@ -1,0 +1,65 @@
+---
+title: Calendar.ViewButton
+description: A toggle button that shows a view with `view.set`, pressed while that view is shown, for a month, week, day, n-day or list switcher.
+---
+
+`Calendar.ViewButton` is a toggle `button` for a view switcher. It runs `view.set` with its
+`view` (and `days`), and says whether its view is the one shown. The labels, the group around the
+buttons and their look are yours.
+
+## Behaviour
+
+- A press runs `view.set` with `{ type: view }`, or `{ type: view, days }` for a `days` view. The
+  anchor date stays, so the new view shows the same date.
+- It is pressed (`aria-pressed="true"`, `data-pressed`) while the view shown is its view (and, for
+  a `days` view with `days`, the same count); `aria-pressed="false"` otherwise.
+- It is disabled (`disabled`, `data-disabled`) when `model.can("view.set", …)` says no.
+
+It renders `data-calendar-part="view-button"` on a `button` with `type="button"`.
+
+## Usage
+
+```tsx
+import { Calendar } from "@fragiola/calendar-react";
+
+function ViewSwitcher() {
+    return (
+        <div role="group" aria-label="View">
+            <Calendar.ViewButton view="month" className="segment">
+                Month
+            </Calendar.ViewButton>
+            <Calendar.ViewButton view="week" className="segment">
+                Week
+            </Calendar.ViewButton>
+            <Calendar.ViewButton view="days" days={3} className="segment">
+                3 days
+            </Calendar.ViewButton>
+            <Calendar.ViewButton view="list" className="segment">
+                Agenda
+            </Calendar.ViewButton>
+        </div>
+    );
+}
+```
+
+Style the pressed one with `[data-pressed]` or `[aria-pressed="true"]`.
+
+## Props
+
+`ViewButtonProps`; it also takes the [common props](/docs/api/root#common-props) and every
+`button` attribute.
+
+| prop | type | description |
+| --- | --- | --- |
+| `view` | `ViewType` | the view it shows: `"month"`, `"week"`, `"day"`, `"days"` or `"list"` |
+| `days` | `number` | a `days` view's number of days |
+| `children` | `ReactNode` | its label |
+
+## State
+
+`ViewButtonState` extends `CommandButtonState`:
+
+| field | type | description |
+| --- | --- | --- |
+| `pressed` | `boolean` | its view is the one shown (`aria-pressed`, `data-pressed`) |
+| `disabled` | `boolean` | `view.set` cannot run now (`data-disabled`) |

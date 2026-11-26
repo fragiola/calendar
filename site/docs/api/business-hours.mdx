@@ -1,0 +1,95 @@
+---
+title: BusinessHours
+description: A day's business hours in its column with constraints(), one element per range positioned at its fractions of the column, for you to shade.
+---
+
+`BusinessHours` draws a day's business hours in its `Calendar.Column`, with the `constraints()`
+feature from `@fragiola/calendar-react/constraints` and the `businessHours` setting. It renders
+one `div` per range of the day, positioned at its fractions of the column (`top`, `height`); the
+shade is yours.
+
+## Behaviour
+
+- The ranges are the setting's rules for the column's weekday, in the display zone
+  (`model.get("business-hours-in")`): touching rules merge, a day without rules shows nothing.
+- The slots whose start is within them carry `data-business-hours`, so you can shade the closed
+  hours instead.
+- With `eventConstraint: "business-hours"` (or `selectConstraint`), a move, a resize or a
+  selection outside them is refused (see
+  [Constraints and business hours](/docs/guides/constraints-and-business-hours)).
+- It is `aria-hidden`.
+- Without `constraints()` in the model's features it renders nothing and warns once.
+
+## Usage
+
+```tsx
+import { Calendar, createCalendarModel } from "@fragiola/calendar-react";
+import { BusinessHours, constraints } from "@fragiola/calendar-react/constraints";
+import { useState } from "react";
+
+const FEATURES = [constraints()] as const;
+
+export function OfficeWeek() {
+    const [model] = useState(() =>
+        createCalendarModel(
+            {
+                version: 1,
+                events: [],
+                calendars: [],
+                settings: {
+                    businessHours: [
+                        { daysOfWeek: [1, 2, 3, 4, 5], startTime: "09:00", endTime: "17:00" },
+                    ],
+                },
+                view: { type: "week", anchorDate: "2026-11-26" },
+            },
+            { features: FEATURES },
+        ),
+    );
+    return (
+        <Calendar.Root model={model}>
+            <Calendar.TimeGrid aria-label="Week">
+                <Calendar.Columns>
+                    {(column) => (
+                        <Calendar.Column column={column}>
+                            <BusinessHours className="business-hours" />
+                        </Calendar.Column>
+                    )}
+                </Calendar.Columns>
+            </Calendar.TimeGrid>
+        </Calendar.Root>
+    );
+}
+```
+
+Each weekday's column shows a block from 09:00 to 17:00; the weekend shows none. A real grid also
+renders its slot rows (see [Calendar.TimeGrid](/docs/api/time-grid)). `useBusinessHours` (on the
+[hooks page](/docs/api/hooks)) gives the ranges themselves.
+
+<Example id="business-hours-and-constraints" />
+
+## Attributes
+
+| attribute | value |
+| --- | --- |
+| `data-calendar-part` | `data-calendar-part="business-hours"` |
+| `data-date` | its day, `YYYY-MM-DD` |
+| `aria-hidden` | `true` |
+| `style` | `position: absolute`, `top`, `height` (structural) |
+
+## Props
+
+`BusinessHoursProps` takes the [common props](/docs/api/root#common-props) and any `div`
+attribute, and:
+
+| prop | type | description |
+| --- | --- | --- |
+| `children` | `ReactNode`, or `(state: BusinessHoursState) => ReactNode` | what it shows: elements, or a function of its state |
+
+## State
+
+`BusinessHoursState`:
+
+| field | type | description |
+| --- | --- | --- |
+| `range` | `BusinessHoursRange` | the range: its day (`date`), its instants (`start`, `end`) and its fractions of the column (`top`, `height`) |

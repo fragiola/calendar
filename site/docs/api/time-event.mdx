@@ -1,0 +1,71 @@
+---
+title: Calendar.TimeEvent
+description: A timed event's part in a day column, placed from its layout fractions as percentages, focusable, draggable and resizable with the features.
+---
+
+`Calendar.TimeEvent` is a timed occurrence's part in one column: a `div` with `role="listitem"`,
+its ids and its state as `data-*`. It places itself from the layout: `position: absolute`, `top`
+and `height` from its times, `inset-inline-start` and `width` from its overlap columns, all as
+percentages of the column (logical properties: right to left needs nothing more). What it
+shows (the title, the times, a colour from its calendar) is yours.
+
+## Behaviour
+
+- A `listitem` of its day's `list`: reached with Enter from the slot it starts in, then Up
+  and Down; Enter on a focused event is `event-click` (`onEventClick`). It is in the roving focus
+  (`tabindex`, `data-focused`).
+- With `dragAndDrop()`, a press and drag moves it (a mouse after 5 px, a touch after a long press
+  unless it is focused), Space grabs it from the keyboard and the arrows move it by a snap step
+  (Up/Down) or a day (Left/Right), Enter drops, Escape cancels. `touch-action: none` is set while a
+  drag feature is installed.
+- With `resize()`, a `ResizeHandle` inside it resizes it; Shift + Up/Down resizes a grabbed event.
+- Its accessible name is yours: its content, or an `aria-label`. The library sets none.
+
+## Usage
+
+```tsx
+import { Calendar, type TimeSegment, useCalendar } from "@fragiola/calendar-react";
+import { ResizeHandle } from "@fragiola/calendar-react/resize";
+
+export function TimedEvent(props: { segment: TimeSegment }) {
+    const { model } = useCalendar();
+    const event = model.get("event-by", { id: props.segment.eventId });
+    return (
+        <Calendar.TimeEvent
+            segment={props.segment}
+            className={(state) =>
+                state.dragging || state.grabbed ? "event event-moving" : "event"
+            }
+        >
+            <span className="event-title">{event?.title}</span>
+            <ResizeHandle edge="end" className="event-handle" />
+        </Calendar.TimeEvent>
+    );
+}
+```
+
+The state (`TimeEventState`, on the [hooks page](/docs/api/hooks), with the segment and the
+`EventState` flags) styles it; `useTimeEvent` gives the same props for an element of your own.
+
+<Example id="drag-and-resize" />
+
+## Attributes
+
+| attribute | value |
+| --- | --- |
+| `data-calendar-part` | `data-calendar-part="time-event"` |
+| `data-event-id`, `data-occurrence-id`, `data-calendar-id` | its event, its occurrence, its calendar |
+| `data-continues-before`, `data-continues-after` | it started before, or ends after, the column's day |
+| `data-focused`, `data-dragging`, `data-grabbed`, `data-resizing` | present when on |
+| `role`, `tabindex` | `listitem`, the roving focus |
+| `style` | `position`, `top`, `height`, `inset-inline-start`, `width` (structural) |
+
+## Props
+
+`TimeEventProps` takes the [common props](/docs/api/root#common-props) and any `div` attribute,
+and:
+
+| prop | type | description |
+| --- | --- | --- |
+| `segment` | `TimeSegment` | the segment, from `Calendar.ColumnEvents`' children function |
+| `children` | `ReactNode`, or `(state: TimeEventState) => ReactNode` | the event's content (its title is model data: render it yourself), or a function of the state |

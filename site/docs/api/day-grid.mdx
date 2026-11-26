@@ -1,0 +1,69 @@
+---
+title: Calendar.DayGrid
+description: The month view's grid. It holds the weekday headers and the week rows, with one tab stop and a roving focus over its days.
+---
+
+`Calendar.DayGrid` is a month's grid (`role="grid"`). It renders a `div` with the children you
+give it, usually a `Calendar.ColumnHeaders` row and the `Calendar.Weeks`. The layout of the weeks,
+their days and their events comes from the core; the grid's size, lines and colours are yours.
+
+## Behaviour
+
+The grid follows the APG grid pattern (https://www.w3.org/WAI/ARIA/apg/patterns/grid/), as an event
+calendar, which has no APG pattern of its own, uses it:
+
+- one tab stop: the focused day, else today, else the month's first day;
+- the arrows move the roving focus between days, Home and End go to the week's first and last
+  days, PageUp and PageDown to the previous and next month (`view.previous`, `view.next`),
+  Shift + PageUp and PageDown a year;
+- Enter (or F2) on a day moves the focus into its events, Up and Down move between them, Escape
+  returns to the day; a day's "+N more" is the last item of its events.
+
+The grid needs its accessible name (`aria-label`, or `aria-labelledby` your title): the library
+sets none. It renders `data-calendar-part="day-grid"`.
+
+## Usage
+
+```tsx
+import { Calendar } from "@fragiola/calendar-react";
+
+function MonthGrid() {
+    return (
+        <Calendar.DayGrid aria-label="November 2026" className="month">
+            <Calendar.ColumnHeaders className="weekdays">
+                {(date) => <Calendar.ColumnHeader date={date}>{date}</Calendar.ColumnHeader>}
+            </Calendar.ColumnHeaders>
+            <Calendar.Weeks>
+                {(week) => (
+                    <Calendar.Week week={week} className="week">
+                        {(day) => (
+                            <Calendar.Day day={day} className="day">
+                                <span aria-hidden>{Number(day.date.slice(8))}</span>
+                                <Calendar.DayEvents>
+                                    {(segment) => <Calendar.Segment segment={segment} />}
+                                </Calendar.DayEvents>
+                            </Calendar.Day>
+                        )}
+                    </Calendar.Week>
+                )}
+            </Calendar.Weeks>
+        </Calendar.DayGrid>
+    );
+}
+```
+
+A month view shows six weeks by default (`fixedWeekCount`); give the weeks a height in your CSS
+(a grid of rows, or `flex: 1` each). See the [month view guide](/docs/guides/month-view).
+
+<Example id="month" />
+
+## Props
+
+`DayGridProps`; it also takes the [common props](/docs/api/root#common-props) and every `div`
+attribute.
+
+| prop | type | description |
+| --- | --- | --- |
+| `children` | `ReactNode` | the header row and the weeks |
+
+Its state (`DayGridState`) is empty.

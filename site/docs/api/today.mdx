@@ -1,0 +1,45 @@
+---
+title: Calendar.Today
+description: A button that runs `view.today`, going to today's range, and is disabled when the model cannot.
+---
+
+`Calendar.Today` is a `button` that runs one view command. Its label, icon and look are yours;
+the command, its availability and the button's state are the package's.
+
+## Behaviour
+
+- A press runs `view.today`: the range holding today (the model's clock, in the display zone).
+- It is disabled (`disabled` and `data-disabled`) while `model.can("view.today")` says no, which
+  happens when the step would leave the `validRange` setting.
+- It is an ordinary button outside the grid's roving focus: Tab reaches it, Enter and Space press
+  it.
+
+It renders `data-calendar-part="today"` on a `button` with `type="button"`.
+
+## Usage
+
+```tsx
+import { Calendar } from "@fragiola/calendar-react";
+
+// inside Calendar.Root
+<Calendar.Today className={(state) => (state.disabled ? "button muted" : "button")}>
+    Today
+</Calendar.Today>
+```
+
+## Props
+
+`TodayProps`; it also takes the [common props](/docs/api/root#common-props) and every `button`
+attribute.
+
+| prop | type | description |
+| --- | --- | --- |
+| `children` | `ReactNode` | its label: text or elements of yours |
+
+## State
+
+`TodayState` is `CommandButtonState` ([hooks](/docs/api/hooks)):
+
+| field | type | description |
+| --- | --- | --- |
+| `disabled` | `boolean` | its command cannot run now (`data-disabled`) |

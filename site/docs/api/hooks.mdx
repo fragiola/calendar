@@ -1,0 +1,362 @@
+---
+title: Hooks
+description: The React hooks of the calendar - the model and the engine, the view, the title and headers as Intl parts, the layouts, part hooks and the features' state.
+---
+
+The hooks read what the calendar shows and re-render when it changes. Every hook works inside a
+`Calendar.Root` (the refs also outside it). There are three kinds, as in every Fragiola adapter:
+
+- **context hooks** give the model and the engine (`useCalendar`, and the refs for code outside
+  the root);
+- **value hooks** give data: the view, the title and the headers as `Intl` parts, the layouts, the
+  features' state. Text is never made for you: render the parts' `value`s yourself;
+- **part hooks** give `{ state, props }` (`PartHookResult<S>`): spread `props` on your own element
+  to make it a day, a slot or an event, when `render` is not enough.
+
+A value hook re-renders only when its value changes: records and arrays are compared entry by
+entry, and the layouts keep the identity of unchanged rows.
+
+## `useCalendar`
+
+The model and the engine of the enclosing root. Pass the registry and the features as type
+arguments (a child cannot infer them through context).
+
+```tsx
+import { useCalendar } from "@fragiola/calendar-react";
+
+function DeleteButton({ eventId }: { eventId: string }) {
+    const { model } = useCalendar<Types, typeof features>();
+    if (!model.can("event.remove", { eventId })) return null;
+    return (
+        <button type="button" onClick={() => model.run("event.remove", { eventId })}>
+            Delete
+        </button>
+    );
+}
+```
+
+`UseCalendarResult<T, F>`:
+
+| field | type | description |
+| --- | --- | --- |
+| `model` | `CalendarModel<T, F>` | the calendar's data, its view and its rules: `run`, `can`, `check`, `get`, `is` |
+| `engine` | `CalendarEngine<T, F>` | the calendar on screen: `engine.run("focus", { date })`, `engine.get("drag-preview")`; there from the first render, refusing actions until the root is mounted |
+
+## `useCalendarRef`
+
+A calendar ref kept by the component, which re-renders when the root it is given to mounts or
+unmounts: pass it as the root's `calendarRef` and read `current` in render or in handlers, from
+outside the root (a toolbar next to it, a menu).
+
+```tsx
+import { Calendar, useCalendarRef } from "@fragiola/calendar-react";
+
+function Planner() {
+    const calendar = useCalendarRef<Types>();
+    return (
+        <>
+            <button type="button" onClick={() => calendar.current?.model.run("view.today", {})}>
+                Today
+            </button>
+            <Calendar.Root calendarRef={calendar}>{/* the grid */}</Calendar.Root>
+        </>
+    );
+}
+```
+
+## `createCalendarRef`
+
+The same ref, created outside React (a module, a test); it does not re-render anything.
+
+```ts
+import { createCalendarRef } from "@fragiola/calendar-react";
+
+export const calendar = createCalendarRef<Types>();
+// <Calendar.Root calendarRef={calendar}> … then:
+calendar.current?.model.run("view.next", {});
+```
+
+`CalendarRef<T, F>`:
+
+| field | type | description |
+| --- | --- | --- |
+| `current` | `CalendarHandle<T, F> \| null` | the root's model and engine while it is mounted, `null` otherwise |
+
+`CalendarHandle<T, F>`:
+
+| field | type | description |
+| --- | --- | --- |
+| `model` | `CalendarModel<T, F>` | the root's model |
+| `engine` | `CalendarEngine<T, F>` | the root's engine |
+
+## `useCalendarView`
+
+The view the root shows, re-rendering when it changes: what to render (a month, a time grid, a
+list) and the ranges for your own UI.
+
+```tsx
+import { useCalendarView } from "@fragiola/calendar-react";
+
+function View() {
+    const view = useCalendarView();
+    if (view.type === "month") return <MonthGrid />;
+    if (view.type === "list") return <Agenda />;
+    return <WeekGrid />;
+}
+```
+
+`CalendarView`:
+
+| field | type | description |
+| --- | --- | --- |
+| `type` | `ViewType` | `"month"`, `"week"`, `"day"`, `"days"` or `"list"` |
+| `anchorDate` | `string` | the date the view is built around, `YYYY-MM-DD` |
+| `days` | `number \| undefined` | a `days` view's count |
+| `visibleRange` | `DateRangeJson` | the days shown (a month's six weeks), end exclusive |
+| `currentRange` | `DateRangeJson` | the range the view is about (the month itself), end exclusive |
+
+## `useCalendarTitle`
+
+The view's title as `Intl.DateTimeFormat` range parts in the calendar's locale (`get("title-parts")`):
+a month view's month, another view's days. Pass `Intl` options to change it.
+
+```tsx
+import { useCalendarTitle } from "@fragiola/calendar-react";
+
+function Title() {
+    const parts = useCalendarTitle({ month: "long", year: "numeric" });
+    return <h2>{parts.map((part) => part.value).join("")}</h2>;
+}
+```
+
+## `useDayHeader`
+
+A column's header as `Intl` parts (`get("day-header-by")`): the weekday in a month view, the
+weekday and the day in a time grid; `useDayHeader(date, format?)`.
+
+```tsx
+const parts = useDayHeader("2026-11-26", { weekday: "short", day: "numeric" });
+// [{ type: "weekday", value: "Thu" }, { type: "literal", value: " " }, { type: "day", value: "26" }]
+```
+
+## `useSlotLabel`
+
+A slot's time (`HH:mm`) as `Intl` parts (`get("slot-label-by")`), by default `{ hour: "numeric",
+minute: "2-digit" }`; `useSlotLabel(time, format?)`.
+
+```tsx
+const parts = useSlotLabel("13:00", { hour: "numeric" });
+// "1 PM" in en-US, "13" in pt-BR
+```
+
+## `useDayGrid`
+
+The day grid shown (a month, or a time grid's all-day row), with the lanes the engine measured for
+`dayMaxEvents: "auto"`; `null` in a list view. `Calendar.Weeks` reads it.
+
+```tsx
+const grid = useDayGrid();
+const busiest = Math.max(0, ...(grid?.weeks ?? []).map((week) => week.lanes));
+```
+
+## `useTimeGrid`
+
+The time grid shown (week, day and `days` views; `null` otherwise): its columns, slots and timed
+segments with their fractions. `Calendar.SlotRows` and `Calendar.Columns` read it.
+
+```tsx
+const grid = useTimeGrid();
+const slotCount = grid?.slots.length ?? 0;
+```
+
+## `useListLayout`
+
+The visible days with their occurrences, empty days left out (`get("list")`, any view's days):
+`Calendar.ListDays` reads it.
+
+```tsx
+const { days } = useListLayout();
+const count = days.reduce((sum, day) => sum + day.items.length, 0);
+```
+
+## `useDay`
+
+A part hook: a day of a day grid, its state and the props of its element (`role="gridcell"`,
+`data-date`, the roving tab stop, its registration). `Calendar.Day` is built on it.
+
+```tsx
+import { type DayCell, useDay } from "@fragiola/calendar-react";
+
+function DayCellButton({ day }: { day: DayCell }) {
+    const { state, props } = useDay(day);
+    return <td {...props} className={state.focused ? "focused" : undefined} />;
+}
+```
+
+`DayState`:
+
+| field | type | description |
+| --- | --- | --- |
+| `day` | `DayCell` | the day as the layout gives it |
+| `focused` | `boolean` | it holds the roving focus |
+| `selected` | `boolean` | a selected range covers it (`selection()`) |
+| `disabled` | `boolean` | outside `validRange` |
+| `businessHours` | `boolean` | it has business hours (`constraints()`) |
+
+## `useSlot`
+
+A part hook: a slot of a time grid (`{ date, time }`), its state and props (`role="gridcell"`,
+`data-date`, `data-time`, the roving tab stop). `Calendar.Slot` is built on it.
+
+```tsx
+const { state, props } = useSlot({ date: "2026-11-26", time: "09:30" });
+```
+
+`SlotState`:
+
+| field | type | description |
+| --- | --- | --- |
+| `date` | `string` | its day, `YYYY-MM-DD` |
+| `time` | `string` | its wall-clock start, `HH:mm` |
+| `focused` | `boolean` | it holds the roving focus |
+| `selected` | `boolean` | a selected range covers it (`selection()`) |
+| `disabled` | `boolean` | outside `validRange` |
+| `businessHours` | `boolean` | its start is within business hours (`constraints()`) |
+
+## `useSegment`
+
+A part hook: a day-grid segment inside a `Calendar.Week` or `Calendar.AllDayRow`, its state and
+props (`role="listitem"`, its ids, the roving tab stop, its place in its lane as `style`).
+`Calendar.Segment` is built on it.
+
+```tsx
+const { state, props } = useSegment(segment);
+return <li {...props} data-kind={state.allDay ? "all-day" : "timed"} />;
+```
+
+`SegmentState` extends `EventState` with:
+
+| field | type | description |
+| --- | --- | --- |
+| `segment` | `Segment` | the segment as the layout gives it: `startColumn`, `span`, `lane` |
+
+## `useTimeEvent`
+
+A part hook: a timed segment inside a `Calendar.Column`, its state and props, its position as
+percentages of the column in `style`. `Calendar.TimeEvent` is built on it.
+
+```tsx
+const { state, props } = useTimeEvent(segment);
+```
+
+`TimeEventState` extends `EventState` with:
+
+| field | type | description |
+| --- | --- | --- |
+| `segment` | `TimeSegment` | the segment: `top`, `height` (fractions of the column), `column`, `columns`, `span` |
+
+## `useListEvent`
+
+A part hook: an occurrence on a list view's day, inside a `Calendar.ListDay`, its state and props
+(`role="listitem"`, its ids, a tab stop of its own). `Calendar.ListEvent` is built on it.
+
+```tsx
+const { state, props } = useListEvent(item);
+```
+
+`ListEventState` extends `EventState` with:
+
+| field | type | description |
+| --- | --- | --- |
+| `item` | `ListItem` | the item as the list layout gives it |
+
+### The event state
+
+`EventState`, shared by every occurrence's element (a segment, a timed event, a list event):
+
+| field | type | description |
+| --- | --- | --- |
+| `eventId` | `string` | its event (`data-event-id`) |
+| `occurrenceId` | `string` | its occurrence (`data-occurrence-id`) |
+| `calendarId` | `string \| undefined` | its calendar, the category (`data-calendar-id`) |
+| `allDay` | `boolean` | an all-day occurrence (`data-all-day`) |
+| `continuesBefore` | `boolean` | this part started before its row, column or day |
+| `continuesAfter` | `boolean` | this part ends after its row, column or day |
+| `focused` | `boolean` | it holds the roving focus |
+| `dragging` | `boolean` | a pointer drags it (`dragAndDrop()`) |
+| `grabbed` | `boolean` | the keyboard grabbed it (`dragAndDrop()`) |
+| `resizing` | `boolean` | it is being resized (`resize()`) |
+
+### The part hook result
+
+`PartHookResult<S>`, what every part hook returns:
+
+| field | type | description |
+| --- | --- | --- |
+| `state` | `S` | the part's state |
+| `props` | `Record<string, unknown> & { ref }` | the element's props: spread them on it (`ref` is a callback ref) |
+
+The navigation buttons share `CommandButtonState`:
+
+| field | type | description |
+| --- | --- | --- |
+| `disabled` | `boolean` | the button's command cannot run now (outside `validRange`) |
+
+## `useSelection`
+
+From `@fragiola/calendar-react/selection`, with `selection()`: the selected range and the one
+being selected, re-rendering when either changes.
+
+```tsx
+import { useSelection } from "@fragiola/calendar-react/selection";
+
+function SelectedRange() {
+    const { range, preview } = useSelection();
+    const shown = preview ?? range;
+    return <p>{shown ? `${shown.start} to ${shown.end}` : "Nothing selected"}</p>;
+}
+```
+
+`CalendarSelection`:
+
+| field | type | description |
+| --- | --- | --- |
+| `range` | `SelectionRange \| null` | the selected range (model state: `get("selected-range")`) |
+| `preview` | `SelectionRange \| null` | the range a pointer or Shift + arrows is selecting, before it is set |
+
+## `useDragPreview`
+
+From `@fragiola/calendar-react/drag-and-drop` (or `/resize`): the occurrence being dragged or
+resized where it would land, its times and its segments in the layout's shape; `null` for none or
+a refused target. `DragPreview` renders from it; use it for a label of the new times.
+
+```tsx
+import { useDragPreview } from "@fragiola/calendar-react/drag-and-drop";
+
+function DropTimes() {
+    const preview = useDragPreview();
+    return preview ? <output>{preview.start}</output> : null;
+}
+```
+
+## `useNowPosition`
+
+From `@fragiola/calendar-react/now-indicator`, with `nowIndicator()`: the current time's place in
+the time grid, ticked by the engine's clock (`NowPosition`: today's date, the time and its fraction
+of a column); `null` when not in view and before the engine (a server render has no "now").
+
+```tsx
+const now = useNowPosition();
+const label = now ? `Now, ${now.time}` : null;
+```
+
+## `useBusinessHours`
+
+From `@fragiola/calendar-react/constraints`, with `constraints()`: the business hours of the
+visible days (`get("business-hours-in")`) as instants and time-grid fractions
+(`BusinessHoursRange`), only `date`'s when given: `useBusinessHours(date?)`.
+
+```tsx
+const hours = useBusinessHours("2026-11-26");
+const open = hours.length > 0;
+```

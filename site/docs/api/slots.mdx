@@ -1,0 +1,51 @@
+---
+title: Calendar.Slots
+description: Calls your function once per day of the time grid inside a slot row, after its label, and renders no element of its own.
+---
+
+`Calendar.Slots` is a collection part inside a `Calendar.SlotRow`: it calls its children function
+once per column (day) of the time grid, in order, and renders nothing of its own. Each call
+usually returns a `Calendar.Slot`.
+
+## Behaviour
+
+- The days are the time grid's columns (`model.get("time-grid")`), hidden days left out.
+- A day's call runs again only when its column object or the children function changes (the layout keeps
+  an unchanged column the same object). A function declared outside the component, or wrapped in
+  `useCallback`, keeps unchanged rows from re-rendering. See
+  [Performance](/docs/guides/performance).
+- In a right-to-left calendar the days run from the right: the order of the calls is the same,
+  your layout's inline direction flips them.
+
+## Usage
+
+```tsx
+import { Calendar, type TimeSlot } from "@fragiola/calendar-react";
+
+export function SlotRow(props: { slot: TimeSlot }) {
+    return (
+        <Calendar.SlotRow slot={props.slot}>
+            <Calendar.SlotLabel>{props.slot.time}</Calendar.SlotLabel>
+            <Calendar.Slots>
+                {(column) => (
+                    <Calendar.Slot
+                        date={column.date}
+                        className={column.weekend ? "slot slot-weekend" : "slot"}
+                    />
+                )}
+            </Calendar.Slots>
+        </Calendar.SlotRow>
+    );
+}
+```
+
+## Props
+
+`SlotsProps`:
+
+| prop | type | description |
+| --- | --- | --- |
+| `children` | `(column: TimeGridColumn) => ReactNode` | called per day of the time grid (`<Calendar.Slot date={column.date} />`) |
+
+`TimeGridColumn` is the core's: `date`, `today`, `weekend`, `past`, `disabled` and its
+`segments`.

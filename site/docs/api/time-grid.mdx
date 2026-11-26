@@ -1,0 +1,111 @@
+---
+title: Calendar.TimeGrid
+description: The grid of a week, a day or an n-day view, one tab stop over its all-day days and its slots, with the keyboard of the date picker.
+---
+
+`Calendar.TimeGrid` is the container of a time-grid view (`week`, `day` and `days`). It renders a
+`div` with `role="grid"` and its children, nothing else: the header row, the all-day row, the slot
+rows and the layer of columns are parts you place inside it. Its size, its borders and the way its
+rows line up are yours.
+
+## Behaviour
+
+The time grid follows the WAI-ARIA APG [grid pattern](https://www.w3.org/WAI/ARIA/apg/patterns/grid/),
+row by row:
+
+- a `row` of `columnheader`s (`Calendar.ColumnHeaders`);
+- the all-day `row` (`Calendar.AllDayRow`), whose days are `gridcell`s holding a `list` of segments;
+- one `row` per slot (`Calendar.SlotRow`): a `rowheader` label (`Calendar.SlotLabel`) and a
+  `gridcell` per day (`Calendar.Slot`);
+- the layer of columns (`Calendar.Columns`), the grid's last `row`, each column (`Calendar.Column`)
+  its day's `gridcell` holding the day's timed events as a `list` of `listitem`s.
+
+The grid has **one tab stop**. The arrows move the roving focus over the all-day days and the slots
+(Up from the first slot reaches the all-day row), Home and End go to the first and last day of the
+week, PageUp and PageDown run `view.previous` and `view.next` and keep the column, Shift + PageUp
+and Shift + PageDown move a week. Enter on a slot moves the focus into the events that start in
+it, Up and Down move between them, Escape returns to the slot. Keys with Ctrl, Alt or Meta, and
+Tab, stay the browser's. See [Keyboard](/docs/guides/keyboard) for the features' keys (grab, move,
+resize, select).
+
+It renders only in a view that has a time grid (`model.get("time-grid")` is `null` in month and
+list views): show it from `useCalendarView()`.
+
+## Usage
+
+```tsx
+import { Calendar } from "@fragiola/calendar-react";
+
+export function WeekGrid() {
+    return (
+        <Calendar.TimeGrid aria-label="Week" className="grid">
+            <Calendar.ColumnHeaders className="headers">
+                {(date) => (
+                    <Calendar.ColumnHeader date={date}>{date}</Calendar.ColumnHeader>
+                )}
+            </Calendar.ColumnHeaders>
+            <Calendar.AllDayRow className="all-day">
+                {(day) => (
+                    <Calendar.Day day={day}>
+                        <Calendar.DayEvents>
+                            {(segment) => <Calendar.Segment segment={segment} />}
+                        </Calendar.DayEvents>
+                    </Calendar.Day>
+                )}
+            </Calendar.AllDayRow>
+            <Calendar.Scroller className="scroller">
+                <div className="body">
+                    <Calendar.SlotRows>
+                        {(slot) => (
+                            <Calendar.SlotRow slot={slot} className="slot-row">
+                                <Calendar.SlotLabel>{slot.time}</Calendar.SlotLabel>
+                                <Calendar.Slots>
+                                    {(column) => <Calendar.Slot date={column.date} />}
+                                </Calendar.Slots>
+                            </Calendar.SlotRow>
+                        )}
+                    </Calendar.SlotRows>
+                    <Calendar.Columns className="columns">
+                        {(column) => (
+                            <Calendar.Column column={column}>
+                                <Calendar.ColumnEvents>
+                                    {(segment) => (
+                                        <Calendar.TimeEvent segment={segment} />
+                                    )}
+                                </Calendar.ColumnEvents>
+                            </Calendar.Column>
+                        )}
+                    </Calendar.Columns>
+                </div>
+            </Calendar.Scroller>
+        </Calendar.TimeGrid>
+    );
+}
+```
+
+The grid's name is yours: give it an `aria-label` (or `aria-labelledby` a title you render). The
+`body` wrapper is the containing block the columns' layer is laid over: give it
+`position: relative` and the columns `position: absolute` over the slot rows (see
+[Week and day views](/docs/guides/week-and-day-views)).
+
+<Example id="week" />
+
+## Attributes
+
+| attribute | value |
+| --- | --- |
+| `data-calendar-part` | `data-calendar-part="time-grid"` |
+| `role` | `grid` |
+
+## Props
+
+`TimeGridProps` takes the [common props](/docs/api/root#common-props) (`render`, `className`,
+`style`, `ref`) and any `div` attribute, and:
+
+| prop | type | description |
+| --- | --- | --- |
+| `children` | `ReactNode` | the grid's rows: the header row, the all-day row, the scroller with the slot rows and the columns |
+
+## State
+
+`TimeGridState` is empty: a `className` or `style` function receives `{}`.

@@ -1,0 +1,67 @@
+---
+title: Calendar.SlotRow
+description: A time grid's row at one time of day, its label and one slot cell per day, marked with the slot's time in data-time.
+---
+
+`Calendar.SlotRow` is a row of the time grid at one slot: a `div` with `role="row"` and
+`data-time`, holding the row's label and a slot per day. Its height (the slot height of your
+design) and its lines are yours.
+
+## Behaviour
+
+- One row per slot of the APG [grid pattern](https://www.w3.org/WAI/ARIA/apg/patterns/grid/):
+  a `rowheader` (`Calendar.SlotLabel`), then a `gridcell` per day (`Calendar.Slot`), the cells of the
+  roving focus.
+- Up and Down move the focus between rows in a column; the first row's Up reaches the all-day row.
+- Children as a function are called per day (the row wraps them in `Calendar.Slots`); children as
+  elements let you put the label first.
+
+## Usage
+
+```tsx
+import { Calendar, type TimeSlot } from "@fragiola/calendar-react";
+
+export function Row(props: { slot: TimeSlot }) {
+    return (
+        <Calendar.SlotRow
+            slot={props.slot}
+            className={({ slot }) =>
+                slot.time.endsWith(":00") ? "row row-hour" : "row"
+            }
+        >
+            <Calendar.SlotLabel>{props.slot.time}</Calendar.SlotLabel>
+            <Calendar.Slots>
+                {(column) => <Calendar.Slot date={column.date} />}
+            </Calendar.Slots>
+        </Calendar.SlotRow>
+    );
+}
+```
+
+A `className` function of the state draws a stronger line on the full hours.
+
+## Attributes
+
+| attribute | value |
+| --- | --- |
+| `data-calendar-part` | `data-calendar-part="slot-row"` |
+| `data-time` | the slot's start, `HH:mm` |
+| `role` | `row` |
+
+## Props
+
+`SlotRowProps` takes the [common props](/docs/api/root#common-props) and any `div` attribute
+(but `slot`), and:
+
+| prop | type | description |
+| --- | --- | --- |
+| `slot` | `TimeSlot` | the slot, from `Calendar.SlotRows`' children function |
+| `children` | `ReactNode`, or `(column: TimeGridColumn) => ReactNode` | a function called per day (`<Calendar.Slot date={column.date} />`), or elements: a `Calendar.SlotLabel`, then `Calendar.Slots` |
+
+## State
+
+`SlotRowState`:
+
+| field | type | description |
+| --- | --- | --- |
+| `slot` | `TimeSlot` | the slot: its `time` (`HH:mm`) and its place in a column (`top`, `height` fractions) |

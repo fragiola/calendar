@@ -1,0 +1,63 @@
+---
+title: Calendar.Scroller
+description: The element that scrolls a time grid's slots, which the engine scrolls for you while a drag or a selection nears its edges.
+---
+
+`Calendar.Scroller` is the element that scrolls the slot rows of a time grid. It renders a `div`
+and its children; its height and its `overflow: auto` are yours, and so is the scroll position (a
+ref callback that scrolls to the morning, a saved position).
+
+## Behaviour
+
+- The engine registers it as the time grid's scroller: while a pointer drag, a resize or a
+  selection nears its top or bottom edge (40 px by default), it scrolls it, 12 px a frame at most
+  (the engine option `autoScroll`, `false` to turn it off).
+- A scroll inside the root drops the measured hit boxes, so a drag keeps landing where the pointer
+  is.
+- It has no role: the grid's rows inside it keep their own.
+
+## Usage
+
+```tsx
+import { Calendar } from "@fragiola/calendar-react";
+import type { ReactNode } from "react";
+
+/** Opens the time grid at 08:00 (the scroll position is the app's). */
+function scrollToMorning(element: HTMLElement | null) {
+    const eight = element?.querySelector<HTMLElement>('[data-time="08:00"]');
+    if (element && eight) element.scrollTop = eight.offsetTop - 8;
+}
+
+export function Body(props: { children: ReactNode }) {
+    return (
+        <Calendar.Scroller
+            ref={scrollToMorning}
+            style={{ height: 480, overflow: "auto" }}
+        >
+            {props.children}
+        </Calendar.Scroller>
+    );
+}
+```
+
+`ref` is a plain prop, merged with the part's own. See
+[Sizing and scrolling](/docs/getting-started/sizing).
+
+## Attributes
+
+| attribute | value |
+| --- | --- |
+| `data-calendar-part` | `data-calendar-part="scroller"` |
+
+## Props
+
+`ScrollerProps` takes the [common props](/docs/api/root#common-props) and any `div` attribute,
+and:
+
+| prop | type | description |
+| --- | --- | --- |
+| `children` | `ReactNode` | the slot rows and the layer of columns |
+
+## State
+
+`ScrollerState` is empty: a `className` or `style` function receives `{}`.

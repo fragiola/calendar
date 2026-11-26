@@ -1,0 +1,47 @@
+---
+title: Calendar.Weeks
+description: The month's rows. It calls your function once per week of the day grid and renders no element of its own.
+---
+
+`Calendar.Weeks` walks the month's rows. It renders nothing of its own: it calls your children
+function once per week (a `DayGridWeek` of the core's layout), and you render a `Calendar.Week`
+for it. The row's markup, height and look are yours.
+
+## Behaviour
+
+- The weeks come from the core's layout (`model.get("day-grid")`, or the engine's with
+  `dayMaxEvents: "auto"`), keyed by `week.id`, the row's first day.
+- A week keeps its object while nothing in it changes, so moving an event changes only the rows
+  it leaves and enters.
+- It calls the function again for a week whose object changed, and for every week when the
+  function itself is a new one (React's contract). An inline function is always current but
+  re-renders every row on each render of the component that writes it; a stable function
+  (declared outside the component, or `useCallback` with what it reads) re-renders only the rows
+  whose layout changed. See [performance](/docs/guides/performance).
+
+## Usage
+
+```tsx
+import { Calendar, type DayGridWeek } from "@fragiola/calendar-react";
+
+// reads only its argument: declared outside the component, it is stable
+function weekRow(week: DayGridWeek) {
+    return (
+        <Calendar.Week week={week} className="week">
+            {(day) => <Calendar.Day day={day} className="day" />}
+        </Calendar.Week>
+    );
+}
+
+<Calendar.DayGrid aria-label="Month">
+    <Calendar.Weeks>{weekRow}</Calendar.Weeks>
+</Calendar.DayGrid>;
+```
+
+## Props
+
+`WeeksProps` (it renders no element, so it takes no other prop):
+
+| prop | type | description |
+| --- | --- | --- |
+| `children` | `(week: DayGridWeek) => ReactNode` | called per row of the month; render a `Calendar.Week` |

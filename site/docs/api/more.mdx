@@ -1,0 +1,87 @@
+---
+title: Calendar.More
+description: A day's "+N more" trigger, rendered while some of its events do not fit. A press is the engine's more-click; the popover is yours.
+---
+
+`Calendar.More` is a day's "+N more" `button`. It renders only while some of the day's
+occurrences do not fit under the `dayMaxEvents` setting, and hands you how many and which. The
+popover, dialog or agenda it opens is yours.
+
+## Behaviour
+
+- It renders nothing while the day's `hiddenCount` is 0.
+- A press, Enter on it, or an assistive technology's click is the engine's `more-click`
+  (`onMoreClick`, with the day's `date` and the hidden `occurrenceIds`): open your popover from
+  there. The engine takes Enter and prevents the native click, so a popover trigger rendered as it
+  would never toggle from the keyboard: control the popover's `open` from `onMoreClick`.
+- On the keyboard it is the last item of the day's events: Down from the last event reaches it,
+  Enter on a day whose events are all hidden focuses it, Up goes back, Escape returns to the day.
+  It stays `tabindex="-1"`, outside the roving focus.
+
+It renders `data-calendar-part="more"` and `data-date`.
+
+## Usage
+
+```tsx
+import { Calendar } from "@fragiola/calendar-react";
+import { type ReactNode, useState } from "react";
+
+function BusyMonth() {
+    const [openDay, setOpenDay] = useState<string | null>(null);
+    return (
+        <Calendar.Root
+            settings={{ dayMaxEvents: 2 }}
+            onMoreClick={(event) => setOpenDay(event.date)}
+        >
+            <Calendar.DayGrid aria-label="Month">
+                <Calendar.Weeks>
+                    {(week) => (
+                        <Calendar.Week week={week}>
+                            {(day) => (
+                                <Calendar.Day day={day}>
+                                    <Calendar.DayEvents>
+                                        {(segment) => <Calendar.Segment segment={segment} />}
+                                    </Calendar.DayEvents>
+                                    <Calendar.More className="more">
+                                        {({ hiddenCount }) => `+${hiddenCount} more`}
+                                    </Calendar.More>
+                                    {openDay === day.date ? (
+                                        <DayPopover date={day.date} onClose={() => setOpenDay(null)} />
+                                    ) : null}
+                                </Calendar.Day>
+                            )}
+                        </Calendar.Week>
+                    )}
+                </Calendar.Weeks>
+            </Calendar.DayGrid>
+        </Calendar.Root>
+    );
+}
+
+// your popover: the day's events from model.get("list"), a close button
+declare function DayPopover(props: { date: string; onClose: () => void }): ReactNode;
+```
+
+The rows' function closes over `openDay`, so it is called again when the open day changes (React's
+contract). The [more events guide](/docs/guides/more-events) builds the popover with Fragiola UI.
+
+<Example id="more-events" />
+
+## Props
+
+`MoreProps`; it also takes the [common props](/docs/api/root#common-props) and every `button`
+attribute.
+
+| prop | type | description |
+| --- | --- | --- |
+| `children` | `ReactNode \| (state) => ReactNode` | what it shows, or a function of its state (`({ hiddenCount }) => …`) |
+
+## State
+
+`MoreState`:
+
+| field | type | description |
+| --- | --- | --- |
+| `hiddenCount` | `number` | how many occurrences of the day do not fit |
+| `hiddenOccurrenceIds` | `readonly string[]` | their ids, for your popover |
+| `date` | `string` | the day, `YYYY-MM-DD` |

@@ -1,0 +1,76 @@
+---
+title: NowIndicator
+description: The current time in today's column with nowIndicator(), positioned at its fraction of the day and moved by the engine's clock.
+---
+
+`NowIndicator` marks the current time in today's `Calendar.Column`, with the `nowIndicator()`
+feature from `@fragiola/calendar-react/now-indicator`. It renders a `div` positioned at now's
+fraction of the column (`position: absolute`, `top`); the line, the dot and the time it may show
+are yours.
+
+## Behaviour
+
+- It renders only in today's column, and only once the engine runs (a server render has no
+  "now"): render it in every column, it shows in the right one.
+- The engine moves it at each `nowIndicator({ interval })` tick (default a minute), from the
+  injected clock (`now` on the model or the root), and refreshes "today" at the display zone's
+  midnight.
+- It is `aria-hidden`.
+- Without `nowIndicator()` in the model's features it renders nothing and warns once.
+
+## Usage
+
+```tsx
+import { Calendar } from "@fragiola/calendar-react";
+import { NowIndicator } from "@fragiola/calendar-react/now-indicator";
+
+export function NowColumns() {
+    return (
+        <Calendar.Columns>
+            {(column) => (
+                <Calendar.Column column={column}>
+                    <NowIndicator className="now">
+                        {({ position }) => <span className="now-time">{position.time}</span>}
+                    </NowIndicator>
+                </Calendar.Column>
+            )}
+        </Calendar.Columns>
+    );
+}
+```
+
+```css
+.now {
+    inset-inline: 0;
+    border-block-start: 2px solid red;
+}
+```
+
+`useNowPosition` (on the [hooks page](/docs/api/hooks)) gives the same position anywhere.
+
+<Example id="now-indicator" />
+
+## Attributes
+
+| attribute | value |
+| --- | --- |
+| `data-calendar-part` | `data-calendar-part="now-indicator"` |
+| `aria-hidden` | `true` |
+| `style` | `position: absolute`, `top` (structural) |
+
+## Props
+
+`NowIndicatorProps` takes the [common props](/docs/api/root#common-props) and any `div`
+attribute, and:
+
+| prop | type | description |
+| --- | --- | --- |
+| `children` | `ReactNode`, or `(state: NowIndicatorState) => ReactNode` | what it shows (a line, a dot): elements, or a function of its state |
+
+## State
+
+`NowIndicatorState`:
+
+| field | type | description |
+| --- | --- | --- |
+| `position` | `NowPosition` | where now is: today (`date`), the wall-clock `time` (`HH:mm`), its fraction of the column (`top`) |

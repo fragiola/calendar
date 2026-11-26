@@ -1,0 +1,79 @@
+---
+title: Calendar.Columns
+description: The layer of the time grid's day columns, laid over the slot rows, that holds each day's timed events, the now line and the previews.
+---
+
+`Calendar.Columns` is the layer of the time grid where the timed events are placed: a `div`, the
+grid's last `row`, that calls its children function once per day. It sets `pointer-events: none`
+so presses go through it to the slots; each event takes its own back. Where it sits is yours:
+position it over the slot rows (`position: absolute; inset: 0` in a `position: relative`
+wrapper).
+
+## Behaviour
+
+- The grid's last `row` of the APG [grid pattern](https://www.w3.org/WAI/ARIA/apg/patterns/grid/)
+ : each `Calendar.Column` is its day's `gridcell` holding the day's events as a `list`,
+  so assistive technology finds every event in a row of the grid. The columns are not in the
+  roving focus: the slots are.
+- A column's call runs again only when its column object or the children function changes: moving
+  an event re-renders the columns it leaves and enters, with a stable function (declared outside
+  the component, or `useCallback`). See [Performance](/docs/guides/performance).
+
+## Usage
+
+```tsx
+import { Calendar, type TimeGridColumn } from "@fragiola/calendar-react";
+import { useCallback } from "react";
+
+export function DayColumns(props: { highlighted: string | null }) {
+    const { highlighted } = props;
+    // closes over app state: useCallback with what it reads
+    const dayColumn = useCallback(
+        (column: TimeGridColumn) => (
+            <Calendar.Column column={column} className="column">
+                <Calendar.ColumnEvents>
+                    {(segment) => (
+                        <Calendar.TimeEvent
+                            segment={segment}
+                            data-highlighted={
+                                segment.eventId === highlighted ? "" : undefined
+                            }
+                        />
+                    )}
+                </Calendar.ColumnEvents>
+            </Calendar.Column>
+        ),
+        [highlighted],
+    );
+    return (
+        <Calendar.Columns
+            style={{ position: "absolute", inset: 0, display: "flex" }}
+        >
+            {dayColumn}
+        </Calendar.Columns>
+    );
+}
+```
+
+When `highlighted` changes every column is called again, so the highlight is always current; any
+other render of the app re-renders only the columns whose layout changed.
+
+## Attributes
+
+| attribute | value |
+| --- | --- |
+| `data-calendar-part` | `data-calendar-part="columns"` |
+| `role` | `row` |
+| `style` | `pointer-events: none` (structural) |
+
+## Props
+
+`ColumnsProps` takes the [common props](/docs/api/root#common-props) and any `div` attribute, and:
+
+| prop | type | description |
+| --- | --- | --- |
+| `children` | `(column: TimeGridColumn) => ReactNode` | called per day of the time grid (`<Calendar.Column column={column}>`) |
+
+## State
+
+`ColumnsState` is empty: a `className` or `style` function receives `{}`.

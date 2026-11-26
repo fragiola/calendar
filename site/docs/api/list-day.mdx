@@ -1,0 +1,68 @@
+---
+title: Calendar.ListDay
+description: A list view's day, a list of its events under the heading you render before it, calling your function once per event of the day.
+---
+
+`Calendar.ListDay` is one day of a list view: a `div` with `role="list"` and `data-date`, holding
+the day's events. It calls its children function once per occurrence of the day, usually a
+`Calendar.ListEvent`. The day's heading is yours, rendered before it; name the list with it
+(`aria-labelledby`).
+
+## Behaviour
+
+- A `list` per day: its items are `listitem`s, each a tab stop of its own.
+- The items are the day's occurrences in the settings' `eventOrder`; an event over several days is an item of each of its days (`continuesBefore`, `continuesAfter`).
+- An item's call runs again when the item object or the children function changes. See
+  [Performance](/docs/guides/performance).
+
+## Usage
+
+```tsx
+import { Calendar, type ListDay } from "@fragiola/calendar-react";
+
+export function Day(props: { day: ListDay }) {
+    const id = `day-${props.day.date}`;
+    return (
+        <>
+            <h3 id={id}>{props.day.date}</h3>
+            <Calendar.ListDay
+                day={props.day}
+                aria-labelledby={id}
+                className={({ today }) => (today ? "events events-today" : "events")}
+            >
+                {(item) => (
+                    <Calendar.ListEvent item={item}>
+                        {item.allDay ? "All day" : null} {item.eventId}
+                    </Calendar.ListEvent>
+                )}
+            </Calendar.ListDay>
+        </>
+    );
+}
+```
+
+## Attributes
+
+| attribute | value |
+| --- | --- |
+| `data-calendar-part` | `data-calendar-part="list-day"` |
+| `data-date` | its day, `YYYY-MM-DD` |
+| `role` | `list` |
+
+## Props
+
+`ListDayProps` takes the [common props](/docs/api/root#common-props) and any `div` attribute, and:
+
+| prop | type | description |
+| --- | --- | --- |
+| `day` | `ListDay` | the day, from `Calendar.ListDays`' children function |
+| `children` | `(item: ListItem) => ReactNode` | called per occurrence of the day (`<Calendar.ListEvent item={item} />`) |
+
+## State
+
+`ListDayState`:
+
+| field | type | description |
+| --- | --- | --- |
+| `day` | `ListDay` | the day as the list layout gives it (`date`, `today`, `past`, `items`) |
+| `today` | `boolean` | the day is today |

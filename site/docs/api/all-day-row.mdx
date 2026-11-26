@@ -1,0 +1,87 @@
+---
+title: Calendar.AllDayRow
+description: The time grid's all-day row, the day grid's one row inside a week or day view, holding all-day and multi-day events as lanes of segments.
+---
+
+`Calendar.AllDayRow` is the row of a time grid that shows all-day events, and timed events that
+last several days, as day-grid segments: the same `Calendar.Day`, `Calendar.DayEvents` and
+`Calendar.Segment` as a month's week row. It renders a `div` with `role="row"`; the corner cell
+before its days (an "all-day" label), its height and its look are yours.
+
+## Behaviour
+
+- It is the time grid's first row after the column headers (the APG
+  [grid pattern](https://www.w3.org/WAI/ARIA/apg/patterns/grid/)): its days are `gridcell`s in
+  the roving focus, Up from the first slot reaches them, Down returns to the slots.
+- It is the row the core's `model.get("day-grid")` gives for a time-grid view (its only week): a
+  segment packed into lanes by start, then longer first, then `eventOrder`.
+- It is `position: relative`, the containing block of its decorations: a `Selection` and a
+  `DragPreview` rendered inside it sit over their days, after `--calendar-row-inset` (the row's
+  space before its first day, such as a label).
+- Moving an event between this row and the slots follows the all-day and timed rules: see
+  [Drag and drop](/docs/guides/drag-and-drop).
+
+It renders nothing in a view without a day grid.
+
+## Usage
+
+Children as a function are called per day (the row wraps them in `Calendar.Days`); children as
+elements let you put a corner cell first:
+
+```tsx
+import { Calendar } from "@fragiola/calendar-react";
+import { DragPreview } from "@fragiola/calendar-react/drag-and-drop";
+
+export function AllDay() {
+    return (
+        <Calendar.AllDayRow className="all-day-row">
+            <div aria-hidden className="all-day-label">
+                all-day
+            </div>
+            <Calendar.Days>
+                {(day) => (
+                    <Calendar.Day day={day} className="all-day-cell">
+                        <Calendar.DayEvents>
+                            {(segment) => (
+                                <Calendar.Segment segment={segment}>
+                                    {segment.eventId}
+                                </Calendar.Segment>
+                            )}
+                        </Calendar.DayEvents>
+                    </Calendar.Day>
+                )}
+            </Calendar.Days>
+            <DragPreview className="preview" />
+        </Calendar.AllDayRow>
+    );
+}
+```
+
+The label is `aria-hidden` here: the row's days are named by their headers. Set
+`--calendar-row-inset` to the label's width so the decorations start at the first day.
+
+<Example id="all-day-and-multi-day" />
+
+## Attributes
+
+| attribute | value |
+| --- | --- |
+| `data-calendar-part` | `data-calendar-part="all-day-row"` |
+| `role` | `row` |
+
+## Props
+
+`AllDayRowProps` takes the [common props](/docs/api/root#common-props) and any `div` attribute,
+and:
+
+| prop | type | description |
+| --- | --- | --- |
+| `children` | `ReactNode`, or `(day: DayCell) => ReactNode` | a function called per day (`<Calendar.Day day={day} />`), or elements: a corner cell, then `Calendar.Days` |
+
+## State
+
+`AllDayRowState`, given to a `className`, `style` or `render` function:
+
+| field | type | description |
+| --- | --- | --- |
+| `week` | `DayGridWeek` | the all-day row as the day grid gives it: its days and its segments |

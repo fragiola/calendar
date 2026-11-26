@@ -1,0 +1,130 @@
+---
+title: Date helpers
+description: The plain dates, instants, time zones and locale weeks the calendar computes with, exported for your own code. Intl only, no Date math, no dependency.
+---
+
+The calendar does its own date work with `Intl` and integer math: plain dates on the Gregorian
+calendar, instants as epoch milliseconds, wall clocks per IANA zone, the locale's week. The same
+helpers are exported, so your toolbar, editor and server code compute exactly as the calendar
+does. Formatting is data: the helpers return `Intl` parts, and the text is yours
+([Dates and time zones](/docs/concepts/dates-and-time-zones)).
+
+```ts
+import {
+    addDaysInZone,
+    formatInstant,
+    parseDateTime,
+} from "@fragiola/calendar-react";
+
+const parsed = parseDateTime("2026-10-31T09:00:00-04:00");
+if (parsed.ok) {
+    // one day later on New York's wall clock: across the end of DST, still 09:00
+    const next = addDaysInZone(parsed.value.instant, 1, "America/New_York");
+    formatInstant(next, "America/New_York"); // "2026-11-01T09:00:00-05:00"
+}
+```
+
+The parsers never throw: they return a `ValidationResult` (`{ ok: true, value }` or
+`{ ok: false, issues }`). The math throws a `RangeError` on an unknown zone or locale: validate
+those first (`validateTimeZone`, `validateLocale`).
+
+## Values
+
+| type | description |
+| --- | --- |
+| `PlainDate` | `{ year, month, day }`, `month` 1 to 12: structurally the date picker's of `@fragiola/primitives`, so its value passes as is |
+| `PlainDateString` | `YYYY-MM-DD` (a documented alias of `string`) |
+| `PlainTime` | `{ hour, minute }`; `24:00` is a day's end |
+| `PlainTimeString` | `HH:mm` |
+| `DateTimeString` | an RFC 3339 date-time with its offset |
+| `OffsetDateTime` | a parsed date-time: its `instant` and its `offset` (minutes east of UTC) |
+| `Instant` | epoch milliseconds, branded; `instant(ms)` makes one (a non-integer is a `RangeError`) |
+| `ZonedDateTimeFields` | a wall clock: a `PlainDate` with `hour`, `minute`, `second`, `millisecond` |
+| `DateRange` | `{ start, end }` plain dates, `end` exclusive |
+| `Weekday` | 0 (Sunday) to 6 |
+
+## Parsing and printing
+
+| helper | description |
+| --- | --- |
+| `parsePlainDate(value)` | `YYYY-MM-DD` to a `PlainDate`, strictly |
+| `parsePlainTime(value)` | `HH:mm` to a `PlainTime` (`24:00` allowed) |
+| `parseDateTime(value)` | RFC 3339 (seconds and an offset required) to an `OffsetDateTime` |
+| `formatPlainDate(date)` | a `PlainDate` as `YYYY-MM-DD` |
+| `formatPlainTime(time)` | a `PlainTime` as `HH:mm` |
+| `formatDateTime(at, offset)` | an instant written with an offset; `Z` for zero |
+| `isPlainDate(value)` | whether a value is a `PlainDate` object |
+
+## Dates
+
+| helper | description |
+| --- | --- |
+| `addDays(date, days)` | a date `days` later (negative: earlier) |
+| `addMonths(date, months)` | the same day `months` later, clamped to the month's last day |
+| `comparePlainDates(a, b)` | negative, zero or positive |
+| `daysBetween(start, end)` | the whole days from `start` to `end` |
+| `daysInMonth(year, month)` | 28 to 31 |
+| `dayOfWeek(date)` | its `Weekday` |
+| `isDateInRange(date, range)` | `start` included, `end` excluded |
+| `dateRangesOverlap(a, b)` | whether two ranges share a day |
+| `lastDateOfRange(range)` | the last day a range covers (the day before `end`) |
+
+```ts
+import { addDays, dayOfWeek, formatPlainDate } from "@fragiola/calendar-react";
+
+const thursday = { year: 2026, month: 11, day: 26 };
+dayOfWeek(thursday); // 4
+formatPlainDate(addDays(thursday, 7)); // "2026-12-03"
+```
+
+## Instants and time zones
+
+| helper | description |
+| --- | --- |
+| `addMinutes(at, minutes)` | an instant later by exact minutes |
+| `minutesBetween(start, end)` | the exact minutes between two instants |
+| `minutesOfDay(time)` | a `PlainTime` as minutes after midnight |
+| `timeZoneOffset(zone, at)` | the zone's offset at an instant, minutes east of UTC |
+| `instantToWallClock(at, zone)` | the wall clock an instant shows in a zone |
+| `wallClockToInstant(fields, zone)` | the instant of a wall clock: a skipped time moves past the gap, a repeated one takes the earlier offset |
+| `plainDateInZone(at, zone)` | the day an instant falls on in a zone |
+| `startOfDay(date, zone)` | the instant a day starts (the transition when midnight is skipped) |
+| `minutesInDay(date, zone)` | how long a day lasts there: 1 440, or 1 380 and 1 500 at DST changes, 0 for a skipped day |
+| `addDaysInZone(at, days, zone)` | whole days on the zone's wall clock: 09:00 stays 09:00 across DST |
+| `formatInstant(at, zone)` | an instant as RFC 3339 with the zone's offset at it |
+| `timedDayRange(start, end, nextDayThreshold?)` | the days a timed occurrence covers, from its wall clocks |
+| `resolveTimeZone(zone)` | a zone setting as an IANA name: `LOCAL_TIME_ZONE` (`"local"`) is the host's |
+| `validateTimeZone(value)` | an IANA name or `"local"`, or an issue |
+
+## Locales and weeks
+
+| helper | description |
+| --- | --- |
+| `weekInfo(locale, settings?)` | the locale's `WeekInfo` (`firstDay`, `weekend`, `minimalDays`), an explicit `firstDayOfWeek` winning |
+| `ISO_WEEK` | ISO 8601's week: Monday first, 4 minimal days |
+| `weekOfYear(date, rules)` | a `WeekOfYear` (`week`, `year`: the week-year) under `WeekRules` (`firstDay`, `minimalDays`) |
+| `isoWeekOfYear(date)` | the ISO week |
+| `isWeekend(date, week)` | whether the date is a weekend day of a `WeekInfo` |
+| `validateLocale(value)` | a BCP 47 tag, or an issue |
+
+## Formatting as data
+
+Each takes `FormatOptions` (`Intl.DateTimeFormatOptions` without `timeZone`) and returns
+`Intl.DateTimeFormat` parts; the formats are cached per locale.
+
+| helper | description |
+| --- | --- |
+| `formatDateParts(date, locale, options)` | a plain date, never moved by the host's zone |
+| `formatTimeParts(time, locale, options)` | a plain time |
+| `formatDateRangeParts(range, locale, options)` | a range up to its last day (`end` exclusive) |
+| `formatInstantParts(at, zone, locale, options)` | an instant on a zone's wall clock (an event's start) |
+
+```ts
+import { formatDateParts } from "@fragiola/calendar-react";
+
+const parts = formatDateParts({ year: 2026, month: 11, day: 26 }, "pt-BR", {
+    weekday: "long",
+    day: "numeric",
+});
+parts.map((part) => part.value).join(""); // "quinta-feira, 26"
+```

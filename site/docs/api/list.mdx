@@ -1,0 +1,79 @@
+---
+title: Calendar.List
+description: A list view's container, its days with events under headings you render, and an empty state you show when the range has none.
+---
+
+`Calendar.List` is the container of a list view (an agenda): a `div` that renders its children,
+usually a `Calendar.ListDays`. It tells you when the range has no event (`state.empty`), so the
+empty message, like every word of the view, is yours.
+
+## Behaviour
+
+- A list view is a `role="list"` per day under a heading you render: `Calendar.ListDay` is
+  the list, `Calendar.ListEvent` its items. The list itself has no role.
+- Each event is a tab stop of its own (no roving focus in a list).
+- `Calendar.ListDays` lists the visible days of any view (an agenda beside a month), not only of a
+  `list` view: `model.get("list")` lays them out.
+- `state.empty` is `model.is("list-empty")`: no visible day has an event.
+
+## Usage
+
+```tsx
+import { Calendar } from "@fragiola/calendar-react";
+
+export function Agenda() {
+    return (
+        <Calendar.List className="list">
+            {({ empty }) =>
+                empty ? (
+                    <p className="empty">Nothing planned this month.</p>
+                ) : (
+                    <Calendar.ListDays>
+                        {(day) => (
+                            <section key={day.date}>
+                                <h3 id={`list-${day.date}`}>{day.date}</h3>
+                                <Calendar.ListDay
+                                    day={day}
+                                    aria-labelledby={`list-${day.date}`}
+                                >
+                                    {(item) => (
+                                        <Calendar.ListEvent item={item}>
+                                            {item.eventId}
+                                        </Calendar.ListEvent>
+                                    )}
+                                </Calendar.ListDay>
+                            </section>
+                        )}
+                    </Calendar.ListDays>
+                )
+            }
+        </Calendar.List>
+    );
+}
+```
+
+Each day's list is named by the heading before it. See [List view](/docs/guides/list-view).
+
+<Example id="list" />
+
+## Attributes
+
+| attribute | value |
+| --- | --- |
+| `data-calendar-part` | `data-calendar-part="list"` |
+
+## Props
+
+`ListProps` takes the [common props](/docs/api/root#common-props) and any `div` attribute, and:
+
+| prop | type | description |
+| --- | --- | --- |
+| `children` | `ReactNode`, or `(state: ListState) => ReactNode` | `Calendar.ListDays` (and what the app shows when `state.empty`) |
+
+## State
+
+`ListState`:
+
+| field | type | description |
+| --- | --- | --- |
+| `empty` | `boolean` | no day of the range has an event (`is("list-empty")`) |
