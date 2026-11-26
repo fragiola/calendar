@@ -128,8 +128,11 @@ test("the editor's modal covers the site's page while it is open", async ({
     await expect(element).toHaveAttribute("data-promoted", "");
     const viewport = page.viewportSize();
     await expect
-        .poll(async () => (await element.boundingBox())?.width)
-        .toBe(viewport?.width);
+        .poll(async () => {
+            const box = await element.boundingBox();
+            return box && [box.x, box.y, box.width, box.height];
+        })
+        .toEqual([0, 0, viewport?.width, viewport?.height]);
     // the example did not move: its stage is pinned where the frame was
     const stage = await frame.getByTestId("stage").boundingBox();
     expect(stage && inline && Math.abs(stage.x - inline.x)).toBeLessThanOrEqual(
