@@ -483,6 +483,7 @@ describe("attributes (D17)", () => {
         expect(attributes("time-grid", {})).toEqual({
             "data-calendar-part": "time-grid",
             role: "grid",
+            "aria-colcount": "8",
         });
         expect(
             attributes("slot", { date: "2026-11-26", time: "09:00" }),
@@ -535,6 +536,7 @@ describe("attributes (D17)", () => {
             "data-calendar-part": "slot-label",
             "data-time": "09:00",
             role: "rowheader",
+            "aria-colindex": "1",
         });
         // the columns' layer is the grid's last row, each column a cell holding its events' list
         expect(attributes("columns", {})).toEqual({

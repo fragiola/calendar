@@ -132,8 +132,8 @@ function TimedEvent({ segment }: { segment: TimeSegment }) {
 
 What each part is:
 
-- `Calendar.ColumnHeaders` is the header row, one `Calendar.ColumnHeader` per day. A time axis
-  needs a corner cell before them: put an element of your own first.
+- `Calendar.ColumnHeaders` is the header row, one `Calendar.ColumnHeader` per day. The time axis
+  is the grid's column 1 (`aria-colcount`, `aria-colindex`): leave its room with your layout.
 - `Calendar.AllDayRow` is the time grid's day-grid row: its days and segments work as a month
   row's ([Month view](/docs/guides/month-view)).
 - `Calendar.Scroller` is the element that scrolls. The engine autoscrolls it during a drag.

@@ -13,11 +13,21 @@
 //   `gridcell` per day (`column`) holding its timed events, a `list` of `listitem`s (Issue #8: a
 //   list must sit in a cell, never beside the rows);
 // - a list view: a `list` per day, its events `listitem`s that are each a tab stop.
+//
+// The grid states (Epic #13's carry-over): `aria-current="date"` on today's cell (and a time grid's
+// header of today), `aria-selected` on every date cell while `selection()` is installed (its grid
+// `aria-multiselectable`), `aria-disabled` on the cells outside `validRange`. A month's column
+// headers stand for weekdays: they keep `data-date` (a date of that weekday) and `data-weekend`,
+// never the first row's day state. A time grid's columns are numbered (`aria-colcount` on the
+// grid, `aria-colindex` on each cell: the time axis is column 1, the days from 2), so the header
+// row, the all-day row and the columns' layer, which have no axis cell of their own, keep the slot
+// rows' column count without an empty header the library could not name (D19).
 import type { CalendarTypes } from "../document/calendar-types";
 import type {
     FeatureEngine,
     MutablePartAttributes,
 } from "../features/engine-types";
+import { featuresOf } from "../features/registry";
 import type { CalendarFeatures, PartAttributes } from "../features/types";
 import type { CalendarModel } from "../model/calendar-model";
 import { clockOf } from "../model/model-clock";
@@ -69,6 +79,47 @@ function focusAttributes(
             : undefined;
 }
 
+/** Whether a model has `selection()` installed (its date cells are selectable). */
+function selectable(model: CalendarModel): boolean {
+    return featuresOf(model).list.some(
+        (feature) => feature.name === "selection",
+    );
+}
+
+/** A time grid's column of a date (the axis is 1, the days from 2), `undefined` outside one. */
+function columnIndex(
+    model: CalendarModel,
+    date: string | undefined,
+): string | undefined {
+    if (date === undefined) return undefined;
+    const grid = model.get("time-grid");
+    if (!grid) return undefined;
+    const index = grid.columns.findIndex((column) => column.date === date);
+    return index < 0 ? undefined : String(index + 2);
+}
+
+/** The ARIA a date cell's `data-*` state says (`day`, `slot`), once the features wrote theirs. */
+function cellStates(
+    model: CalendarModel,
+    part: PartName,
+    date: string | undefined,
+    into: MutablePartAttributes,
+): void {
+    if (part === "day") {
+        if (into["data-today"] === "") into["aria-current"] = "date";
+        if (into["data-disabled"] === "") into["aria-disabled"] = "true";
+    } else if (date !== undefined) {
+        // a slot holds no day state of its own: its day's says whether it is outside the range
+        const day = model.get("day-attributes-by", { date });
+        if (day?.["data-disabled"] === "") into["aria-disabled"] = "true";
+    }
+    if (selectable(model)) {
+        into["aria-selected"] = into["data-selected"] === "" ? "true" : "false";
+    }
+    const column = columnIndex(model, date);
+    if (column !== undefined) into["aria-colindex"] = column;
+}
+
 /** A part's attributes with a focus and the features' engine parts (the engine's). */
 export function attributesOf(
     model: CalendarModel,
@@ -86,9 +137,13 @@ export function attributesOf(
             Object.assign(into, model.get("root-attributes"));
             break;
         case "day-grid":
-        case "time-grid":
+        case "time-grid": {
             into.role = "grid";
+            if (selectable(model)) into["aria-multiselectable"] = "true";
+            const grid = part === "time-grid" ? model.get("time-grid") : null;
+            if (grid) into["aria-colcount"] = String(grid.columns.length + 1);
             break;
+        }
         case "week":
         case "all-day-row":
         case "column-headers":
@@ -119,15 +174,32 @@ export function attributesOf(
         case "slot-label":
             into.role = "rowheader";
             into["data-time"] = String(payload.time);
+            if (model.get("time-grid")) into["aria-colindex"] = "1";
             break;
-        case "column-header":
+        case "column-header": {
             into.role = "columnheader";
-            Object.assign(into, dayAttributes());
+            const day = dayAttributes() ?? {};
+            if (model.state.view.type === "month") {
+                // a weekday's header: not the first row's day (outside, past, today, ...)
+                if (day["data-date"] !== undefined)
+                    into["data-date"] = day["data-date"];
+                if (day["data-weekend"] !== undefined)
+                    into["data-weekend"] = day["data-weekend"];
+                break;
+            }
+            Object.assign(into, day);
+            if (into["data-today"] === "") into["aria-current"] = "date";
+            const column = columnIndex(model, date);
+            if (column !== undefined) into["aria-colindex"] = column;
             break;
-        case "column":
+        }
+        case "column": {
             Object.assign(into, dayAttributes());
             into.role = "gridcell";
+            const column = columnIndex(model, date);
+            if (column !== undefined) into["aria-colindex"] = column;
             break;
+        }
         case "day-events":
         case "column-events":
         case "list-day":
@@ -204,6 +276,7 @@ export function attributesOf(
     for (const feature of features) {
         feature.attributes?.(part, payload, into);
     }
+    if (part === "day" || part === "slot") cellStates(model, part, date, into);
     return into;
 }
 

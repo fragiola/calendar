@@ -96,3 +96,16 @@ The engine sets the grid's roles and the roving focus: one element of a grid has
 (the tab stop), the others `-1`. `Calendar.ViewButton` sets `aria-pressed`; the decorations
 (`Selection`, `DragPreview`, `ResizeHandle`, `NowIndicator`, `BusinessHours`) are
 `aria-hidden`. The names are yours ([Accessible names and the keyboard](/docs/getting-started/accessible-names)).
+
+The date cells say their state in ARIA too:
+
+- today's day (and a time grid's header of today) has `aria-current="date"`;
+- with `selection()` installed, every day and slot has `aria-selected` (`"true"` inside the
+  selected range) and the grid `aria-multiselectable="true"`;
+- a day or a slot outside `validRange` has `aria-disabled="true"`.
+
+A month's column headers stand for weekdays: they carry `data-date` (a date of that weekday) and
+`data-weekend`, never the first row's day state. A time grid numbers its columns: the grid has
+`aria-colcount` (the days plus the time axis), each cell `aria-colindex` (the axis is column 1,
+the days from 2), so the header row, the all-day row and the columns' layer need no cell of yours
+for the axis.

@@ -15,7 +15,8 @@ row (standing for its weekday). What a header says is yours, from `useDayHeader`
   function itself is a new one (React's contract): an inline function is always current; declare
   it outside the component, or with `useCallback`, to re-render only what changed (see
   [performance](/docs/guides/performance)).
-- In a time grid, a corner cell for the time axis is yours: put it before the headers.
+- In a time grid, the time axis is column 1 (`aria-colindex` on each header): leave its room
+  with your layout (a padding or the grid template), no corner cell is needed.
 
 It renders `data-calendar-part="column-headers"`.
 
