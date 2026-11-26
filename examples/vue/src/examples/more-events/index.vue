@@ -84,6 +84,7 @@ const open = ref<string | null>(null);
                             <MorePopover
                                 :date="day.date"
                                 :open="open === day.date"
+                                @open="open = day.date"
                                 @close="open = null"
                             />
                         </Calendar.Day>

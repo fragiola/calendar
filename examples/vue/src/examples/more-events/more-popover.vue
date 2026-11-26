@@ -7,9 +7,9 @@ import * as styles from "./styles";
 
 // The popover of a day: its trigger is the day's "+N more" (rendered only while some events do
 // not fit). The engine's `more-click` opens it (the root's `@more-click`); a press on the trigger
-// is that click, so the trigger's own toggle is ignored, and Escape or a press outside close it.
+// is that click, so the trigger's own toggle is undone, and Escape or a press outside close it.
 const props = defineProps<{ date: string; open: boolean }>();
-const emit = defineEmits<{ close: [] }>();
+const emit = defineEmits<{ open: []; close: [] }>();
 const { model } = useCalendar<Types>();
 
 /** The day's events, read as the open popover renders. */
@@ -23,12 +23,22 @@ function items() {
 function onOpenChange(next: boolean) {
     if (!next) emit("close");
 }
+
+// Reka UI's trigger toggles the popover on its click and gives no reason (React cancels the
+// `trigger-press` one): the More's own click runs after it (`as-child` merges the trigger's
+// listener first), so a press on an open popover's "+N more" opens it again in the same tick
+function onPress() {
+    emit("open");
+}
 </script>
 
 <template>
     <Popover.Root :open="open" @update:open="onOpenChange">
         <Popover.Trigger as-child>
-            <Calendar.More v-slot="{ hiddenCount }" :class="styles.more"
+            <Calendar.More
+                v-slot="{ hiddenCount }"
+                :class="styles.more"
+                @click="onPress"
                 >+{{ hiddenCount }} more</Calendar.More
             >
         </Popover.Trigger>
