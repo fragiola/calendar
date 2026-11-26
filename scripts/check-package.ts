@@ -6,13 +6,14 @@
 // - its packed `exports` (from `publishConfig.exports`) are the repo's `exports` without the source
 //   condition, and use only the `types`, `import` and `default` conditions, with targets in `dist`;
 // - publint (strict) and attw (`esm-only` profile) pass on the tarball;
-// - the core's and the React adapter's tarballs export every feature's subpath (`FEATURES` of
-//   `check-features.ts`), their `types` and `import` targets packed;
-// - every adapter (`ADAPTERS`: each package under packages/ but the core; React today, Vue and
-//   Angular with their Epics, and a package missing from the list fails) depends on the core at
+// - the core's and the React and Vue adapters' tarballs export every feature's subpath
+//   (`FEATURES` of `check-features.ts`), their `types` and `import` targets packed;
+// - every adapter (`ADAPTERS`: each package under packages/ but the core; React and Vue today,
+//   Angular with its Epic, and a package missing from the list fails) depends on the core at
 //   its exact version, and passes its smoke test: a scratch app outside the workspace that
 //   installs the adapter's tarball only (the core tarball comes as its dependency), typechecks,
-//   builds and loads its dev server (`reactSmoke`: a Vite + React app, its pins the examples
+//   builds and loads its dev server (`reactSmoke`: a Vite + React app; `vueSmoke`: a Vite + Vue
+//   app of single-file components checked by vue-tsc on TypeScript 6; their pins the examples
 //   app's, the adapter's own until it exists). A package published from its build output
 //   (`publishConfig.directory`: an Angular one, which ng-packagr builds into `dist`) is packed from
 //   that directory: its packed `exports` are the repo's relative to it, each target a file of the
@@ -217,7 +218,7 @@ function lint(name: string, tarball: string): string[] {
               ]
     )
         .concat(
-            name === "core" || name === "react"
+            name === "core" || name === "react" || name === "vue"
                 ? featureExportProblems(
                       manifest.exports,
                       FEATURES.map((feature) => feature.subpath),
@@ -296,10 +297,19 @@ function adapterVersion(dir: string, name: string): string {
 }
 
 /**
+ * What a smoke app needs that no adapter depends on (the Vite plugin of single-file components),
+ * pinned as `../primitives` pins it, until the examples app pins it (it wins then).
+ */
+const SMOKE_ONLY: Readonly<Record<string, string>> = {
+    "@vitejs/plugin-vue": "6.0.11",
+};
+
+/**
  * The version the smoke app of `framework` installs of `name`: the examples app's
  * (`examples/<framework>`) once it exists, else the adapter's own (the same pins: AGENTS.md D22).
  */
 function smokeVersion(framework: Framework, dir: string, name: string): string {
+    const pinned = SMOKE_ONLY[name];
     const examples = join(root, "examples", framework, "package.json");
     if (existsSync(examples)) {
         const manifest = JSON.parse(readFileSync(examples, "utf8")) as {
@@ -310,6 +320,7 @@ function smokeVersion(framework: Framework, dir: string, name: string): string {
             manifest.dependencies?.[name] ?? manifest.devDependencies?.[name];
         if (version !== undefined) return version;
     }
+    if (pinned !== undefined) return pinned;
     return adapterVersion(dir, name);
 }
 
@@ -548,8 +559,8 @@ export function servedImports(code: string): string[] {
 }
 
 /**
- * Starts the app's dev server, loads its entry (`/src/main.tsx`) and every module it imports,
- * then stops it.
+ * Starts the app's dev server, loads its entry (`/src/main.tsx`), the app's modules it reaches
+ * (a single-file component) and every module they import, then stops it.
  */
 async function loadThroughDevServer(
     dir: string,
@@ -583,15 +594,28 @@ async function loadThroughDevServer(
                 await new Promise((resolve) => setTimeout(resolve, 250));
             }
         }
-        const entry = await fetchOk(`${base}${entryPath}`);
-        const imports = servedImports(entry);
+        // the entry and the app's own modules it reaches (`/src/app.vue`), each import loaded
+        const seen = new Set<string>([entryPath]);
+        const queue = [entryPath];
+        const imports: string[] = [];
+        for (
+            let path = queue.shift();
+            path !== undefined;
+            path = queue.shift()
+        ) {
+            const code = await fetchOk(`${base}${path}`);
+            for (const imported of servedImports(code)) {
+                if (seen.has(imported)) continue;
+                seen.add(imported);
+                imports.push(imported);
+                if (imported.startsWith("/src/")) queue.push(imported);
+                else await fetchOk(`${base}${imported}`);
+            }
+        }
         if (!imports.some((path) => path.includes("@fragiola"))) {
             throw new Error(
-                `the dev server's entry imports no package:\n${entry}`,
+                `the dev server's entry imports no package (${entryPath}): ${imports.join(", ")}`,
             );
-        }
-        for (const path of imports) {
-            await fetchOk(`${base}${path}`);
         }
         console.log(
             `check-package: the dev server loads the entry (${imports.length} imports)`,
@@ -618,10 +642,234 @@ async function reactSmoke(
     await loadThroughDevServer(app, "/src/main.tsx");
 }
 
+// Everything from the Vue package, the core included: a Vue app installs that one only. A month
+// and a week in single-file components, so that vue-tsc checks the templates against the
+// published types: `typedCalendar` with the registry and the features, the v-models, a feature's
+// event, the features' parts from their entries, and a composable.
+const VUE_SMOKE_MAIN = `import { createApp } from "vue";
+import App from "./app.vue";
+
+createApp(App).mount("#root");
+`;
+
+const VUE_SMOKE_TITLE = `<script setup lang="ts">
+import { useCalendarTitle } from "@fragiola/calendar-vue";
+
+const parts = useCalendarTitle();
+</script>
+
+<template>
+    <h2>{{ parts.map((part) => part.value).join("") }}</h2>
+</template>
+`;
+
+const VUE_SMOKE_APP = `<script setup lang="ts">
+import {
+    type CalendarEngineEventOf,
+    createCalendarModel,
+    typedCalendar,
+    type ViewType,
+} from "@fragiola/calendar-vue";
+import { BusinessHours, constraints } from "@fragiola/calendar-vue/constraints";
+import { DragPreview, dragAndDrop } from "@fragiola/calendar-vue/drag-and-drop";
+import { NowIndicator, nowIndicator } from "@fragiola/calendar-vue/now-indicator";
+import { recurrence } from "@fragiola/calendar-vue/recurrence";
+import { ResizeHandle, resize } from "@fragiola/calendar-vue/resize";
+import { Selection, selection } from "@fragiola/calendar-vue/selection";
+import { ref } from "vue";
+import Title from "./title.vue";
+
+type Types = {
+    events: { meeting: { room: string } };
+    calendar: undefined;
+};
+
+const features = [
+    selection(),
+    dragAndDrop(),
+    resize(),
+    nowIndicator(),
+    constraints(),
+    recurrence(),
+] as const;
+const model = createCalendarModel<Types, typeof features>(
+    {
+        version: 1,
+        events: [
+            {
+                id: "standup",
+                kind: "meeting",
+                title: "Standup",
+                start: "2026-11-26T09:00:00-03:00",
+                end: "2026-11-26T09:15:00-03:00",
+                allDay: false,
+                data: { room: "Blue" },
+                recurrence: { rule: "FREQ=WEEKLY;BYDAY=MO,TH" },
+            },
+        ],
+        settings: { timeZone: "America/Sao_Paulo" },
+        view: { type: "week", anchorDate: "2026-11-26" },
+    },
+    { features },
+);
+const Calendar = typedCalendar<Types, typeof features>();
+const view = ref<ViewType>("week");
+const date = ref("2026-11-26");
+
+function onSelect(event: CalendarEngineEventOf<"select">) {
+    console.log(event.range);
+}
+</script>
+
+<template>
+    <Calendar.Root :model="model" v-model:view="view" v-model:date="date" @select="onSelect">
+        <Title />
+        <Calendar.Previous>Previous</Calendar.Previous>
+        <Calendar.Today>Today</Calendar.Today>
+        <Calendar.Next>Next</Calendar.Next>
+        <Calendar.ViewButton view="month">Month</Calendar.ViewButton>
+        <Calendar.ViewButton view="week">Week</Calendar.ViewButton>
+        <Calendar.DayGrid v-if="view === 'month'" aria-label="Month">
+            <Calendar.Weeks v-slot="{ week }">
+                <Calendar.Week :week="week">
+                    <template #day="{ day }">
+                        <Calendar.Day :day="day">
+                            <Calendar.DayEvents v-slot="{ segment }">
+                                <Calendar.Segment :segment="segment" />
+                            </Calendar.DayEvents>
+                            <Calendar.More v-slot="{ hiddenCount }">+{{ hiddenCount }}</Calendar.More>
+                        </Calendar.Day>
+                    </template>
+                    <Selection />
+                    <DragPreview />
+                </Calendar.Week>
+            </Calendar.Weeks>
+        </Calendar.DayGrid>
+        <Calendar.TimeGrid v-else aria-label="Week">
+            <Calendar.ColumnHeaders v-slot="{ date: day }">
+                <Calendar.ColumnHeader :date="day">{{ day }}</Calendar.ColumnHeader>
+            </Calendar.ColumnHeaders>
+            <Calendar.Scroller style="height: 600px; overflow: auto">
+                <Calendar.SlotRows v-slot="{ slot }">
+                    <Calendar.SlotRow :slot="slot">
+                        <Calendar.SlotLabel>{{ slot.time }}</Calendar.SlotLabel>
+                        <Calendar.Slots v-slot="{ column }">
+                            <Calendar.Slot :date="column.date" />
+                        </Calendar.Slots>
+                    </Calendar.SlotRow>
+                </Calendar.SlotRows>
+                <Calendar.Columns v-slot="{ column }">
+                    <Calendar.Column :column="column">
+                        <BusinessHours />
+                        <Calendar.ColumnEvents v-slot="{ segment }">
+                            <Calendar.TimeEvent :segment="segment" v-slot="{ eventId }">
+                                {{ model.get("event-by", { id: eventId })?.title }}
+                                <ResizeHandle edge="end" />
+                            </Calendar.TimeEvent>
+                        </Calendar.ColumnEvents>
+                        <Selection />
+                        <DragPreview />
+                        <NowIndicator />
+                    </Calendar.Column>
+                </Calendar.Columns>
+            </Calendar.Scroller>
+        </Calendar.TimeGrid>
+    </Calendar.Root>
+</template>
+`;
+
+const VUE_SMOKE_SHIM = `declare module "*.vue" {
+    import type { DefineComponent } from "vue";
+    const component: DefineComponent;
+    export default component;
+}
+`;
+
+/**
+ * A scratch Vite + Vue app in \`dir\` that depends on the Vue tarball only (the core tarball
+ * stands in for its dependency). vue-tsc runs on TypeScript 6 (it does not run on TypeScript 7
+ * yet), pinned by the adapter (the examples app's once it exists), with the published
+ * declarations checked too (no skipLibCheck).
+ */
+function writeVueSmokeApp(dir: string, core: string, vue: string): void {
+    const version = (name: string) => smokeVersion("vue", "vue", name);
+    const manifest = {
+        name: "calendar-smoke-vue",
+        private: true,
+        type: "module",
+        dependencies: {
+            "@fragiola/calendar-vue": `file:${vue}`,
+            vue: version("vue"),
+        },
+        devDependencies: {
+            "@vitejs/plugin-vue": version("@vitejs/plugin-vue"),
+            typescript: version("typescript"),
+            vite: version("vite"),
+            "vue-tsc": version("vue-tsc"),
+        },
+    };
+    writeFileSync(
+        join(dir, "package.json"),
+        `${JSON.stringify(manifest, null, 4)}\n`,
+    );
+    writeFileSync(
+        join(dir, "pnpm-workspace.yaml"),
+        `overrides:\n  "@fragiola/calendar": "file:${core}"\n`,
+    );
+    writeFileSync(
+        join(dir, "vite.config.js"),
+        `import vue from "@vitejs/plugin-vue";\nimport { defineConfig } from "vite";\n\nexport default defineConfig({ plugins: [vue()] });\n`,
+    );
+    writeFileSync(
+        join(dir, "index.html"),
+        `<!doctype html>\n<html lang="en">\n<body>\n<div id="root"></div>\n<script type="module" src="/src/main.ts"></script>\n</body>\n</html>\n`,
+    );
+    const tsconfig = {
+        compilerOptions: {
+            target: "ES2022",
+            lib: ["ES2022", "DOM", "DOM.Iterable"],
+            module: "ESNext",
+            moduleResolution: "bundler",
+            jsx: "preserve",
+            strict: true,
+            noUncheckedIndexedAccess: true,
+            verbatimModuleSyntax: true,
+            noEmit: true,
+            types: [],
+        },
+        include: ["src/**/*.ts", "src/**/*.vue"],
+    };
+    writeFileSync(
+        join(dir, "tsconfig.json"),
+        `${JSON.stringify(tsconfig, null, 4)}\n`,
+    );
+    mkdirSync(join(dir, "src"));
+    writeFileSync(join(dir, "src/main.ts"), VUE_SMOKE_MAIN);
+    writeFileSync(join(dir, "src/app.vue"), VUE_SMOKE_APP);
+    writeFileSync(join(dir, "src/title.vue"), VUE_SMOKE_TITLE);
+    writeFileSync(join(dir, "src/shims.d.ts"), VUE_SMOKE_SHIM);
+}
+
+/**
+ * The Vue smoke test: the scratch Vite + Vue app installs the Vue tarball, typechecks its
+ * templates (vue-tsc), builds and loads its dev server.
+ */
+async function vueSmoke(
+    app: string,
+    tarballs: { core: string; adapter: string },
+): Promise<void> {
+    writeVueSmokeApp(app, tarballs.core, tarballs.adapter);
+    run("pnpm", ["install", "--no-frozen-lockfile"], app);
+    run("pnpm", ["exec", "vue-tsc", "--noEmit"], app);
+    run("pnpm", ["exec", "vite", "build"], app);
+    await loadThroughDevServer(app, "/src/main.ts");
+}
+
 /** Every adapter, one per package under packages/ but the core (`unlistedPackages` checks it). */
 export const ADAPTERS: readonly AdapterCheck[] = [
-    // the Vue and Angular adapters join with their Epics, each with its smoke app
+    // the Angular adapter joins with its Epic, with its smoke app
     { dir: "react", framework: "react", smoke: reactSmoke },
+    { dir: "vue", framework: "vue", smoke: vueSmoke },
 ];
 
 /** The packages/ directories that are neither the core nor an adapter of `adapters`. */
