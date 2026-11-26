@@ -99,6 +99,25 @@ function chipClass(state: SegmentState) {
 
 </Framework>
 
+<Framework name="angular">
+
+```html title="event-chip.html"
+<!-- imports: [CALENDAR, CalendarResizeHandleDirective] (from @fragiola/calendar-angular/resize) -->
+<div
+    [calendarSegment]="segment"
+    #chip="calendarSegment"
+    class="chip"
+    [class.chip-open-start]="chip.state()?.continuesBefore"
+    [class.chip-open-end]="chip.state()?.continuesAfter"
+    [class.chip-dragging]="chip.state()?.dragging"
+>
+    {{ titleOf(segment.occurrenceId) }}
+    <div *calendarResizeHandle="'end'" class="chip-handle"></div>
+</div>
+```
+
+</Framework>
+
 The same element can come from `useSegment(segment)` ([hooks](/docs/api/hooks)).
 
 <Example id="all-day-and-multi-day" variant="card" />
@@ -110,6 +129,9 @@ attribute.
 
 In Vue: the same props (in kebab-case in a template), and slots in place of `children`; see
 [Vue primitives](/docs/api/vue).
+
+In Angular: a directive on your element, the props as its inputs, templates in place of
+`children`; see [Angular primitives](/docs/api/angular).
 
 | prop | type | description |
 | --- | --- | --- |

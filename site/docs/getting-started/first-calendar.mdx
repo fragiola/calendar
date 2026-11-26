@@ -120,13 +120,42 @@ const model = createCalendarModel<Types>(document);
 
 </Framework>
 
+<Framework name="angular">
+
+A field initializer runs once per component, so the model created there lives as long as the
+component. The root is typed by the model it is given.
+
+```ts title="team-week.ts"
+import { Component } from "@angular/core";
+import { CALENDAR, createCalendarModel } from "@fragiola/calendar-angular";
+import { document, type Types } from "./calendar-data";
+import { Toolbar } from "./toolbar";
+import { WeekGrid } from "./week-grid";
+
+@Component({
+    selector: "app-team-week",
+    imports: [CALENDAR, Toolbar, WeekGrid],
+    template: `
+        <div [calendarRoot]="model" class="calendar">
+            <div appToolbar class="toolbar"></div>
+            <app-week-grid />
+        </div>
+    `,
+})
+export class TeamWeek {
+    readonly model = createCalendarModel<Types>(document);
+}
+```
+
+</Framework>
+
 </Step>
 <Step>
 
 ## Add the toolbar
 
 The title is data: `useCalendarTitle` gives `Intl` parts in the calendar's locale (in Vue, a
-computed), which you join. `Calendar.Previous`, `Calendar.Today` and `Calendar.Next` are buttons that run
+computed; in Angular, a signal), which you join. `Calendar.Previous`, `Calendar.Today` and `Calendar.Next` are buttons that run
 `view.previous`, `view.today` and `view.next`, with `data-disabled` when the model cannot run
 them. Their labels are yours.
 
@@ -171,13 +200,40 @@ const title = useCalendarTitle();
 
 </Framework>
 
+<Framework name="angular">
+
+```ts title="toolbar.ts"
+import { Component } from "@angular/core";
+import { CALENDAR, injectCalendarTitle } from "@fragiola/calendar-angular";
+
+// inside the root: <div appToolbar class="toolbar"></div>
+@Component({
+    selector: "[appToolbar]",
+    imports: [CALENDAR],
+    template: `
+        <h2>{{ text() }}</h2>
+        <button calendarToday>Today</button>
+        <button calendarPrevious aria-label="Previous week">‹</button>
+        <button calendarNext aria-label="Next week">›</button>
+    `,
+})
+export class Toolbar {
+    private readonly title = injectCalendarTitle();
+    protected text() {
+        return this.title().map((part) => part.value).join("");
+    }
+}
+```
+
+</Framework>
+
 </Step>
 <Step>
 
 ## Assemble the time grid
 
 `Calendar.TimeGrid` is the grid (`role="grid"`). Inside it, each collection part calls your
-function (in Vue, its default scoped slot) per entity of the layout: `ColumnHeaders` per day, `Days` per day of the all-day row,
+function (in Vue, its default scoped slot; in Angular, its template) per entity of the layout: `ColumnHeaders` per day, `Days` per day of the all-day row,
 `SlotRows` per slot, `Slots` per day of a slot's row, `Columns` per day, `ColumnEvents` per timed
 event of that day ([Composition](/docs/concepts/composition)).
 
@@ -347,6 +403,105 @@ const parts = useSlotLabel(() => props.time, { hour: "numeric" });
 
 </Framework>
 
+<Framework name="angular">
+
+```ts title="week-grid.ts"
+import { Component } from "@angular/core";
+import { CALENDAR } from "@fragiola/calendar-angular";
+import { AllDayEvent } from "./all-day-event";
+import { DayHeader } from "./day-header";
+import { SlotTime } from "./slot-time";
+import { TimedEvent } from "./timed-event";
+
+@Component({
+    selector: "app-week-grid",
+    imports: [CALENDAR, AllDayEvent, DayHeader, SlotTime, TimedEvent],
+    host: { class: "contents" },
+    template: `
+        <div calendarTimeGrid aria-label="Week" class="grid">
+            <div calendarColumnHeaders class="headers">
+                <ng-template calendarColumnHeadersItem let-date>
+                    <div [calendarColumnHeader]="date" [appDayHeader]="date" class="header"></div>
+                </ng-template>
+            </div>
+            <div calendarAllDayRow class="all-day">
+                <ng-template calendarDays let-day>
+                    <div [calendarDay]="day" class="all-day-cell">
+                        <div calendarDayEvents>
+                            <ng-template calendarDayEventsItem let-segment>
+                                <div [calendarSegment]="segment" appAllDayEvent class="segment"></div>
+                            </ng-template>
+                        </div>
+                    </div>
+                </ng-template>
+            </div>
+            <div calendarScroller class="scroller">
+                <div class="body">
+                    <ng-template calendarSlotRows let-slot>
+                        <div [calendarSlotRow]="slot" class="slot-row">
+                            <div calendarSlotLabel class="slot-label">
+                                @if (slot.time.endsWith(":00")) {
+                                    <app-slot-time [time]="slot.time" />
+                                }
+                            </div>
+                            <ng-template calendarSlots let-column>
+                                <div [calendarSlot]="column.date" class="slot"></div>
+                            </ng-template>
+                        </div>
+                    </ng-template>
+                    <div calendarColumns class="columns">
+                        <ng-template calendarColumnsItem let-column>
+                            <div [calendarColumn]="column" class="column">
+                                <div calendarColumnEvents>
+                                    <ng-template calendarColumnEventsItem let-segment>
+                                        <div [calendarTimeEvent]="segment" appTimedEvent class="event"></div>
+                                    </ng-template>
+                                </div>
+                            </div>
+                        </ng-template>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `,
+})
+export class WeekGrid {}
+```
+
+An injection function takes a value, a signal or a getter: a getter on an input follows the input.
+A component on the part's own element (an attribute selector) adds no element between the parts.
+
+```ts title="day-header.ts"
+import { Component, input } from "@angular/core";
+import { injectDayHeader } from "@fragiola/calendar-angular";
+
+// <div [calendarColumnHeader]="date" [appDayHeader]="date"></div>
+@Component({ selector: "[appDayHeader]", template: "{{ text() }}" })
+export class DayHeader {
+    readonly appDayHeader = input.required<string>();
+    private readonly parts = injectDayHeader(() => this.appDayHeader());
+    protected text() {
+        return this.parts().map((part) => part.value).join("");
+    }
+}
+```
+
+```ts title="slot-time.ts"
+import { Component, input } from "@angular/core";
+import { injectSlotLabel } from "@fragiola/calendar-angular";
+
+@Component({ selector: "app-slot-time", template: "<span>{{ text() }}</span>" })
+export class SlotTime {
+    readonly time = input.required<string>();
+    private readonly parts = injectSlotLabel(() => this.time(), { hour: "numeric" });
+    protected text() {
+        return this.parts().map((part) => part.value).join("");
+    }
+}
+```
+
+</Framework>
+
 </Step>
 <Step>
 
@@ -436,6 +591,62 @@ const { model } = useCalendar<Types>();
         {{ titleOf(model, segment.occurrenceId, segment.eventId) }}
     </Calendar.TimeEvent>
 </template>
+```
+
+</Framework>
+
+<Framework name="angular">
+
+```ts title="title-of.ts"
+import type { CalendarModel } from "@fragiola/calendar-angular";
+import type { Types } from "./calendar-data";
+
+export function titleOf(
+    model: CalendarModel<Types>,
+    occurrenceId: string,
+    eventId: string,
+) {
+    return (
+        model.get("occurrence-by", { id: occurrenceId })?.title ??
+        model.get("event-by", { id: eventId })?.title
+    );
+}
+```
+
+```ts title="all-day-event.ts"
+import { Component, computed } from "@angular/core";
+import { injectCalendar, injectSegment } from "@fragiola/calendar-angular";
+import type { Types } from "./calendar-data";
+import { titleOf } from "./title-of";
+
+// <div [calendarSegment]="segment" appAllDayEvent class="segment"></div>
+@Component({ selector: "[appAllDayEvent]", template: "{{ title() }}" })
+export class AllDayEvent {
+    private readonly segment = injectSegment();
+    private readonly model = injectCalendar<Types>().model;
+    protected readonly title = computed(() => {
+        const state = this.segment.state();
+        return state && titleOf(this.model(), state.occurrenceId, state.eventId);
+    });
+}
+```
+
+```ts title="timed-event.ts"
+import { Component, computed } from "@angular/core";
+import { injectCalendar, injectTimeEvent } from "@fragiola/calendar-angular";
+import type { Types } from "./calendar-data";
+import { titleOf } from "./title-of";
+
+// <div [calendarTimeEvent]="segment" appTimedEvent class="event"></div>
+@Component({ selector: "[appTimedEvent]", template: "{{ title() }}" })
+export class TimedEvent {
+    private readonly event = injectTimeEvent();
+    private readonly model = injectCalendar<Types>().model;
+    protected readonly title = computed(() => {
+        const state = this.event.state();
+        return state && titleOf(this.model(), state.occurrenceId, state.eventId);
+    });
+}
 ```
 
 </Framework>

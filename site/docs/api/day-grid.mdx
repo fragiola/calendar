@@ -87,6 +87,34 @@ import { Calendar } from "@fragiola/calendar-vue";
 
 </Framework>
 
+<Framework name="angular">
+
+```html title="month-grid.html"
+<div calendarDayGrid aria-label="November 2026" class="month">
+    <div calendarColumnHeaders class="weekdays">
+        <ng-template calendarColumnHeadersItem let-date>
+            <div [calendarColumnHeader]="date">{{ date }}</div>
+        </ng-template>
+    </div>
+    <ng-template calendarWeeks let-week>
+        <div [calendarWeek]="week" class="week">
+            <ng-template calendarDays let-day>
+                <div [calendarDay]="day" class="day">
+                    <span aria-hidden="true">{{ +day.date.slice(8) }}</span>
+                    <div calendarDayEvents>
+                        <ng-template calendarDayEventsItem let-segment>
+                            <div [calendarSegment]="segment"></div>
+                        </ng-template>
+                    </div>
+                </div>
+            </ng-template>
+        </div>
+    </ng-template>
+</div>
+```
+
+</Framework>
+
 A month view shows six weeks by default (`fixedWeekCount`); give the weeks a height in your CSS
 (a grid of rows, or `flex: 1` each). See the [month view guide](/docs/guides/month-view).
 
@@ -99,6 +127,9 @@ attribute.
 
 In Vue: the same props (in kebab-case in a template), and slots in place of `children`; see
 [Vue primitives](/docs/api/vue).
+
+In Angular: a directive on your element, the props as its inputs, templates in place of
+`children`; see [Angular primitives](/docs/api/angular).
 
 | prop | type | description |
 | --- | --- | --- |

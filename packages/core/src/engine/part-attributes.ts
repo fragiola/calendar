@@ -21,7 +21,10 @@
 // never the first row's day state. A time grid's columns are numbered (`aria-colcount` on the
 // grid, `aria-colindex` on each cell: the time axis is column 1, the days from 2), so the header
 // row, the all-day row and the columns' layer, which have no axis cell of their own, keep the slot
-// rows' column count without an empty header the library could not name (D19).
+// rows' column count without an empty header the library could not name (D19). A month numbers its
+// columns only when its rows render a week number (`weekNumberColumn`, the adapters' root option:
+// only the app knows it renders `WeekNumber`, and a server render must know it too): the week
+// number is column 1, the days from 2, so the header row of seven and the rows of eight agree.
 import type { CalendarTypes } from "../document/calendar-types";
 import type {
     FeatureEngine,
@@ -40,6 +43,15 @@ import {
     occurrenceOf,
     positionOfPart,
 } from "./positions";
+
+/** How the app renders the parts, beyond their payloads (the same for every part of a root). */
+export interface PartAttributeOptions {
+    /**
+     * a month's rows render a week number (`WeekNumber`) before their days: the grid counts that
+     * column (`aria-colcount`), the week number is column 1 and the days and their headers from 2
+     */
+    readonly weekNumberColumn?: boolean | undefined;
+}
 
 /** The engine's focus, as the attributes read it. */
 export interface FocusView {
@@ -98,12 +110,38 @@ function columnIndex(
     return index < 0 ? undefined : String(index + 2);
 }
 
+/** Whether a month's columns are numbered: its rows render a week number first. */
+function numberedMonth(
+    model: CalendarModel,
+    options: PartAttributeOptions,
+): boolean {
+    return (
+        options.weekNumberColumn === true &&
+        model.state.view.type === "month" &&
+        model.get("day-grid") !== null
+    );
+}
+
+/** A numbered month's column of a date (the week number is 1, the days from 2). */
+function monthColumnIndex(
+    model: CalendarModel,
+    date: string | undefined,
+): string | undefined {
+    if (date === undefined) return undefined;
+    for (const week of model.get("day-grid")?.weeks ?? []) {
+        const index = week.days.findIndex((day) => day.date === date);
+        if (index >= 0) return String(index + 2);
+    }
+    return undefined;
+}
+
 /** The ARIA a date cell's `data-*` state says (`day`, `slot`), once the features wrote theirs. */
 function cellStates(
     model: CalendarModel,
     part: PartName,
     date: string | undefined,
     into: MutablePartAttributes,
+    options: PartAttributeOptions,
 ): void {
     if (part === "day") {
         if (into["data-today"] === "") into["aria-current"] = "date";
@@ -116,7 +154,10 @@ function cellStates(
     if (selectable(model)) {
         into["aria-selected"] = into["data-selected"] === "" ? "true" : "false";
     }
-    const column = columnIndex(model, date);
+    const column =
+        part === "day" && numberedMonth(model, options)
+            ? monthColumnIndex(model, date)
+            : columnIndex(model, date);
     if (column !== undefined) into["aria-colindex"] = column;
 }
 
@@ -127,6 +168,7 @@ export function attributesOf(
     payload: Readonly<Record<string, unknown>>,
     focus: FocusView,
     features: readonly FeatureEngine[],
+    options: PartAttributeOptions = {},
 ): PartAttributes {
     const into: MutablePartAttributes = { "data-calendar-part": part };
     const date = typeof payload.date === "string" ? payload.date : undefined;
@@ -142,6 +184,10 @@ export function attributesOf(
             if (selectable(model)) into["aria-multiselectable"] = "true";
             const grid = part === "time-grid" ? model.get("time-grid") : null;
             if (grid) into["aria-colcount"] = String(grid.columns.length + 1);
+            if (part === "day-grid" && numberedMonth(model, options)) {
+                const days = model.get("day-grid")?.weeks[0]?.days.length ?? 0;
+                into["aria-colcount"] = String(days + 1);
+            }
             break;
         }
         case "week":
@@ -170,6 +216,7 @@ export function attributesOf(
             break;
         case "week-number":
             into.role = "rowheader";
+            if (numberedMonth(model, options)) into["aria-colindex"] = "1";
             break;
         case "slot-label":
             into.role = "rowheader";
@@ -185,6 +232,10 @@ export function attributesOf(
                     into["data-date"] = day["data-date"];
                 if (day["data-weekend"] !== undefined)
                     into["data-weekend"] = day["data-weekend"];
+                if (numberedMonth(model, options)) {
+                    const column = monthColumnIndex(model, date);
+                    if (column !== undefined) into["aria-colindex"] = column;
+                }
                 break;
             }
             Object.assign(into, day);
@@ -276,7 +327,9 @@ export function attributesOf(
     for (const feature of features) {
         feature.attributes?.(part, payload, into);
     }
-    if (part === "day" || part === "slot") cellStates(model, part, date, into);
+    if (part === "day" || part === "slot") {
+        cellStates(model, part, date, into, options);
+    }
     return into;
 }
 
@@ -293,6 +346,7 @@ export function partAttributes<
     model: CalendarModel<T, F>,
     part: P,
     payload: PartPayloadMap[P],
+    options?: PartAttributeOptions,
 ): PartAttributes {
     const loose = model as unknown as CalendarModel;
     const today = todayOf(loose.state.settings, clockOf(loose));
@@ -302,5 +356,6 @@ export function partAttributes<
         payload as Readonly<Record<string, unknown>>,
         { tabStop: () => defaultTabStop(loose, today), focused: null },
         [],
+        options,
     );
 }

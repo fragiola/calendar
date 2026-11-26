@@ -145,6 +145,17 @@ slot, which hands the element's props and the state:
 
 </Framework>
 
+<Framework name="angular">
+
+When you prefer classes, the part's element is yours: `class` and `style` as on any element. A
+class that depends on the part's state binds its state signal, through `exportAs`:
+
+```html
+<div [calendarSegment]="segment" #event="calendarSegment" class="event" [class.event--grabbed]="event.state()?.grabbed"></div>
+```
+
+</Framework>
+
 [Styling with Tailwind](/docs/guides/styling-tailwind) does the same with utility classes,
 and [Theming](/docs/guides/theming) shows themes that change the calendar's shapes as well as its
 colours.

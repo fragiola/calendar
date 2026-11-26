@@ -5,7 +5,7 @@ import { describe, expect, it } from "vitest";
 const root = join(import.meta.dirname, "../..");
 const read = (path: string) => readFileSync(join(root, path), "utf8");
 
-/** The apps whose Playwright version the E2E image follows (Vue's and Angular's join with them). */
+/** The apps whose Playwright version the E2E image follows: every one with a Playwright suite. */
 const PLAYWRIGHT_APPS = [
     "apps/playground",
     "examples/shared",
@@ -14,7 +14,7 @@ const PLAYWRIGHT_APPS = [
     "examples/angular",
 ];
 
-/** The `@playwright/test` versions the existing apps pin. */
+/** The `@playwright/test` versions the apps pin (an app that does not exist pins none). */
 function playwrightVersions(): Set<string> {
     return new Set(
         PLAYWRIGHT_APPS.filter((dir) =>
@@ -78,6 +78,17 @@ describe("the CI workflow", () => {
             expect(body, job).toContain("needs: changes");
         }
         expect(playwrightVersions()).toEqual(new Set(["1.65.1"]));
+    });
+
+    it("sees every app's Playwright pin, examples/angular's included", () => {
+        for (const dir of PLAYWRIGHT_APPS) {
+            const manifest = JSON.parse(read(`${dir}/package.json`)) as {
+                devDependencies?: Record<string, string>;
+            };
+            expect(manifest.devDependencies?.["@playwright/test"], dir).toBe(
+                "1.65.1",
+            );
+        }
     });
 
     it("installs no browser, and any Playwright image is the apps' version", () => {

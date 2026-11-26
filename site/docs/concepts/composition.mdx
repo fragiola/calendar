@@ -7,14 +7,14 @@ There is no `<Calendar view="month" />`. You assemble a view from the parts of o
 `Calendar.*`, and everything between them is yours: a date label, a week number, a button, an
 icon, a wrapper for your grid layout. The layout says which rows, days, slots and events there
 are; **collection parts** turn it into your markup by calling a function per entity (in Vue,
-their default scoped slot).
+their default scoped slot; in Angular, an `ng-template`).
 
 ## Parts and collection parts
 
 A part renders one element with its role, its attributes and its registration:
 `Calendar.DayGrid`, `Calendar.Week`, `Calendar.Day`, `Calendar.Segment`, … A collection part calls
-its children function (React) or its default scoped slot (Vue) once per entity of the layout, in
-order; the Vue slot's scope names the entity (`v-slot="{ week }"`, `{ day, week }`, `{ segment }`,
+its children function (React), its default scoped slot (Vue) or its template (Angular) once per
+entity of the layout, in order; the Vue slot's scope names the entity (`v-slot="{ week }"`, `{ day, week }`, `{ segment }`,
 `{ date }`, `{ slot }`, `{ column }`, `{ day }` for `ListDays`, `{ item }` for `ListDay`):
 
 | collection part | calls your function with | inside |
@@ -89,6 +89,36 @@ render their container (a row, a list) around what you return.
 
 </Framework>
 
+<Framework name="angular">
+
+```html
+<div calendarDayGrid aria-label="Month" class="month">
+    <div calendarColumnHeaders class="weekdays">
+        <ng-template calendarColumnHeadersItem let-date>
+            <div [calendarColumnHeader]="date">{{ weekday(date) }}</div>
+        </ng-template>
+    </div>
+    <ng-template calendarWeeks let-week>
+        <div [calendarWeek]="week" class="week">
+            <div calendarWeekNumber>{{ week.weekNumber }}</div>
+            <ng-template calendarDays let-day>
+                <div [calendarDay]="day" class="day">
+                    <span>{{ +day.date.slice(8) }}</span>
+                    <div calendarDayEvents>
+                        <ng-template calendarDayEventsItem let-segment>
+                            <div [calendarSegment]="segment" appEventSegment></div>
+                        </ng-template>
+                    </div>
+                    <button *calendarMore="let more">+{{ more.hiddenCount }} more</button>
+                </div>
+            </ng-template>
+        </div>
+    </ng-template>
+</div>
+```
+
+</Framework>
+
 <Framework name="react">
 
 `Calendar.Week` and `Calendar.AllDayRow` take either elements (a week number, then
@@ -105,6 +135,18 @@ number, then `Calendar.Days`, then a row's decorations) or a `#day="{ day, week 
 per day, the short form when the row holds nothing else. Every other part's default slot receives
 its state (`Calendar.More`: `{ hiddenCount, hiddenOccurrenceIds, date }`; `Calendar.Segment`,
 `Calendar.TimeEvent`: the event's state).
+
+</Framework>
+
+<Framework name="angular">
+
+A collection is an `ng-template` with a typed context: `<ng-template calendarWeeks let-week>`,
+`<ng-template calendarDays let-day let-week="week">`; a container part (`[calendarDayEvents]`,
+`[calendarColumnEvents]`, `[calendarColumns]`, `[calendarColumnHeaders]`, `[calendarListDay]`)
+holds its item template (`<ng-template calendarDayEventsItem let-segment>`). A part rendered only
+in some states is a structural directive on its element (`<button *calendarMore="let more">`, its
+state in `more`); every other part's state is its directive's `state()` signal, through
+`exportAs` (`#event="calendarSegment"`, then `event.state()`).
 
 </Framework>
 
@@ -203,6 +245,38 @@ defineProps<{ highlighted: string | null }>();
 
 </Framework>
 
+<Framework name="angular">
+
+A per-entity template renders again for an entity whose layout object changed. The layout keeps
+the objects of what did not change (a week row is the same object while nothing in it changed), so
+moving one event renders again the rows or columns it left and entered, and nothing else. Each
+entity's view is checked again whenever the template it is in is, so the app state it reads (a
+signal, a field) is never stale; another template (an `@if` around two) renders every row with it.
+
+```html title="month.html"
+<!-- a row reads `highlighted()`, the component's signal: checked again when it changes -->
+<div calendarDayGrid aria-label="Month">
+    <ng-template calendarWeeks let-week>
+        <div [calendarWeek]="week" class="week">
+            <ng-template calendarDays let-day>
+                <div [calendarDay]="day" class="day">
+                    <div calendarDayEvents>
+                        <ng-template calendarDayEventsItem let-segment>
+                            <div
+                                [calendarSegment]="segment"
+                                [attr.data-highlighted]="segment.eventId === highlighted() ? '' : null"
+                            ></div>
+                        </ng-template>
+                    </div>
+                </div>
+            </ng-template>
+        </div>
+    </ng-template>
+</div>
+```
+
+</Framework>
+
 The functions (or slots) nested inside a row may stay inline: they are new only when their row
 is called again. Most calendars need nothing of this; a grid that re-renders often (a live region that
 changes on every key, a form beside the calendar) does. [Performance](/docs/guides/performance)
@@ -249,12 +323,29 @@ element (`v-bind="props"`), when it depends on the part's state. Never `asChild`
 
 </Framework>
 
+<Framework name="angular">
+
+A directive renders no element of its own: the element you put it on is the part, whatever its
+tag (an `ol`, a `section`, a component of yours whose host is that element). Never `asChild`.
+
+```html
+<ol [calendarListDay]="day">
+    <ng-template calendarListDayItem let-item>
+        <li [calendarListEvent]="item">{{ title(item) }}</li>
+    </ng-template>
+</ol>
+
+<button calendarNext appIconButton>Next</button>
+```
+
+</Framework>
+
 [The primitive contract](/docs/concepts/primitive-contract) says what every part accepts.
 
 ## Hooks for your own parts
 
 A component you write inside a part reads the calendar through hooks (composables in Vue, which
-return computed refs): `useCalendar` (the model
+return computed refs; injection functions in Angular, which return signals): `useCalendar` (the model
 and the engine), `useCalendarView`, `useCalendarTitle`, `useDayHeader`, and the part hooks
 (`useDay`, `useSegment`, `useTimeEvent`, …) that give a part's state and props to spread on an
 element of yours ([Hooks](/docs/api/hooks)).

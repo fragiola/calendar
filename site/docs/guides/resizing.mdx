@@ -97,6 +97,36 @@ The model's features are `[resize()] as const`, from `@fragiola/calendar-vue/res
 
 </Framework>
 
+<Framework name="angular">
+
+```html title="timed-event.html"
+<!-- imports: [CALENDAR, CalendarResizeHandleDirective] (from @fragiola/calendar-angular/resize) -->
+<div [calendarTimeEvent]="segment" class="event">
+    <span class="event-box"><!-- the title and times --></span>
+    <div *calendarResizeHandle="'start'" class="handle"></div>
+    <div *calendarResizeHandle="'end'" class="handle"></div>
+</div>
+```
+
+```html title="all-day-event.html"
+<!-- an all-day event resizes from its last day: no handle where it goes on in the next row -->
+<div [calendarSegment]="segment" class="segment">
+    <span><!-- the title --></span>
+    @if (!segment.continuesAfter) {
+        <div *calendarResizeHandle="'end'" class="segment-handle"></div>
+    }
+</div>
+```
+
+```html
+<!-- in each [calendarColumn], and in each row, as for a move -->
+<div *calendarDragPreview class="preview"></div>
+```
+
+The model's features are `[resize()] as const`, from `@fragiola/calendar-angular/resize`.
+
+</Framework>
+
 ```css
 .handle {
     position: absolute;
@@ -137,7 +167,7 @@ Shift:
 
 With `dragAndDrop()`, the arrows alone still move it. Enter commits one command (an `event.resize`, or a `batch` of a
 move and a resize when both changed), Escape cancels. Each step is an announcement
-(the root's `onAnnounce`, `@announce` in Vue) your live region words.
+(the root's `onAnnounce`, `@announce` in Vue, `(announce)` in Angular) your live region words.
 
 ## What a resize may do
 

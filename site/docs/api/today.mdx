@@ -47,6 +47,17 @@ import { Calendar } from "@fragiola/calendar-react";
 
 </Framework>
 
+<Framework name="angular">
+
+```html
+<!-- inside [calendarRoot]; its state through exportAs -->
+<button calendarToday #today="calendarToday" class="button" [class.muted]="today.state().disabled">
+    Today
+</button>
+```
+
+</Framework>
+
 ## Props
 
 `TodayProps`; it also takes the [common props](/docs/api/root#common-props) and every `button`
@@ -54,6 +65,9 @@ attribute.
 
 In Vue: the same props (in kebab-case in a template), and slots in place of `children`; see
 [Vue primitives](/docs/api/vue).
+
+In Angular: a directive on your element, the props as its inputs, templates in place of
+`children`; see [Angular primitives](/docs/api/angular).
 
 | prop | type | description |
 | --- | --- | --- |

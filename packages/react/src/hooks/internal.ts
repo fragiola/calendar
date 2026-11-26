@@ -125,12 +125,12 @@ export function usePart<P extends PartName>(
     /** registers the element (a decoration shown in several places at once is not) */
     register = true,
 ): PartWiring {
-    const { model, engine } = context;
+    const { model, engine, partOptions } = context;
     const key = JSON.stringify(payload);
     const attributes = useCalendarValue(context, () =>
         engine
-            ? engine.adapter.attributes(part, payload)
-            : partAttributes(model, part, payload),
+            ? engine.adapter.attributes(part, payload, partOptions)
+            : partAttributes(model, part, payload, partOptions),
     );
     // biome-ignore lint/correctness/useExhaustiveDependencies: the payload is its key
     const ref = React.useCallback<React.RefCallback<HTMLElement>>(

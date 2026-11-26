@@ -30,7 +30,7 @@ model.get("visible-range"); // { start: "2026-11-01", end: "2026-12-13" }: six w
 ## The engine
 
 `Calendar.Root` creates the engine (`createCalendarEngine(model, options)`) when it mounts (in a
-layout effect in React, `onMounted` in Vue), attaches its element and destroys it on unmount. The parts register their elements
+layout effect in React, `onMounted` in Vue, after the first render in Angular), attaches its element and destroys it on unmount. The parts register their elements
 with it; you never do. Before it exists (the server render, the first client render) every part
 reads its attributes and its layout from the model, so the server's HTML is the client's first
 render.
@@ -78,8 +78,29 @@ const { model, engine } = useCalendar();
 
 </Framework>
 
+<Framework name="angular">
+
+```ts title="go-to-today.ts"
+import { Component } from "@angular/core";
+import { injectCalendar } from "@fragiola/calendar-angular";
+
+@Component({
+    selector: "app-go-to-today",
+    template: `
+        <button type="button" (click)="calendar.engine.run('focus', { date: calendar.model().get('today') })">
+            Focus today
+        </button>
+    `,
+})
+export class GoToToday {
+    protected readonly calendar = injectCalendar();
+}
+```
+
+</Framework>
+
 `useCalendar` gives both anywhere inside the root. The engine it returns is there from the first
-render (from `setup` in Vue): before the root is mounted an action is refused and a read is empty.
+render (from `setup` in Vue, `injectCalendar()` in Angular): before the root is mounted an action is refused and a read is empty.
 
 ## What the engine tells you
 
@@ -119,6 +140,25 @@ on a root typed without it, `typedCalendar<Types, typeof features>()`).
 >
     <!-- … -->
 </Calendar.Root>
+```
+
+</Framework>
+
+<Framework name="angular">
+
+They are the root's outputs: `(eventClick)`, `(dateClick)`, `(moreClick)`, `(todayChange)`,
+`(announce)`, and a feature's from its directive on the root: `(rangeSelect)` with
+`calendarSelection`, `(eventDrop)` with `calendarDragAndDrop`, `(externalDrop)` with
+`calendarExternalDrop`.
+
+```html
+<div
+    [calendarRoot]="model"
+    (eventClick)="openEditor($event.eventId)"
+    (dateClick)="pressed($event.date, $event.time)"
+>
+    <!-- … -->
+</div>
 ```
 
 </Framework>
@@ -168,6 +208,32 @@ const calendar = useCalendarRef();
         <!-- … -->
     </Calendar.Root>
 </template>
+```
+
+</Framework>
+
+<Framework name="angular">
+
+A calendar ref's `current` is a signal's value: a template or a `computed` that reads it follows
+the root (`null` until it renders).
+
+```ts title="planner.ts"
+import { Component } from "@angular/core";
+import { CALENDAR, injectCalendarRef } from "@fragiola/calendar-angular";
+
+@Component({
+    selector: "app-planner",
+    imports: [CALENDAR],
+    template: `
+        <button type="button" (click)="calendar.current?.model.run('view.today', {})">Today</button>
+        <div calendarRoot [calendarRef]="calendar" [defaultEvents]="[]">
+            <!-- … -->
+        </div>
+    `,
+})
+export class Planner {
+    readonly calendar = injectCalendarRef();
+}
 ```
 
 </Framework>

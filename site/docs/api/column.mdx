@@ -81,6 +81,28 @@ defineProps<{ column: TimeGridColumn }>();
 
 </Framework>
 
+<Framework name="angular">
+
+```html title="day-columns.html"
+<!-- imports: [CALENDAR] and the features' directives: CalendarBusinessHoursDirective,
+     CalendarSelectionDirective, CalendarDragPreviewDirective, CalendarNowIndicatorDirective -->
+<ng-template calendarColumnsItem let-column>
+    <div [calendarColumn]="column" class="column" [class.column-today]="column.today">
+        <div *calendarBusinessHours class="business-hours"></div>
+        <div calendarColumnEvents>
+            <ng-template calendarColumnEventsItem let-segment>
+                <div [calendarTimeEvent]="segment"></div>
+            </ng-template>
+        </div>
+        <div *calendarSelection class="selection"></div>
+        <div *calendarDragPreview class="preview"></div>
+        <div *calendarNowIndicator class="now"></div>
+    </div>
+</ng-template>
+```
+
+</Framework>
+
 Each feature part needs its feature in the model's `features` (`constraints()`, `selection()`,
 `dragAndDrop()` or `resize()`, `nowIndicator()`); without it, it renders nothing and warns once.
 
@@ -98,6 +120,9 @@ Each feature part needs its feature in the model's `features` (`constraints()`, 
 
 In Vue: the same props (in kebab-case in a template), and slots in place of `children`; see
 [Vue primitives](/docs/api/vue).
+
+In Angular: a directive on your element, the props as its inputs, templates in place of
+`children`; see [Angular primitives](/docs/api/angular).
 
 `ColumnProps` takes the [common props](/docs/api/root#common-props) and any `div` attribute, and:
 

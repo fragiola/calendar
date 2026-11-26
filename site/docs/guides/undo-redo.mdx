@@ -118,6 +118,40 @@ onBeforeUnmount(stop);
 
 </Framework>
 
+<Framework name="angular">
+
+A signal holds the snapshot, set again on each change:
+
+```ts title="undo-buttons.ts"
+import { Component, effect, input, signal } from "@angular/core";
+import type { UndoManager } from "./undo";
+
+@Component({
+    selector: "app-undo-buttons",
+    template: `
+        <button type="button" [disabled]="!history()?.canUndo" (click)="undo().undo()">Undo</button>
+        <button type="button" [disabled]="!history()?.canRedo" (click)="undo().redo()">Redo</button>
+    `,
+})
+export class UndoButtons {
+    readonly undo = input.required<UndoManager>();
+    protected readonly history = signal<ReturnType<UndoManager["getSnapshot"]> | undefined>(
+        undefined,
+    );
+
+    constructor() {
+        // the input is set before the first render: the effect reads it then
+        effect((onCleanup) => {
+            const undo = this.undo();
+            this.history.set(undo.getSnapshot());
+            onCleanup(undo.subscribe(() => this.history.set(undo.getSnapshot())));
+        });
+    }
+}
+```
+
+</Framework>
+
 The example binds Ctrl or Cmd + Z (and Shift + Z, or Y, to redo) on the document; a text field
 keeps its own.
 

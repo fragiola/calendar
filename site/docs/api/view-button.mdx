@@ -66,6 +66,19 @@ import { Calendar } from "@fragiola/calendar-vue";
 
 </Framework>
 
+<Framework name="angular">
+
+```html title="view-switcher.html"
+<div role="group" aria-label="View">
+    <button calendarViewButton="month" class="segment">Month</button>
+    <button calendarViewButton="week" class="segment">Week</button>
+    <button calendarViewButton="days" [days]="3" class="segment">3 days</button>
+    <button calendarViewButton="list" class="segment">Agenda</button>
+</div>
+```
+
+</Framework>
+
 Style the pressed one with `[data-pressed]` or `[aria-pressed="true"]`.
 
 ## Props
@@ -75,6 +88,9 @@ Style the pressed one with `[data-pressed]` or `[aria-pressed="true"]`.
 
 In Vue: the same props (in kebab-case in a template), and slots in place of `children`; see
 [Vue primitives](/docs/api/vue).
+
+In Angular: a directive on your element, the props as its inputs, templates in place of
+`children`; see [Angular primitives](/docs/api/angular).
 
 | prop | type | description |
 | --- | --- | --- |

@@ -85,6 +85,29 @@ import { Calendar } from "@fragiola/calendar-vue";
 
 </Framework>
 
+<Framework name="angular">
+
+```html title="agenda.html"
+<div calendarList #list="calendarList" class="list">
+    @if (list.state().empty) {
+        <p class="empty">Nothing planned this month.</p>
+    } @else {
+        <ng-template calendarListDays let-day>
+            <section>
+                <h3 [id]="'list-' + day.date">{{ day.date }}</h3>
+                <div [calendarListDay]="day" [attr.aria-labelledby]="'list-' + day.date">
+                    <ng-template calendarListDayItem let-item>
+                        <div [calendarListEvent]="item">{{ item.eventId }}</div>
+                    </ng-template>
+                </div>
+            </section>
+        </ng-template>
+    }
+</div>
+```
+
+</Framework>
+
 Each day's list is named by the heading before it. See [List view](/docs/guides/list-view).
 
 <Example id="list" />
@@ -99,6 +122,9 @@ Each day's list is named by the heading before it. See [List view](/docs/guides/
 
 In Vue: the same props (in kebab-case in a template), and slots in place of `children`; see
 [Vue primitives](/docs/api/vue).
+
+In Angular: a directive on your element, the props as its inputs, templates in place of
+`children`; see [Angular primitives](/docs/api/angular).
 
 `ListProps` takes the [common props](/docs/api/root#common-props) and any `div` attribute, and:
 

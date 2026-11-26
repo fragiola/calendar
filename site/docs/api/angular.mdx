@@ -1,0 +1,283 @@
+---
+title: Angular primitives
+description: The same primitives and hooks for Angular 22, from @fragiola/calendar-angular, and how each React prop maps onto directives, inputs, outputs and templates.
+---
+
+`@fragiola/calendar-angular` has every primitive of the React package, as a standalone attribute
+directive on an element you write, and every hook as an injection function, over the same core
+(re-exported whole, so an Angular app installs and imports one package). The behaviour, the ARIA,
+the roles, the `data-*` attributes and `data-calendar-part` of every element are the same: the
+React pages of this reference describe each part, and this page says how its React API is written
+in Angular.
+
+```ts
+import { Component } from "@angular/core";
+import {
+    CALENDAR,
+    createCalendarModel,
+    injectCalendar,
+    injectCalendarTitle,
+    type CalendarEventJson,
+} from "@fragiola/calendar-angular";
+// each feature from its own entry (an Angular secondary entry point), with its directives
+import {
+    CalendarDragAndDropRootDirective,
+    CalendarDragPreviewDirective,
+    dragAndDrop,
+} from "@fragiola/calendar-angular/drag-and-drop";
+import {
+    CalendarSelectionDirective,
+    CalendarSelectionRootDirective,
+    selection,
+} from "@fragiola/calendar-angular/selection";
+
+@Component({ imports: [CALENDAR, CalendarSelectionDirective], template: `…` })
+export class Planner {}
+```
+
+`CALENDAR` lists every directive of the main entry, for a standalone component's `imports`; a
+feature's directives come with its entry, so a calendar that does not import the feature does not
+ship them ([Features](/docs/concepts/features)). The package is standalone only (no NgModule) and
+built on signals: it needs no zone.js (zoneless is Angular's default). It needs `@angular/core`
+**^22**.
+
+## The element is yours
+
+A directive goes on the element you choose: `<div [calendarDay]="day" class="day">`. It adds the
+part's role, its ARIA, its `data-*` state, its listeners and its structural inline style (a
+segment's lane and span, a timed event's position); your `class`, your other attributes and your
+listeners stay as they are. The structural style keys win over a static `style` you write on the
+element; a `[style.x]` binding of yours on a structural key would fight the part, so leave those
+keys to it. A navigation button gets `type="button"` when it has none, and `disabled` while its
+command cannot run.
+
+Each directive's state is a signal, through `exportAs` (`calendar<Part>`); a part's is
+`undefined` until its input is set:
+
+```html
+<div [calendarSegment]="segment" #event="calendarSegment" [class.dragging]="event.state()?.dragging">
+    {{ titleOf(segment) }}
+</div>
+```
+
+## The model types the root
+
+The root is typed by the model it is given (`[calendarRoot]="model"`, a
+`CalendarModel<Types, typeof features>`): `[(events)]` holds your events, and a component inside it
+passes the registry and the features to the injection functions
+(`injectCalendar<Types, typeof features>()`), as React's hooks take them as type arguments.
+
+```ts title="planner.ts"
+import { Component } from "@angular/core";
+import { CALENDAR, createCalendarModel } from "@fragiola/calendar-angular";
+import {
+    CalendarSelectionRootDirective,
+    selection,
+} from "@fragiola/calendar-angular/selection";
+
+type Types = { events: { meeting: { room: string } }; calendar: undefined };
+const features = [selection()] as const;
+
+@Component({
+    selector: "app-planner",
+    imports: [CALENDAR, CalendarSelectionRootDirective],
+    template: `
+        <div [calendarRoot]="model" calendarSelection (rangeSelect)="create($event.range)">…</div>
+    `,
+})
+export class Planner {
+    readonly model = createCalendarModel<Types, typeof features>(
+        { version: 1, events: [] },
+        { features },
+    );
+
+    create(range: { start: string; end: string; allDay: boolean }) {
+        this.model.run("event.add", { title: "New event", ...range, kind: "meeting" });
+    }
+}
+```
+
+## How React's props map
+
+| React | Angular |
+| --- | --- |
+| `<Calendar.Day day={day}>` | the directive on your element, its main input the directive's name: `<div [calendarDay]="day">` |
+| `render={<section />}`, `render={(props, state) => …}` | the element you put the directive on is the part: `<section calendarDayGrid>` |
+| `className`, `style` | your `class` and `style`, as on any element (structural keys win) |
+| `className={(state) => …}` | the state signal through `exportAs`: `#day="calendarDay" [class.today]="day.state()?.day?.today"`, or a `data-*` selector (`[data-today]`) |
+| `onClick`, `onKeyDown`, … | your listeners (`(click)`, `(keydown)`), next to the part's own |
+| `ref` | a template reference or `viewChild` on your element |
+| children functions (`Calendar.Weeks`, `Calendar.Days`, `Calendar.SlotRows`, `Calendar.Slots`, `Calendar.ListDays`) | a template directive: `<ng-template calendarWeeks let-week>`, `<ng-template calendarDays let-day let-week="week">` |
+| a container's children function (`Calendar.ColumnHeaders`, `Calendar.DayEvents`, `Calendar.ColumnEvents`, `Calendar.Columns`, `Calendar.ListDay`) | its item template inside it: `<ng-template calendarDayEventsItem let-segment>` |
+| a part rendered only in some states (`Calendar.More`, `Selection`, `DragPreview`, `ResizeHandle`, `NowIndicator`, `BusinessHours`) | a structural directive on its element: `<button *calendarMore="let more">`, `<div *calendarResizeHandle="'end'">` |
+| `events` + `onEventsChange` | `[(events)]` (`[events]` with `(eventsChange)`) |
+| `view` + `onViewChange` | `[(view)]` (the type), `(viewChangeDetails)` with `{ type, days }` |
+| `date` + `onDateChange` | `[(date)]` (the anchor date, `YYYY-MM-DD`) |
+| `onEventClick`, `onDateClick`, `onMoreClick`, `onTodayChange`, `onAnnounce` | the root's outputs `(eventClick)`, `(dateClick)`, `(moreClick)`, `(todayChange)`, `(announce)` |
+| `onSelect`, `onEventDrop`, `onExternalDrop` | a feature's directive on the root, from its entry: `calendarSelection` and `(rangeSelect)`, `calendarDragAndDrop` (or `calendarResize`) and `(eventDrop)`, `calendarExternalDrop` and `(externalDrop)` |
+| `calendarRef={calendar}` | `[calendarRef]="calendar"`; the handle is `calendar.current` |
+| `defaultEvents`, `defaultView`, `longPressDelay`, … | the inputs of the same names |
+| `useCalendar<Types, typeof features>()` and the other hooks | the injection functions (below), returning signals |
+
+The controlled values are sent, not enforced, as in React: a new value runs its command with
+`meta: { source: "controlled" }`, and the `*Change` outputs report every other change.
+
+The selection's output is `(rangeSelect)`, not `(select)`: Angular adds a DOM listener for every
+event binding of an element, so `(select)` would hear the `select` event of a text field inside the
+calendar. A feature's directive without its feature in the model warns once and never emits.
+
+## Directives
+
+Every part of the main entry is a directive of `CALENDAR`, with the inputs of its React page's
+props (its main one named as its selector); each one's `state()` is its React state.
+
+| directive | selector, `exportAs` | inputs | outputs, template context |
+| --- | --- | --- | --- |
+| `CalendarRootDirective` | `[calendarRoot]`, `calendarRoot` | `calendarRoot` (the model), `events`, `defaultEvents`, `defaultCalendars`, `settings`, `view`, `defaultView`, `days`, `date`, `defaultDate`, `features`, `now`, `createId`, `calendarRef`, `weekNumberColumn`, and the engine options `host`, `longPressDelay`, `dragThreshold`, `autoScroll` | `eventsChange`, `viewChange`, `viewChangeDetails`, `dateChange`, and the engine events `eventClick`, `dateClick`, `moreClick`, `todayChange`, `announce` |
+| `CalendarPreviousDirective` | `[calendarPrevious]`, `calendarPrevious` | none | none |
+| `CalendarNextDirective` | `[calendarNext]`, `calendarNext` | none | none |
+| `CalendarTodayDirective` | `[calendarToday]`, `calendarToday` | none | none |
+| `CalendarViewButtonDirective` | `[calendarViewButton]`, `calendarViewButton` | `calendarViewButton` (the view), `days` | none |
+| `CalendarDayGridDirective` | `[calendarDayGrid]`, `calendarDayGrid` | none | none |
+| `CalendarColumnHeadersDirective` | `[calendarColumnHeaders]`, `calendarColumnHeaders` | none | none |
+| `CalendarColumnHeadersItemDirective` | `ng-template[calendarColumnHeadersItem]` | none | `let-date` (`ColumnHeadersItemContext`) |
+| `CalendarColumnHeaderDirective` | `[calendarColumnHeader]`, `calendarColumnHeader` | `calendarColumnHeader` (the date) | none |
+| `CalendarWeeksDirective` | `ng-template[calendarWeeks]` | none | `let-week` (`WeeksContext`) |
+| `CalendarWeekDirective` | `[calendarWeek]`, `calendarWeek` | `calendarWeek` (the week) | none |
+| `CalendarWeekNumberDirective` | `[calendarWeekNumber]`, `calendarWeekNumber` | none | none |
+| `CalendarDaysDirective` | `ng-template[calendarDays]` | none | `let-day`, `let-week="week"` (`DaysContext`) |
+| `CalendarDayDirective` | `[calendarDay]`, `calendarDay` | `calendarDay` (the day) | none; `segments()` beside `state()` |
+| `CalendarDayEventsDirective` | `[calendarDayEvents]`, `calendarDayEvents` | none | none |
+| `CalendarDayEventsItemDirective` | `ng-template[calendarDayEventsItem]` | none | `let-segment` (`DayEventsItemContext`) |
+| `CalendarSegmentDirective` | `[calendarSegment]`, `calendarSegment` | `calendarSegment` (the segment) | none |
+| `CalendarMoreDirective` | `ng-template[calendarMore]` (`*calendarMore`) | none | `let more` (`MoreContext`: `MoreState`) |
+| `CalendarTimeGridDirective` | `[calendarTimeGrid]`, `calendarTimeGrid` | none | none |
+| `CalendarAllDayRowDirective` | `[calendarAllDayRow]`, `calendarAllDayRow` | none | none; its days through `calendarDays` |
+| `CalendarScrollerDirective` | `[calendarScroller]`, `calendarScroller` | none | none |
+| `CalendarSlotRowsDirective` | `ng-template[calendarSlotRows]` | none | `let-slot` (`SlotRowsContext`) |
+| `CalendarSlotRowDirective` | `[calendarSlotRow]`, `calendarSlotRow` | `calendarSlotRow` (the slot) | none |
+| `CalendarSlotLabelDirective` | `[calendarSlotLabel]`, `calendarSlotLabel` | none | none |
+| `CalendarSlotsDirective` | `ng-template[calendarSlots]` | none | `let-column` (`SlotsContext`) |
+| `CalendarSlotDirective` | `[calendarSlot]`, `calendarSlot` | `calendarSlot` (the date) | none |
+| `CalendarColumnsDirective` | `[calendarColumns]`, `calendarColumns` | none | none |
+| `CalendarColumnsItemDirective` | `ng-template[calendarColumnsItem]` | none | `let-column` (`ColumnsItemContext`) |
+| `CalendarColumnDirective` | `[calendarColumn]`, `calendarColumn` | `calendarColumn` (the column) | none |
+| `CalendarColumnEventsDirective` | `[calendarColumnEvents]`, `calendarColumnEvents` | none | none |
+| `CalendarColumnEventsItemDirective` | `ng-template[calendarColumnEventsItem]` | none | `let-segment` (`ColumnEventsItemContext`) |
+| `CalendarTimeEventDirective` | `[calendarTimeEvent]`, `calendarTimeEvent` | `calendarTimeEvent` (the segment) | none |
+| `CalendarListDirective` | `[calendarList]`, `calendarList` | none | none |
+| `CalendarListDaysDirective` | `ng-template[calendarListDays]` | none | `let-day` (`ListDaysContext`) |
+| `CalendarListDayDirective` | `[calendarListDay]`, `calendarListDay` | `calendarListDay` (the day) | none |
+| `CalendarListDayItemDirective` | `ng-template[calendarListDayItem]` | none | `let-item` (`ListDayItemContext`) |
+| `CalendarListEventDirective` | `[calendarListEvent]`, `calendarListEvent` | `calendarListEvent` (the item) | none |
+
+The feature directives come from their entries:
+
+| directive | entry | selector | inputs, outputs, template context |
+| --- | --- | --- | --- |
+| `CalendarSelectionRootDirective` | `@fragiola/calendar-angular/selection` | `[calendarRoot][calendarSelection]`, `calendarSelection` | output `rangeSelect` |
+| `CalendarSelectionDirective` | `@fragiola/calendar-angular/selection` | `ng-template[calendarSelection]` (`*calendarSelection`) | `let selection` (`SelectionContext`: `SelectionState`, `{ segment, pending }`) |
+| `CalendarDragAndDropRootDirective` | `@fragiola/calendar-angular/drag-and-drop`, `/resize` | `[calendarRoot][calendarDragAndDrop]` or `[calendarRoot][calendarResize]`, `calendarDragAndDrop` | output `eventDrop` |
+| `CalendarDragPreviewDirective` | `@fragiola/calendar-angular/drag-and-drop`, `/resize` | `ng-template[calendarDragPreview]` (`*calendarDragPreview`) | `let preview` (`DragPreviewContext`: `DragPreviewState`, `{ preview, segment }`) |
+| `CalendarResizeHandleDirective` | `@fragiola/calendar-angular/resize` | `ng-template[calendarResizeHandle]` (`*calendarResizeHandle="'end'"`) | input `calendarResizeHandle` (the edge); `let handle` (`ResizeHandleContext`: `ResizeHandleState`, `{ edge }`) |
+| `CalendarExternalDropRootDirective` | `@fragiola/calendar-angular/external-drop` | `[calendarRoot][calendarExternalDrop]`, `calendarExternalDrop` | output `externalDrop` |
+| `CalendarNowIndicatorDirective` | `@fragiola/calendar-angular/now-indicator` | `ng-template[calendarNowIndicator]` (`*calendarNowIndicator`) | `let now` (`NowIndicatorContext`: `NowIndicatorState`, `{ position }`) |
+| `CalendarBusinessHoursDirective` | `@fragiola/calendar-angular/constraints` | `ng-template[calendarBusinessHours]` (`*calendarBusinessHours`) | `let hours` (`BusinessHoursContext`: `BusinessHoursState`, `{ range }`) |
+
+`@fragiola/calendar-angular/recurrence` and `@fragiola/calendar-angular/event-sources` re-export
+the core's entry and add no directive; an external drop previews through `*calendarDragPreview`.
+
+Another model given to `[calendarRoot]` makes another engine, as in React. A per-entity template
+renders again only for the layout objects that changed (D11): moving an event renders again the
+rows and columns it left and reached; the app state a template reads is checked whenever the
+template it is in is, so it is never stale.
+
+## Zoneless rendering
+
+The root renders the calendar itself: a model commit or an engine change bumps a signal, and the
+root ticks the application once, in a microtask, so a pointer's drop or a key's move is on screen
+before the next task, with or without zone.js. A render error goes to the app's `ErrorHandler`.
+A server render (`@angular/platform-server`, `@angular/ssr`) outputs the calendar's markup from
+the model's state, with no timer and no listener: the engine, the model subscription and the
+controlled inputs start after the first render in the browser. With Angular's client hydration
+(`provideClientHydration()`), put the component that renders the calendar under
+`ngSkipHydration` (`<team-calendar ngSkipHydration />`): a collection's rows and cells are views
+of their own, which hydration cannot match, so the client renders the calendar again in place of
+the server's markup (the rest of the page is hydrated).
+
+## Injection functions
+
+The hooks of [the React reference](/docs/api/hooks), as injection functions. Call them in an
+injection context (a constructor or a field initializer) of a component inside the root (the
+calendar refs anywhere). A value function returns a signal, which changes only when its value
+changes; its arguments take a value, a signal or a getter (`() => this.date()`).
+
+| function | returns |
+| --- | --- |
+| `injectCalendar<T, F>()` | `{ model, engine }`, an `InjectCalendarResult<T, F>`: a signal of the model, and the engine facade |
+| `injectCalendarView()` | a signal of the `CalendarView`: `type`, `anchorDate`, `days`, `visibleRange`, `currentRange` |
+| `injectCalendarTitle(format?)` | a signal of the title's `Intl` range parts |
+| `injectDayHeader(date, format?)` | a signal of a column header's `Intl` parts |
+| `injectSlotLabel(time, format?)` | a signal of a slot time's `Intl` parts |
+| `injectDayGrid()` | a signal of the `DayGrid` shown, `null` in a list view |
+| `injectTimeGrid()` | a signal of the `TimeGrid` shown, `null` outside the time grid views |
+| `injectListLayout()` | a signal of the `ListLayout` (the visible days with their occurrences) |
+| `injectDay()` | the enclosing `[calendarDay]`'s `{ state }` (`InjectDayResult`), for a component inside it |
+| `injectSlot()` | the enclosing `[calendarSlot]`'s `{ state }` (`InjectSlotResult`) |
+| `injectSegment()` | the enclosing `[calendarSegment]`'s `{ state }` (`InjectSegmentResult`) |
+| `injectTimeEvent()` | the enclosing `[calendarTimeEvent]`'s `{ state }` (`InjectTimeEventResult`) |
+| `injectListEvent()` | the enclosing `[calendarListEvent]`'s `{ state }` (`InjectListEventResult`) |
+| `createCalendarRef<T, F>()` | a `CalendarRef<T, F>` for `[calendarRef]`: `current` is the root's `CalendarHandle` (`model`, `engine`) while it lives, `null` otherwise, and a template or a `computed` that reads it follows it |
+| `injectCalendarRef<T, F>()` | the same calendar ref, named for a field next to the other injection functions |
+| `injectSelection()` (from `@fragiola/calendar-angular/selection`) | a signal of the `CalendarSelection`: `range` and `preview` |
+| `injectDragPreview()` (from `@fragiola/calendar-angular/drag-and-drop` or `/resize`) | a signal of the drag's `DragPreview`, `null` for none |
+| `injectNowPosition()` (from `@fragiola/calendar-angular/now-indicator`) | a signal of the `NowPosition`, `null` when not in view and before the engine |
+| `injectBusinessHours(date?)` (from `@fragiola/calendar-angular/constraints`) | a signal of the visible days' `BusinessHoursRange` list, only `date`'s when given |
+
+The part functions do not register an element: the directive is the part. A component of yours on
+the part's element, or inside it, reads its state:
+
+```ts title="event-card.ts"
+import { Component, computed } from "@angular/core";
+import { injectCalendar, injectTimeEvent } from "@fragiola/calendar-angular";
+
+// <div [calendarTimeEvent]="segment" appEventCard></div>
+@Component({ selector: "[appEventCard]", template: "{{ title() }}" })
+export class EventCard {
+    private readonly event = injectTimeEvent();
+    private readonly model = injectCalendar().model;
+    readonly title = computed(() => {
+        const state = this.event.state();
+        return state ? this.model().get("event-by", { id: state.eventId })?.title : "";
+    });
+}
+```
+
+## Types
+
+Each directive exports its state, named as in React, and each template directive its context:
+`RootState`, `RootView`, `PreviousState`, `NextState`, `TodayState`, `ViewButtonState`,
+`CommandButtonState`, `DayGridState`, `ColumnHeadersState`, `ColumnHeadersItemContext`,
+`ColumnHeaderState`, `WeeksContext`, `WeekState`, `WeekNumberState`, `DaysContext`, `DayState`,
+`DayEventsState`, `DayEventsItemContext`, `SegmentState`, `EventState`, `MoreState`, `MoreContext`,
+`TimeGridState`, `AllDayRowState`, `ScrollerState`, `SlotRowsContext`, `SlotRowState`,
+`SlotLabelState`, `SlotsContext`, `SlotState`, `ColumnsState`, `ColumnsItemContext`,
+`ColumnState`, `ColumnEventsState`, `ColumnEventsItemContext`, `TimeEventState`, `ListState`,
+`ListDaysContext`, `ListDayState`, `ListDayItemContext`, `ListEventState`; the feature
+directives' `SelectionState`, `SelectionContext`, `DragPreviewState`, `DragPreviewContext`,
+`ResizeHandleState`, `ResizeHandleContext`, `NowIndicatorState`, `NowIndicatorContext`,
+`BusinessHoursState`, `BusinessHoursContext`; and the injection functions' `InjectCalendarResult`,
+`InjectDayResult`, `InjectSlotResult`, `InjectSegmentResult`, `InjectTimeEventResult`,
+`InjectListEventResult`, `CalendarView`, `CalendarSelection`, `CalendarHandle`, `CalendarRef`.
+
+`@fragiola/calendar-angular/internal` is what the main entry and the features' entries share (the
+injection tokens, the part bindings): it is not an app's API.
+
+## Examples
+
+Every example of the gallery exists in Angular, with the same behaviour: pick Angular in the
+framework switch to see its code. The [month](/examples/month) and [week](/examples/week) examples
+assemble the grids from the templates, [select to create](/examples/select-to-create) and
+[the team planner](/examples/team-planner) use the features' directives and outputs, and
+[undo and redo](/examples/undo-redo) and [save and restore](/examples/save-and-restore) keep the
+model's state in the app.

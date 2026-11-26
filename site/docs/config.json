@@ -340,6 +340,10 @@
                 {
                     "label": "Vue primitives",
                     "path": "api/vue"
+                },
+                {
+                    "label": "Angular primitives",
+                    "path": "api/angular"
                 }
             ]
         },

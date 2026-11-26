@@ -72,8 +72,40 @@ function scrollToMorning(element: HTMLElement | null) {
 
 </Framework>
 
+<Framework name="angular">
+
+```ts title="body.ts"
+import { afterNextRender, Component, type ElementRef, viewChild } from "@angular/core";
+import { CALENDAR } from "@fragiola/calendar-angular";
+
+@Component({
+    selector: "app-body",
+    imports: [CALENDAR],
+    template: `
+        <div calendarScroller #scroller style="height: 480px; overflow: auto">
+            <ng-content />
+        </div>
+    `,
+})
+export class Body {
+    private readonly scroller = viewChild.required<ElementRef<HTMLElement>>("scroller");
+
+    constructor() {
+        afterNextRender(() => scrollToMorning(this.scroller().nativeElement));
+    }
+}
+
+/** Opens the time grid at 08:00 (the scroll position is the app's). */
+function scrollToMorning(element: HTMLElement) {
+    const eight = element.querySelector<HTMLElement>('[data-time="08:00"]');
+    if (eight) element.scrollTop = eight.offsetTop - 8;
+}
+```
+
+</Framework>
+
 In React, `ref` is a plain prop, merged with the part's own; in Vue, a template ref on a part is its
-component, and its `$el` the element. See
+component, and its `$el` the element; in Angular, the element is yours (a `viewChild`). See
 [Sizing and scrolling](/docs/getting-started/sizing).
 
 ## Attributes
@@ -86,6 +118,9 @@ component, and its `$el` the element. See
 
 In Vue: the same props (in kebab-case in a template), and slots in place of `children`; see
 [Vue primitives](/docs/api/vue).
+
+In Angular: a directive on your element, the props as its inputs, templates in place of
+`children`; see [Angular primitives](/docs/api/angular).
 
 `ScrollerProps` takes the [common props](/docs/api/root#common-props) and any `div` attribute,
 and:

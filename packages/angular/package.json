@@ -1,0 +1,185 @@
+{
+    "name": "@fragiola/calendar-angular",
+    "version": "0.0.0",
+    "description": "Composable, headless Angular directives and injection functions for @fragiola/calendar: an accessible event calendar (month, week, day and list views) you assemble and style yourself.",
+    "keywords": [
+        "angular",
+        "calendar",
+        "event-calendar",
+        "scheduler",
+        "headless",
+        "accessibility",
+        "aria",
+        "drag-and-drop"
+    ],
+    "license": "MIT",
+    "type": "module",
+    "author": {
+        "name": "Mauro de Souza",
+        "email": "maurodesouza.me@gmail.com",
+        "url": "https://github.com/maurodesouza"
+    },
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/fragiola/calendar.git",
+        "directory": "packages/angular"
+    },
+    "homepage": "https://fragiola.com/calendar",
+    "bugs": {
+        "url": "https://github.com/fragiola/calendar/issues"
+    },
+    "sideEffects": false,
+    "exports": {
+        ".": {
+            "@fragiola/source": "./src/public-api.ts",
+            "types": "./dist/types/fragiola-calendar-angular.d.ts",
+            "import": "./dist/fesm2022/fragiola-calendar-angular.mjs",
+            "default": "./dist/fesm2022/fragiola-calendar-angular.mjs"
+        },
+        "./internal": {
+            "@fragiola/source": "./internal/public-api.ts",
+            "types": "./dist/types/fragiola-calendar-angular-internal.d.ts",
+            "import": "./dist/fesm2022/fragiola-calendar-angular-internal.mjs",
+            "default": "./dist/fesm2022/fragiola-calendar-angular-internal.mjs"
+        },
+        "./selection": {
+            "@fragiola/source": "./selection/public-api.ts",
+            "types": "./dist/types/fragiola-calendar-angular-selection.d.ts",
+            "import": "./dist/fesm2022/fragiola-calendar-angular-selection.mjs",
+            "default": "./dist/fesm2022/fragiola-calendar-angular-selection.mjs"
+        },
+        "./drag-and-drop": {
+            "@fragiola/source": "./drag-and-drop/public-api.ts",
+            "types": "./dist/types/fragiola-calendar-angular-drag-and-drop.d.ts",
+            "import": "./dist/fesm2022/fragiola-calendar-angular-drag-and-drop.mjs",
+            "default": "./dist/fesm2022/fragiola-calendar-angular-drag-and-drop.mjs"
+        },
+        "./resize": {
+            "@fragiola/source": "./resize/public-api.ts",
+            "types": "./dist/types/fragiola-calendar-angular-resize.d.ts",
+            "import": "./dist/fesm2022/fragiola-calendar-angular-resize.mjs",
+            "default": "./dist/fesm2022/fragiola-calendar-angular-resize.mjs"
+        },
+        "./external-drop": {
+            "@fragiola/source": "./external-drop/public-api.ts",
+            "types": "./dist/types/fragiola-calendar-angular-external-drop.d.ts",
+            "import": "./dist/fesm2022/fragiola-calendar-angular-external-drop.mjs",
+            "default": "./dist/fesm2022/fragiola-calendar-angular-external-drop.mjs"
+        },
+        "./now-indicator": {
+            "@fragiola/source": "./now-indicator/public-api.ts",
+            "types": "./dist/types/fragiola-calendar-angular-now-indicator.d.ts",
+            "import": "./dist/fesm2022/fragiola-calendar-angular-now-indicator.mjs",
+            "default": "./dist/fesm2022/fragiola-calendar-angular-now-indicator.mjs"
+        },
+        "./constraints": {
+            "@fragiola/source": "./constraints/public-api.ts",
+            "types": "./dist/types/fragiola-calendar-angular-constraints.d.ts",
+            "import": "./dist/fesm2022/fragiola-calendar-angular-constraints.mjs",
+            "default": "./dist/fesm2022/fragiola-calendar-angular-constraints.mjs"
+        },
+        "./recurrence": {
+            "@fragiola/source": "./recurrence/public-api.ts",
+            "types": "./dist/types/fragiola-calendar-angular-recurrence.d.ts",
+            "import": "./dist/fesm2022/fragiola-calendar-angular-recurrence.mjs",
+            "default": "./dist/fesm2022/fragiola-calendar-angular-recurrence.mjs"
+        },
+        "./event-sources": {
+            "@fragiola/source": "./event-sources/public-api.ts",
+            "types": "./dist/types/fragiola-calendar-angular-event-sources.d.ts",
+            "import": "./dist/fesm2022/fragiola-calendar-angular-event-sources.mjs",
+            "default": "./dist/fesm2022/fragiola-calendar-angular-event-sources.mjs"
+        },
+        "./package.json": "./package.json"
+    },
+    "files": [
+        "dist",
+        "README.md",
+        "CHANGELOG.md",
+        "LICENSE"
+    ],
+    "publishConfig": {
+        "exports": {
+            ".": {
+                "types": "./dist/types/fragiola-calendar-angular.d.ts",
+                "import": "./dist/fesm2022/fragiola-calendar-angular.mjs",
+                "default": "./dist/fesm2022/fragiola-calendar-angular.mjs"
+            },
+            "./internal": {
+                "types": "./dist/types/fragiola-calendar-angular-internal.d.ts",
+                "import": "./dist/fesm2022/fragiola-calendar-angular-internal.mjs",
+                "default": "./dist/fesm2022/fragiola-calendar-angular-internal.mjs"
+            },
+            "./selection": {
+                "types": "./dist/types/fragiola-calendar-angular-selection.d.ts",
+                "import": "./dist/fesm2022/fragiola-calendar-angular-selection.mjs",
+                "default": "./dist/fesm2022/fragiola-calendar-angular-selection.mjs"
+            },
+            "./drag-and-drop": {
+                "types": "./dist/types/fragiola-calendar-angular-drag-and-drop.d.ts",
+                "import": "./dist/fesm2022/fragiola-calendar-angular-drag-and-drop.mjs",
+                "default": "./dist/fesm2022/fragiola-calendar-angular-drag-and-drop.mjs"
+            },
+            "./resize": {
+                "types": "./dist/types/fragiola-calendar-angular-resize.d.ts",
+                "import": "./dist/fesm2022/fragiola-calendar-angular-resize.mjs",
+                "default": "./dist/fesm2022/fragiola-calendar-angular-resize.mjs"
+            },
+            "./external-drop": {
+                "types": "./dist/types/fragiola-calendar-angular-external-drop.d.ts",
+                "import": "./dist/fesm2022/fragiola-calendar-angular-external-drop.mjs",
+                "default": "./dist/fesm2022/fragiola-calendar-angular-external-drop.mjs"
+            },
+            "./now-indicator": {
+                "types": "./dist/types/fragiola-calendar-angular-now-indicator.d.ts",
+                "import": "./dist/fesm2022/fragiola-calendar-angular-now-indicator.mjs",
+                "default": "./dist/fesm2022/fragiola-calendar-angular-now-indicator.mjs"
+            },
+            "./constraints": {
+                "types": "./dist/types/fragiola-calendar-angular-constraints.d.ts",
+                "import": "./dist/fesm2022/fragiola-calendar-angular-constraints.mjs",
+                "default": "./dist/fesm2022/fragiola-calendar-angular-constraints.mjs"
+            },
+            "./recurrence": {
+                "types": "./dist/types/fragiola-calendar-angular-recurrence.d.ts",
+                "import": "./dist/fesm2022/fragiola-calendar-angular-recurrence.mjs",
+                "default": "./dist/fesm2022/fragiola-calendar-angular-recurrence.mjs"
+            },
+            "./event-sources": {
+                "types": "./dist/types/fragiola-calendar-angular-event-sources.d.ts",
+                "import": "./dist/fesm2022/fragiola-calendar-angular-event-sources.mjs",
+                "default": "./dist/fesm2022/fragiola-calendar-angular-event-sources.mjs"
+            },
+            "./package.json": "./package.json"
+        }
+    },
+    "scripts": {
+        "build": "ng-packagr -p ng-package.json -c tsconfig.build.json && node scripts/check-dist.ts",
+        "typecheck": "ngc -p tsconfig.json",
+        "test": "vitest run"
+    },
+    "dependencies": {
+        "@fragiola/calendar": "workspace:*"
+    },
+    "peerDependencies": {
+        "@angular/core": "^22.0.0"
+    },
+    "devDependencies": {
+        "@analogjs/vite-plugin-angular": "2.9.7",
+        "@analogjs/vitest-angular": "2.9.7",
+        "@angular/build": "22.2.7",
+        "@angular/common": "22.2.6",
+        "@angular/compiler": "22.2.6",
+        "@angular/compiler-cli": "22.2.6",
+        "@angular/core": "22.2.6",
+        "@angular/platform-browser": "22.2.6",
+        "@angular/platform-server": "22.2.6",
+        "@testing-library/dom": "10.4.2",
+        "jsdom": "31.0.1",
+        "ng-packagr": "22.2.6",
+        "rxjs": "7.8.2",
+        "typescript": "6.0.3",
+        "vite": "8.3.8",
+        "vitest": "5.1.0"
+    }
+}

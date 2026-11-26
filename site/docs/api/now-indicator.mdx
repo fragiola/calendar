@@ -65,6 +65,23 @@ import { NowIndicator } from "@fragiola/calendar-vue/now-indicator";
 
 </Framework>
 
+<Framework name="angular">
+
+```html title="now-columns.html"
+<!-- imports: [CALENDAR, CalendarNowIndicatorDirective] (from @fragiola/calendar-angular/now-indicator) -->
+<div calendarColumns>
+    <ng-template calendarColumnsItem let-column>
+        <div [calendarColumn]="column">
+            <div *calendarNowIndicator="let now" class="now">
+                <span class="now-time">{{ now.position.time }}</span>
+            </div>
+        </div>
+    </ng-template>
+</div>
+```
+
+</Framework>
+
 ```css
 .now {
     inset-inline: 0;
@@ -88,6 +105,9 @@ import { NowIndicator } from "@fragiola/calendar-vue/now-indicator";
 
 In Vue: the same props (in kebab-case in a template), and slots in place of `children`; see
 [Vue primitives](/docs/api/vue).
+
+In Angular: a directive on your element, the props as its inputs, templates in place of
+`children`; see [Angular primitives](/docs/api/angular).
 
 `NowIndicatorProps` takes the [common props](/docs/api/root#common-props) and any `div`
 attribute, and:

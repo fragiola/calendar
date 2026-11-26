@@ -5,7 +5,7 @@ description: Test calendar logic in plain Node with an injected clock, component
 
 The model loads in plain Node: no DOM, no timers, no global clock it does not let you replace. So
 most of a calendar's behaviour (your commands, your middleware, what a view lays out) is a unit
-test. Components test with Testing Library (React's or Vue's) through roles, accessible names and
+test. Components test with Testing Library (React's, Vue's, or the DOM's with Angular's `TestBed`) through roles, accessible names and
 `data-calendar-part`; gestures and the keyboard in a real browser. Which runner you use is yours.
 
 ## The model, in Node
@@ -178,6 +178,67 @@ it("shows the standup on Thursday", async () => {
 Render an SFC of your own (`render(TeamWeek, { props: { model } })`) the same way: the test's
 Vite config needs `@vitejs/plugin-vue` to compile it. `fireEvent` returns a promise that resolves
 once Vue has updated the DOM; `@vue/test-utils`' `mount` works the same way, if you prefer it.
+
+</Framework>
+
+<Framework name="angular">
+
+```ts title="team-week.test.ts"
+import { Component, input } from "@angular/core";
+import { TestBed } from "@angular/core/testing";
+import { CALENDAR, type CalendarModel } from "@fragiola/calendar-angular";
+import { screen } from "@testing-library/dom";
+import { expect, it } from "vitest";
+
+@Component({
+    imports: [CALENDAR],
+    template: `
+        <div [calendarRoot]="model()">
+            <div calendarTimeGrid aria-label="Week">
+                <div calendarColumns>
+                    <ng-template calendarColumnsItem let-column>
+                        <div [calendarColumn]="column">
+                            <div calendarColumnEvents>
+                                <ng-template calendarColumnEventsItem let-segment>
+                                    <div [calendarTimeEvent]="segment" [attr.aria-label]="segment.eventId"></div>
+                                </ng-template>
+                            </div>
+                        </div>
+                    </ng-template>
+                </div>
+            </div>
+        </div>
+    `,
+})
+class Week {
+    readonly model = input.required<CalendarModel>();
+}
+
+it("shows the standup on Thursday", async () => {
+    const model = modelOf();
+    const fixture = TestBed.createComponent(Week);
+    fixture.componentRef.setInput("model", model);
+    document.body.append(fixture.nativeElement);
+    await fixture.whenStable();
+    const event = screen.getByRole("listitem", { name: "standup" });
+    expect(event.closest('[data-calendar-part="column"]')).toHaveProperty(
+        "dataset.date",
+        "2026-11-26",
+    );
+    model.run("event.move", { eventId: "standup", delta: { days: 1 } });
+    await fixture.whenStable(); // the root renders the change in a microtask
+    expect(
+        screen
+            .getByRole("listitem", { name: "standup" })
+            .closest('[data-calendar-part="column"]'),
+    ).toHaveProperty("dataset.date", "2026-11-27");
+});
+```
+
+Run it zoneless, as an Angular 22 app is: with Vitest, `@analogjs/vitest-angular`'s
+`setupTestBed({ zoneless: true })` and `@analogjs/vite-plugin-angular` to compile the components.
+A key or a pointer event (`fireEvent`, `userEvent`) is on screen after a microtask: `await
+fixture.whenStable()` before reading the DOM.
 
 </Framework>
 

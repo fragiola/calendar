@@ -18,7 +18,8 @@ to, each from its own entry, so a read-only month ships none of the drag code.
 | `nowIndicator()` | `/now-indicator` | the current time's place in the time grid |
 | `eventSources()` | `/event-sources` | the ranges to fetch per source, and their loading state |
 
-Each entry is `@fragiola/calendar-react/<entry>` (`@fragiola/calendar-vue/<entry>` in Vue): the
+Each entry is `@fragiola/calendar-react/<entry>` (`@fragiola/calendar-vue/<entry>` in Vue,
+`@fragiola/calendar-angular/<entry>` in Angular): the
 factory, and the parts and hooks of the feature ([Installation](/docs/getting-started/installation)).
 
 ## Give them to the model
@@ -97,6 +98,46 @@ A root that creates its own model takes them as its `features` prop, read once:
 
 </Framework>
 
+<Framework name="angular">
+
+```ts title="planner.ts"
+import { Component, computed, input } from "@angular/core";
+import {
+    CALENDAR,
+    type CalendarDocument,
+    createCalendarModel,
+} from "@fragiola/calendar-angular";
+import { dragAndDrop } from "@fragiola/calendar-angular/drag-and-drop";
+import { resize } from "@fragiola/calendar-angular/resize";
+import { selection } from "@fragiola/calendar-angular/selection";
+import type { Types } from "./calendar-data";
+
+const features = [selection(), dragAndDrop(), resize()] as const;
+
+@Component({
+    selector: "app-planner",
+    imports: [CALENDAR],
+    template: `<div [calendarRoot]="model()"><!-- … --></div>`,
+})
+export class Planner {
+    readonly json = input.required<CalendarDocument<Types>>();
+    // the model types the root, its events and its features (another document, another model)
+    protected readonly model = computed(() =>
+        createCalendarModel<Types, typeof features>(this.json(), { features }),
+    );
+}
+```
+
+A root that creates its own model takes them as its `features` input, read once:
+
+```html
+<div calendarRoot [defaultEvents]="events" [features]="features">
+    <!-- … -->
+</div>
+```
+
+</Framework>
+
 A feature may take options (`dragAndDrop({ recurringScope: "this" })`,
 `nowIndicator({ interval: 60_000 })`); [Features](/docs/api/features) lists them.
 
@@ -111,7 +152,8 @@ A feature adds to every surface at once, so nothing has to be wired twice:
 - **gestures** and **keys** in the engine (a press that drags, Space that grabs);
 - **attributes** on the parts (`data-selected`, `data-dragging`, `data-business-hours`);
 - **callbacks** on the root (`onSelect`, `onEventDrop`, `onExternalDrop`; in Vue the listeners
-  `@select`, `@event-drop`, `@external-drop`);
+  `@select`, `@event-drop`, `@external-drop`; in Angular the outputs of the feature's directive on
+  the root, `(rangeSelect)`, `(eventDrop)`, `(externalDrop)`);
 - **parts** in its entry (`Selection`, `DragPreview`, `ResizeHandle`, `NowIndicator`,
   `BusinessHours`).
 
@@ -155,6 +197,37 @@ const selected = useSelection();
         <button type="button" @click="model.run('selection.clear', {})">Clear</button>
     </p>
 </template>
+```
+
+</Framework>
+
+<Framework name="angular">
+
+The model is not a signal: read a feature's state through its injection function
+(`injectSelection` here), which follows every change.
+
+```ts title="selected-range.ts"
+import { Component } from "@angular/core";
+import { injectCalendar } from "@fragiola/calendar-angular";
+import { injectSelection } from "@fragiola/calendar-angular/selection";
+import { features, type Types } from "./calendar-data";
+
+@Component({
+    selector: "app-selected-range",
+    template: `
+        @if (selected().range; as range) {
+            <p>
+                {{ range.start }} to {{ range.end }}
+                <button type="button" (click)="model().run('selection.clear', {})">Clear</button>
+            </p>
+        }
+    `,
+})
+export class SelectedRange {
+    // typed: "selection.clear" is a command of this model
+    protected readonly model = injectCalendar<Types, typeof features>().model;
+    protected readonly selected = injectSelection();
+}
 ```
 
 </Framework>

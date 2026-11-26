@@ -184,4 +184,64 @@ describe("the grids' ARIA state", () => {
             partAttributes(model, "day-grid", {})["aria-colcount"],
         ).toBeUndefined();
     });
+
+    it("numbers a month's columns when its rows render a week number (weekNumberColumn)", () => {
+        const model = modelOf([], { hiddenDays: [6] }, month);
+        const numbered = { weekNumberColumn: true };
+        // six days shown (Saturday hidden), the week number before them
+        expect(
+            partAttributes(model, "day-grid", {}, numbered)["aria-colcount"],
+        ).toBe("7");
+        const grid = model.get("day-grid");
+        const week = grid?.weeks[1];
+        expect(week).toBeDefined();
+        expect(
+            partAttributes(
+                model,
+                "week-number",
+                { weekId: week?.id ?? "" },
+                numbered,
+            )["aria-colindex"],
+        ).toBe("1");
+        week?.days.forEach((day, index) => {
+            expect(
+                partAttributes(model, "day", { date: day.date }, numbered)[
+                    "aria-colindex"
+                ],
+            ).toBe(String(index + 2));
+        });
+        // the header row of six counts the same columns: each header after the week numbers'
+        grid?.weeks[0]?.days.forEach((day, index) => {
+            expect(
+                partAttributes(
+                    model,
+                    "column-header",
+                    { date: day.date },
+                    numbered,
+                )["aria-colindex"],
+            ).toBe(String(index + 2));
+        });
+        // the engine gives the same
+        const engine = createCalendarEngine(model);
+        const first = week?.days[0]?.date ?? "";
+        expect(
+            engine.adapter.attributes("day", { date: first }, numbered)[
+                "aria-colindex"
+            ],
+        ).toBe("2");
+        expect(
+            engine.adapter.attributes("day-grid", {}, numbered)[
+                "aria-colcount"
+            ],
+        ).toBe("7");
+        engine.destroy();
+        // a time grid keeps its own numbering: the option is a month's
+        model.run("view.set", { type: "week" });
+        expect(
+            partAttributes(model, "time-grid", {}, numbered)["aria-colcount"],
+        ).toBe("7");
+        expect(
+            partAttributes(model, "day-grid", {}, numbered)["aria-colcount"],
+        ).toBeUndefined();
+    });
 });

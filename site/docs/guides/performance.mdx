@@ -5,7 +5,8 @@ description: How the calendar re-renders only what changed, and how to keep chil
 
 A busy week shows thousands of elements: slots, columns, events. The core keeps the layout's
 unchanged parts as the same objects, previews are engine view state, and each collection part
-calls your children function (in Vue, its slot) again only when it has to. What stays yours is
+calls your children function (in Vue, its slot; in Angular, its template) again only when it has
+to. What stays yours is
 the framework's usual rule: keep that function stable where a render of your component should not
 render the calendar's rows again.
 
@@ -18,7 +19,7 @@ objects only for the rows or columns it leaves and enters; a title change makes 
 the rows that show it.
 
 Each part reads its value through a store that keeps the last object while it is equal (React's
-`useSyncExternalStore`, a `computed` in Vue), so a part re-renders only when what it shows changed.
+`useSyncExternalStore`, a `computed` in Vue and in Angular), so a part re-renders only when what it shows changed.
 
 ## When a children function is called again
 
@@ -53,6 +54,24 @@ anew on every render, but flags it, and the part calls it through one function f
 only a changed layout object calls it again. A dynamic slot (under `v-for` or `v-if`) or a render
 function's slot is compared by identity: a render of the component that writes it renders every
 row of the part again.
+
+</Framework>
+
+<Framework name="angular">
+
+A collection (`calendarWeeks`, `calendarDays`, `calendarSlotRows`, `calendarSlots`, and the item
+templates of `[calendarColumns]`, `[calendarColumnEvents]`, `[calendarDayEvents]`,
+`[calendarListDay]`, `[calendarColumnHeaders]`, and `calendarListDays`) renders its template once
+per entity, each entity's view a root view of its own whose context is the layout's objects, and
+renders it again for an entity when:
+
+- the entity's layout object changed (a week row moved an event in), or
+- the template itself changed (an `@if` that swaps two templates renders every row with the new
+  one).
+
+Each entity's view is checked again whenever the template it is in is, so the app state it reads
+(a signal, a field) is never stale; with the root's one tick per model commit, a drop or a key's
+move is on screen before the next task.
 
 </Framework>
 
@@ -175,6 +194,37 @@ h(Calendar.Columns, null, {
     $stable: true,
 });
 ```
+
+</Framework>
+
+<Framework name="angular">
+
+A template needs nothing more: one that reads app state (a signal, an input) is checked with its
+component, and renders again only the bindings that changed.
+
+```html title="month.html"
+<div calendarDayGrid aria-label="Month">
+    <ng-template calendarWeeks let-week>
+        <div [calendarWeek]="week">
+            <ng-template calendarDays let-day>
+                <div [calendarDay]="day">
+                    <div calendarDayEvents>
+                        <ng-template calendarDayEventsItem let-segment>
+                            <div
+                                [calendarSegment]="segment"
+                                [attr.data-highlighted]="segment.eventId === highlighted() ? '' : null"
+                            ></div>
+                        </ng-template>
+                    </div>
+                </div>
+            </ng-template>
+        </div>
+    </ng-template>
+</div>
+```
+
+Keep one template per collection: a template swapped by an `@if` or an `@switch` is another
+template, and every row renders again with it. Put the condition inside the template instead.
 
 </Framework>
 

@@ -250,6 +250,136 @@ const { model } = useCalendar();
 
 </Framework>
 
+<Framework name="angular">
+
+```ts title="week-calendar.ts"
+import { Component } from "@angular/core";
+import { CALENDAR, createCalendarModel } from "@fragiola/calendar-angular";
+import { AllDayEvent } from "./all-day-event";
+import { DayHeader } from "./day-header";
+import { SlotTime } from "./slot-time";
+import { TimedEvent } from "./timed-event";
+
+@Component({
+    selector: "app-week-calendar",
+    imports: [CALENDAR, AllDayEvent, DayHeader, SlotTime, TimedEvent],
+    template: `
+        <div [calendarRoot]="model" class="week">
+            <div calendarTimeGrid aria-label="Week" class="grid">
+                <div calendarColumnHeaders class="headers">
+                    <ng-template calendarColumnHeadersItem let-date>
+                        <div [calendarColumnHeader]="date" [appDayHeader]="date" class="header"></div>
+                    </ng-template>
+                </div>
+                <div calendarAllDayRow class="all-day">
+                    <ng-template calendarDays let-day>
+                        <div [calendarDay]="day" class="all-day-cell">
+                            <div calendarDayEvents>
+                                <ng-template calendarDayEventsItem let-segment>
+                                    <div [calendarSegment]="segment" appAllDayEvent></div>
+                                </ng-template>
+                            </div>
+                        </div>
+                    </ng-template>
+                </div>
+                <div calendarScroller class="scroller">
+                    <div class="body">
+                        <ng-template calendarSlotRows let-slot>
+                            <div [calendarSlotRow]="slot" class="slot-row">
+                                <div calendarSlotLabel class="slot-label">
+                                    @if (slot.time.endsWith(":00")) {
+                                        <app-slot-time [time]="slot.time" />
+                                    }
+                                </div>
+                                <ng-template calendarSlots let-column>
+                                    <div [calendarSlot]="column.date" class="slot"></div>
+                                </ng-template>
+                            </div>
+                        </ng-template>
+                        <div calendarColumns class="columns">
+                            <ng-template calendarColumnsItem let-column>
+                                <div [calendarColumn]="column" class="column">
+                                    <div calendarColumnEvents>
+                                        <ng-template calendarColumnEventsItem let-segment>
+                                            <div [calendarTimeEvent]="segment" appTimedEvent class="event"></div>
+                                        </ng-template>
+                                    </div>
+                                </div>
+                            </ng-template>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `,
+})
+export class WeekCalendar {
+    readonly model = createCalendarModel<Types>({
+        version: 1,
+        events: [
+            {
+                id: "review",
+                title: "Design review",
+                start: "2026-11-26T10:00:00-05:00",
+                end: "2026-11-26T11:30:00-05:00",
+                allDay: false,
+            },
+        ],
+        calendars: [],
+        settings: { timeZone: "America/New_York" },
+        view: { type: "week", anchorDate: "2026-11-26" },
+    });
+}
+```
+
+```ts title="day-header.ts"
+import { Component, input } from "@angular/core";
+import { injectDayHeader } from "@fragiola/calendar-angular";
+
+@Component({ selector: "[appDayHeader]", template: "{{ text() }}" })
+export class DayHeader {
+    readonly appDayHeader = input.required<string>();
+    // the weekday and the day, in the locale's order
+    private readonly parts = injectDayHeader(() => this.appDayHeader());
+    protected text() {
+        return this.parts().map((part) => part.value).join("");
+    }
+}
+```
+
+```ts title="slot-time.ts"
+import { Component, input } from "@angular/core";
+import { injectSlotLabel } from "@fragiola/calendar-angular";
+
+@Component({ selector: "app-slot-time", template: "<span>{{ text() }}</span>" })
+export class SlotTime {
+    readonly time = input.required<string>();
+    private readonly parts = injectSlotLabel(() => this.time(), { hour: "numeric" });
+    protected text() {
+        return this.parts().map((part) => part.value).join("");
+    }
+}
+```
+
+```ts title="timed-event.ts"
+import { Component, computed } from "@angular/core";
+import { injectCalendar, injectTimeEvent } from "@fragiola/calendar-angular";
+
+@Component({ selector: "[appTimedEvent]", template: "{{ title() }}" })
+export class TimedEvent {
+    private readonly event = injectTimeEvent();
+    private readonly model = injectCalendar().model;
+    protected readonly title = computed(() => {
+        const state = this.event.state();
+        return state && this.model().get("event-by", { id: state.eventId })?.title;
+    });
+}
+```
+
+`all-day-event.ts` is the same with `injectSegment()` on a `[calendarSegment]`.
+
+</Framework>
+
 What each part is:
 
 - `Calendar.ColumnHeaders` is the header row, one `Calendar.ColumnHeader` per day. The time axis
@@ -257,7 +387,7 @@ What each part is:
 - `Calendar.AllDayRow` is the time grid's day-grid row: its days and segments work as a month
   row's ([Month view](/docs/guides/month-view)).
 - `Calendar.Scroller` is the element that scrolls. The engine autoscrolls it during a drag.
-- `Calendar.SlotRows` calls your function (in Vue, its slot) per slot; `Calendar.SlotRow` is the row,
+- `Calendar.SlotRows` calls your function (in Vue, its slot; in Angular, its template) per slot; `Calendar.SlotRow` is the row,
   `Calendar.SlotLabel` its row header and `Calendar.Slots` its cells, one `Calendar.Slot` per day.
   The slots are the grid's cells and its roving focus.
 - `Calendar.Columns` is the layer of day columns, the grid's last row; each `Calendar.Column` is a
@@ -407,6 +537,27 @@ function scrollToMorning(element: HTMLElement | null) {
 
 </Framework>
 
+<Framework name="angular">
+
+The scroller is your element: a `viewChild` reads it, after the first render.
+
+```ts
+import { afterNextRender, type ElementRef, viewChild } from "@angular/core";
+
+// <div calendarScroller #scroller class="scroller"> the slot rows and the columns </div>
+private readonly scroller = viewChild.required<ElementRef<HTMLElement>>("scroller");
+
+constructor() {
+    afterNextRender(() => {
+        const element = this.scroller().nativeElement;
+        const eight = element.querySelector<HTMLElement>('[data-time="08:00"]');
+        if (eight) element.scrollTop = eight.offsetTop;
+    });
+}
+```
+
+</Framework>
+
 ## The current time
 
 With `nowIndicator()` (`@fragiola/calendar-react/now-indicator`, `@fragiola/calendar-vue/now-indicator`), a `NowIndicator` in today's
@@ -447,6 +598,23 @@ const features = [nowIndicator()] as const;
         <NowIndicator class="now" />
     </Calendar.Column>
 </template>
+```
+
+</Framework>
+
+<Framework name="angular">
+
+```html
+<!-- features = [nowIndicator()] as const; imports: CalendarNowIndicatorDirective, from
+     @fragiola/calendar-angular/now-indicator -->
+<div [calendarColumn]="column" class="column">
+    <div calendarColumnEvents>
+        <ng-template calendarColumnEventsItem let-segment>
+            <div [calendarTimeEvent]="segment" appTimedEvent></div>
+        </ng-template>
+    </div>
+    <div *calendarNowIndicator class="now"></div>
+</div>
 ```
 
 </Framework>

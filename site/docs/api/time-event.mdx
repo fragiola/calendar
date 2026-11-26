@@ -79,6 +79,23 @@ const event = model.get("event-by", { id: props.segment.eventId });
 
 </Framework>
 
+<Framework name="angular">
+
+```html title="timed-event.html"
+<!-- imports: [CALENDAR, CalendarResizeHandleDirective] (from @fragiola/calendar-angular/resize) -->
+<div
+    [calendarTimeEvent]="segment"
+    #event="calendarTimeEvent"
+    class="event"
+    [class.event-moving]="event.state()?.dragging || event.state()?.grabbed"
+>
+    <span class="event-title">{{ model.get("event-by", { id: segment.eventId })?.title }}</span>
+    <div *calendarResizeHandle="'end'" class="event-handle"></div>
+</div>
+```
+
+</Framework>
+
 The state (`TimeEventState`, on the [hooks page](/docs/api/hooks), with the segment and the
 `EventState` flags) styles it; `useTimeEvent` gives the same props for an element of your own.
 
@@ -99,6 +116,9 @@ The state (`TimeEventState`, on the [hooks page](/docs/api/hooks), with the segm
 
 In Vue: the same props (in kebab-case in a template), and slots in place of `children`; see
 [Vue primitives](/docs/api/vue).
+
+In Angular: a directive on your element, the props as its inputs, templates in place of
+`children`; see [Angular primitives](/docs/api/angular).
 
 `TimeEventProps` takes the [common props](/docs/api/root#common-props) and any `div` attribute,
 and:

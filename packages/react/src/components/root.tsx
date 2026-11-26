@@ -133,6 +133,12 @@ export interface RootBaseProps<
     createId?: CreateId | undefined;
     /** access to the model and the engine from outside the root (`useCalendarRef`, `createCalendarRef`) */
     calendarRef?: CalendarRef<T, F> | undefined;
+    /**
+     * a month's rows render a `Calendar.WeekNumber` before their days: the grid counts that column
+     * (`aria-colcount`, `aria-colindex` on the week numbers, days and headers), so the header row
+     * and the rows agree. Set it wherever the rows render one (a server render included)
+     */
+    weekNumberColumn?: boolean | undefined;
     children?: React.ReactNode;
 }
 
@@ -248,6 +254,7 @@ export function Root<
         now,
         createId,
         calendarRef,
+        weekNumberColumn,
         host,
         longPressDelay,
         dragThreshold,
@@ -460,6 +467,11 @@ export function Root<
         [live],
     );
 
+    const numbered = weekNumberColumn === true;
+    const partOptions = React.useMemo(
+        () => ({ weekNumberColumn: numbered }),
+        [numbered],
+    );
     const context = React.useMemo<CalendarContextValue>(
         () => ({
             model,
@@ -468,8 +480,9 @@ export function Root<
             store,
             installed,
             warn,
+            partOptions,
         }),
-        [model, live, facade, store, installed, warn],
+        [model, live, facade, store, installed, warn, partOptions],
     );
 
     // every change re-renders the root (its children are the app's elements, which do not

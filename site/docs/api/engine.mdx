@@ -50,6 +50,27 @@ const { engine } = useCalendar();
 
 </Framework>
 
+<Framework name="angular">
+
+```ts title="go-to-review.ts"
+import { Component } from "@angular/core";
+import { injectCalendar } from "@fragiola/calendar-angular";
+
+@Component({
+    selector: "app-go-to-review",
+    template: `
+        <button type="button" (click)="engine.run('focus', { occurrenceId: 'review' })">
+            Focus the review
+        </button>
+    `,
+})
+export class GoToReview {
+    protected readonly engine = injectCalendar().engine;
+}
+```
+
+</Framework>
+
 `engine.run("focus", …)` navigates to the event when the view does not show it, then gives it
 the grid's tab stop and the DOM focus.
 
@@ -57,7 +78,7 @@ the grid's tab stop and the DOM focus.
 
 `createCalendarEngine(model, options?)` returns a `CalendarEngine`; the adapter attaches its root.
 An app on an adapter never calls it: the root's engine props take the same `CalendarEngineOptions`
-(`longPressDelay` in React, `long-press-delay` in Vue).
+(`longPressDelay` in React, `long-press-delay` in Vue, the `longPressDelay` input in Angular).
 
 | option | type | default | description |
 | --- | --- | --- | --- |
@@ -145,7 +166,9 @@ Typed by `EngineIsMap` (`EngineIsKey`):
 `engine.subscribe` hears a `CalendarEngineEvent` (`CalendarEngineEventType` names its `type`,
 `CalendarEngineEventOf<K>` one of them). In React, each is a root callback: `on` plus its
 `ENGINE_EVENT_CALLBACKS` name ([Calendar.Root](/docs/api/root)); in Vue, a listener on the root,
-that name in kebab-case (`@event-click`, `@event-drop`; [Vue primitives](/docs/api/vue)).
+that name in kebab-case (`@event-click`, `@event-drop`; [Vue primitives](/docs/api/vue)); in
+Angular, an output of the root (`(eventClick)`), a feature's of its directive on the root
+(`(eventDrop)`; [Angular primitives](/docs/api/angular)).
 
 | type | callback | carries |
 | --- | --- | --- |
@@ -204,14 +227,14 @@ injects its own timers.
 | `attachRoot` | attaches the root element: the engine listens to its pointers, keys, focus and native drags |
 | `detachRoot` | detaches it, cancelling a gesture under way |
 | `register` | `register(part, payload, element)` registers (or, with `null`, unregisters) a part's element: measured, hit-tested, focused |
-| `attributes` | `attributes(part, payload)`: a part's `PartAttributes`: `data-calendar-part`, the model's, the engine's and the features' |
+| `attributes` | `attributes(part, payload, options?)`: a part's `PartAttributes`: `data-calendar-part`, the model's, the engine's and the features'; `options` (`PartAttributeOptions`) say how the app renders the parts: `weekNumberColumn`, a month's rows render a week number |
 | `committed` | the adapter committed a render: the engine measures and gives focus to an element it waited for |
 | `subscribe` | calls a listener with a `ViewChange` (`focus`, `gesture`, `layout`) when the view changes; returns its remover |
 | `getSnapshot` | a number that changes whenever the view changes |
 
 `PartName` names a registered part and `PartPayloadMap` its payload (`{ date }` for a day,
 `{ occurrenceId, date }` for an event). Before an engine exists (a server render, the first
-client render), `partAttributes(model, part, payload)` gives the same attributes with nothing
+client render), `partAttributes(model, part, payload, options?)` gives the same attributes with nothing
 focused, the tab stop where the model puts it ([State attributes](/docs/concepts/state-attributes)).
 
 ```ts

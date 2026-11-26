@@ -21,6 +21,11 @@ entries: a value composable returns a computed ref, a part composable `{ state, 
 computed refs (`v-bind="props"`), and their arguments take a value, a ref or a getter
 ([Vue primitives](/docs/api/vue)).
 
+In Angular, each hook is an injection function (`useDay` is `injectDay`), from
+`@fragiola/calendar-angular` and its feature entries: a value function returns a signal, a part
+function the enclosing part directive's `{ state }`, and their arguments take a value, a signal or
+a getter ([Angular primitives](/docs/api/angular)).
+
 ## `useCalendar`
 
 The model and the engine of the enclosing root. Pass the registry and the features as type
@@ -65,6 +70,31 @@ const { model } = useCalendar<Types, typeof features>();
         Delete
     </button>
 </template>
+```
+
+</Framework>
+
+<Framework name="angular">
+
+```ts title="delete-button.ts"
+import { Component, input } from "@angular/core";
+import { injectCalendar } from "@fragiola/calendar-angular";
+import type { features, Types } from "./calendar";
+
+@Component({
+    selector: "app-delete-button",
+    template: `
+        @if (model().can("event.remove", { eventId: eventId() })) {
+            <button type="button" (click)="model().run('event.remove', { eventId: eventId() })">
+                Delete
+            </button>
+        }
+    `,
+})
+export class DeleteButton {
+    readonly eventId = input.required<string>();
+    protected readonly model = injectCalendar<Types, typeof features>().model;
+}
 ```
 
 </Framework>
@@ -126,6 +156,29 @@ const calendar = useCalendarRef<Types>();
 
 </Framework>
 
+<Framework name="angular">
+
+```ts title="planner.ts"
+import { Component } from "@angular/core";
+import { CALENDAR, injectCalendarRef } from "@fragiola/calendar-angular";
+import type { Types } from "./calendar";
+
+@Component({
+    selector: "app-planner",
+    imports: [CALENDAR],
+    template: `
+        <button type="button" (click)="calendar.current?.model.run('view.today', {})">Today</button>
+        <div calendarRoot [calendarRef]="calendar"><!-- the grid --></div>
+    `,
+})
+export class Planner {
+    // `current` is a signal's value: the template follows the root
+    readonly calendar = injectCalendarRef<Types>();
+}
+```
+
+</Framework>
+
 ## `createCalendarRef`
 
 The same ref, created outside a component (a module, a test); it does not re-render anything.
@@ -150,6 +203,18 @@ import { createCalendarRef } from "@fragiola/calendar-vue";
 export const calendar = createCalendarRef<Types>();
 // <Calendar.Root :calendar-ref="calendar"> … then:
 calendar.value?.model.run("view.next", {});
+```
+
+</Framework>
+
+<Framework name="angular">
+
+```ts
+import { createCalendarRef } from "@fragiola/calendar-angular";
+
+export const calendar = createCalendarRef<Types>();
+// <div calendarRoot [calendarRef]="calendar"> … then:
+calendar.current?.model.run("view.next", {});
 ```
 
 </Framework>
@@ -210,6 +275,34 @@ const view = useCalendarView();
 
 </Framework>
 
+<Framework name="angular">
+
+```ts title="view.ts"
+import { Component } from "@angular/core";
+import { injectCalendarView } from "@fragiola/calendar-angular";
+import { Agenda } from "./agenda";
+import { MonthGrid } from "./month-grid";
+import { WeekGrid } from "./week-grid";
+
+@Component({
+    selector: "app-view",
+    imports: [Agenda, MonthGrid, WeekGrid],
+    template: `
+        @switch (view().type) {
+            @case ("month") { <app-month-grid /> }
+            @case ("list") { <app-agenda /> }
+            @default { <app-week-grid /> }
+        }
+    `,
+})
+export class View {
+    // a signal
+    protected readonly view = injectCalendarView();
+}
+```
+
+</Framework>
+
 `CalendarView`:
 
 | field | type | description |
@@ -255,6 +348,26 @@ const parts = useCalendarTitle({ month: "long", year: "numeric" });
 
 </Framework>
 
+<Framework name="angular">
+
+```ts title="title.ts"
+import { Component } from "@angular/core";
+import { injectCalendarTitle } from "@fragiola/calendar-angular";
+
+@Component({
+    selector: "app-title",
+    template: "<h2>{{ text() }}</h2>",
+})
+export class Title {
+    private readonly parts = injectCalendarTitle({ month: "long", year: "numeric" });
+    text() {
+        return this.parts().map((part) => part.value).join("");
+    }
+}
+```
+
+</Framework>
+
 ## `useDayHeader`
 
 A column's header as `Intl` parts (`get("day-header-by")`): the weekday in a month view, the
@@ -279,6 +392,16 @@ const parts = useDayHeader("2026-11-26", { weekday: "short", day: "numeric" });
 
 </Framework>
 
+<Framework name="angular">
+
+```ts
+// the date and the format: values, signals or getters (() => this.date())
+readonly parts = injectDayHeader("2026-11-26", { weekday: "short", day: "numeric" });
+// this.parts(): [{ type: "weekday", value: "Thu" }, { type: "literal", value: " " }, { type: "day", value: "26" }]
+```
+
+</Framework>
+
 ## `useSlotLabel`
 
 A slot's time (`HH:mm`) as `Intl` parts (`get("slot-label-by")`), by default `{ hour: "numeric",
@@ -298,6 +421,15 @@ const parts = useSlotLabel("13:00", { hour: "numeric" });
 ```ts
 const parts = useSlotLabel("13:00", { hour: "numeric" });
 // parts.value: "1 PM" in en-US, "13" in pt-BR
+```
+
+</Framework>
+
+<Framework name="angular">
+
+```ts
+readonly parts = injectSlotLabel("13:00", { hour: "numeric" });
+// this.parts(): "1 PM" in en-US, "13" in pt-BR
 ```
 
 </Framework>
@@ -327,6 +459,17 @@ const busiest = computed(() =>
 
 </Framework>
 
+<Framework name="angular">
+
+```ts
+readonly grid = injectDayGrid();
+readonly busiest = computed(() =>
+    Math.max(0, ...(this.grid()?.weeks ?? []).map((week) => week.lanes)),
+);
+```
+
+</Framework>
+
 ## `useTimeGrid`
 
 The time grid shown (week, day and `days` views; `null` otherwise): its columns, slots and timed
@@ -346,6 +489,15 @@ const slotCount = grid?.slots.length ?? 0;
 ```ts
 const grid = useTimeGrid();
 const slotCount = computed(() => grid.value?.slots.length ?? 0);
+```
+
+</Framework>
+
+<Framework name="angular">
+
+```ts
+readonly grid = injectTimeGrid();
+readonly slotCount = computed(() => this.grid()?.slots.length ?? 0);
 ```
 
 </Framework>
@@ -370,6 +522,17 @@ const count = days.reduce((sum, day) => sum + day.items.length, 0);
 const list = useListLayout();
 const count = computed(() =>
     list.value.days.reduce((sum, day) => sum + day.items.length, 0),
+);
+```
+
+</Framework>
+
+<Framework name="angular">
+
+```ts
+readonly list = injectListLayout();
+readonly count = computed(() =>
+    this.list().days.reduce((sum, day) => sum + day.items.length, 0),
 );
 ```
 
@@ -412,6 +575,26 @@ const { state, props: cell } = useDay(() => props.day);
 
 </Framework>
 
+<Framework name="angular">
+
+```ts title="day-cell.ts"
+import { Component } from "@angular/core";
+import { injectDay } from "@fragiola/calendar-angular";
+
+// the directive is the part (it registers the element); a component on it, or inside it, reads
+// its state: <td [calendarDay]="day" appDayCell>
+@Component({
+    selector: "[appDayCell]",
+    host: { "[class.focused]": "day.state()?.focused" },
+    template: "{{ day.state()?.day?.date }}",
+})
+export class DayCell {
+    protected readonly day = injectDay();
+}
+```
+
+</Framework>
+
 `DayState`:
 
 | field | type | description |
@@ -440,6 +623,15 @@ const { state, props } = useSlot({ date: "2026-11-26", time: "09:30" });
 ```ts
 const { state, props } = useSlot({ date: "2026-11-26", time: "09:30" });
 // <div v-bind="props" />
+```
+
+</Framework>
+
+<Framework name="angular">
+
+```ts
+// inside <div [calendarSlot]="date">: the slot's state, a signal
+readonly slot = injectSlot();
 ```
 
 </Framework>
@@ -479,6 +671,16 @@ const { state, props } = useSegment(() => segment);
 
 </Framework>
 
+<Framework name="angular">
+
+```ts
+// inside <li [calendarSegment]="segment">: host: { "[attr.data-kind]": "kind()" }
+readonly segment = injectSegment();
+readonly kind = computed(() => (this.segment.state()?.allDay ? "all-day" : "timed"));
+```
+
+</Framework>
+
 `SegmentState` extends `EventState` with:
 
 | field | type | description |
@@ -506,6 +708,14 @@ const { state, props } = useTimeEvent(() => segment);
 
 </Framework>
 
+<Framework name="angular">
+
+```ts
+readonly event = injectTimeEvent();
+```
+
+</Framework>
+
 `TimeEventState` extends `EventState` with:
 
 | field | type | description |
@@ -529,6 +739,14 @@ const { state, props } = useListEvent(item);
 
 ```ts
 const { state, props } = useListEvent(() => item);
+```
+
+</Framework>
+
+<Framework name="angular">
+
+```ts
+readonly event = injectListEvent();
 ```
 
 </Framework>
@@ -609,6 +827,26 @@ const shown = computed(() => selection.value.preview ?? selection.value.range);
 
 </Framework>
 
+<Framework name="angular">
+
+```ts title="selected-range.ts"
+import { Component, computed } from "@angular/core";
+import { injectSelection } from "@fragiola/calendar-angular/selection";
+
+@Component({
+    selector: "app-selected-range",
+    template: `<p>{{ shown() ? shown()!.start + " to " + shown()!.end : "Nothing selected" }}</p>`,
+})
+export class SelectedRange {
+    private readonly selection = injectSelection();
+    protected readonly shown = computed(
+        () => this.selection().preview ?? this.selection().range,
+    );
+}
+```
+
+</Framework>
+
 `CalendarSelection`:
 
 | field | type | description |
@@ -652,6 +890,23 @@ const preview = useDragPreview();
 
 </Framework>
 
+<Framework name="angular">
+
+```ts title="drop-times.ts"
+import { Component } from "@angular/core";
+import { injectDragPreview } from "@fragiola/calendar-angular/drag-and-drop";
+
+@Component({
+    selector: "app-drop-times",
+    template: `@if (preview(); as preview) { <output>{{ preview.start }}</output> }`,
+})
+export class DropTimes {
+    protected readonly preview = injectDragPreview();
+}
+```
+
+</Framework>
+
 ## `useNowPosition`
 
 From `@fragiola/calendar-react/now-indicator`, with `nowIndicator()`: the current time's place in
@@ -676,6 +931,15 @@ const label = computed(() => (now.value ? `Now, ${now.value.time}` : null));
 
 </Framework>
 
+<Framework name="angular">
+
+```ts
+readonly now = injectNowPosition();
+readonly label = computed(() => (this.now() ? `Now, ${this.now()?.time}` : null));
+```
+
+</Framework>
+
 ## `useBusinessHours`
 
 From `@fragiola/calendar-react/constraints`, with `constraints()`: the business hours of the
@@ -696,6 +960,15 @@ const open = hours.length > 0;
 ```ts
 const hours = useBusinessHours("2026-11-26");
 const open = computed(() => hours.value.length > 0);
+```
+
+</Framework>
+
+<Framework name="angular">
+
+```ts
+readonly hours = injectBusinessHours("2026-11-26");
+readonly open = computed(() => this.hours().length > 0);
 ```
 
 </Framework>

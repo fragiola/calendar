@@ -108,4 +108,7 @@ A month's column headers stand for weekdays: they carry `data-date` (a date of t
 `data-weekend`, never the first row's day state. A time grid numbers its columns: the grid has
 `aria-colcount` (the days plus the time axis), each cell `aria-colindex` (the axis is column 1,
 the days from 2), so the header row, the all-day row and the columns' layer need no cell of yours
-for the axis.
+for the axis. A month numbers its columns when its rows render a week number and the root says so
+(`weekNumberColumn`): the grid's `aria-colcount` counts the week numbers' column, each week number
+is column 1 and the days and their headers from 2, so the header row of seven and the rows of
+eight agree.

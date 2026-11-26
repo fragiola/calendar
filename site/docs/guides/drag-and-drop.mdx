@@ -133,6 +133,72 @@ const model = createCalendarModel(
 
 </Framework>
 
+<Framework name="angular">
+
+```ts title="draggable-week.ts"
+import { Component } from "@angular/core";
+import { CALENDAR, createCalendarModel } from "@fragiola/calendar-angular";
+import {
+    CalendarDragPreviewDirective,
+    dragAndDrop,
+} from "@fragiola/calendar-angular/drag-and-drop";
+
+const features = [dragAndDrop()] as const;
+
+@Component({
+    selector: "app-draggable-week",
+    imports: [CALENDAR, CalendarDragPreviewDirective],
+    template: `
+        <div [calendarRoot]="model">
+            <div calendarTimeGrid aria-label="Week">
+                <div calendarAllDayRow>
+                    <ng-template calendarDays let-day>
+                        <div [calendarDay]="day">
+                            <div calendarDayEvents>
+                                <ng-template calendarDayEventsItem let-segment>
+                                    <div [calendarSegment]="segment"></div>
+                                </ng-template>
+                            </div>
+                        </div>
+                    </ng-template>
+                    <div *calendarDragPreview class="preview"></div>
+                </div>
+                <div calendarScroller>
+                    <div class="body">
+                        <!-- the slot rows -->
+                        <div calendarColumns class="columns">
+                            <ng-template calendarColumnsItem let-column>
+                                <div [calendarColumn]="column">
+                                    <div calendarColumnEvents>
+                                        <ng-template calendarColumnEventsItem let-segment>
+                                            <div [calendarTimeEvent]="segment"></div>
+                                        </ng-template>
+                                    </div>
+                                    <div *calendarDragPreview class="preview"></div>
+                                </div>
+                            </ng-template>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `,
+})
+export class DraggableWeek {
+    readonly model = createCalendarModel(
+        {
+            version: 1,
+            events: [],
+            calendars: [],
+            view: { type: "week", anchorDate: "2026-11-26" },
+        },
+        { features },
+    );
+}
+```
+
+</Framework>
+
 Every event is draggable once the feature is installed (`touch-action: none` is set on it, so a
 touch can drag). `DragPreview` goes wherever the event could land: each `Calendar.Column`, and
 each `Calendar.Week` or the `Calendar.AllDayRow`. It renders only while there is a target, laid
@@ -140,7 +206,7 @@ out as the event would be there.
 
 ## Showing where it lands
 
-`DragPreview` takes elements or a function of its state (in Vue, its default slot's scope): `preview` (the occurrence's new times,
+`DragPreview` takes elements or a function of its state (in Vue, its default slot's scope; in Angular, its template's, `*calendarDragPreview="let drag"`): `preview` (the occurrence's new times,
 `start`, `end`, `allDay`, and the gesture's `kind` and `keyboard`) and `segment` (its part here).
 
 <Framework name="react">
@@ -176,6 +242,20 @@ const time = new Intl.DateTimeFormat("en-US", { hour: "numeric", minute: "2-digi
 
 </Framework>
 
+<Framework name="angular">
+
+```html
+<!-- time = new Intl.DateTimeFormat("en-US", { hour: "numeric", minute: "2-digit" }), a field -->
+<div *calendarDragPreview="let drag" class="preview">
+    <span>{{ time.format(Date.parse(drag.preview.start)) }}</span>
+</div>
+```
+
+`Date` is not in a template's scope: give the component a method (`start(drag)`) or a field
+(`readonly Date = Date`).
+
+</Framework>
+
 While it is dragged, the event itself carries `data-dragging` (dim it), and a keyboard grab
 carries `data-grabbed`:
 
@@ -208,7 +288,7 @@ Each step of a keyboard move is announced as data (`onAnnounce`, `@announce`): s
 
 ## Hearing the drop
 
-A drop runs one command, and the root reports it as `onEventDrop` (`@event-drop` in Vue) with the event's new
+A drop runs one command, and the root reports it as `onEventDrop` (`@event-drop` in Vue, `(eventDrop)` with `calendarDragAndDrop` in Angular) with the event's new
 times:
 
 <Framework name="react">
@@ -250,7 +330,22 @@ function dropped(event: CalendarEngineEventOf<"drop">) {
 
 </Framework>
 
-To save it, listen to the model instead (`model.subscribe`, or `onEventsChange`, `@events-change` in Vue): it hears the
+<Framework name="angular">
+
+```ts
+import type { CalendarEngineEventOf } from "@fragiola/calendar-angular";
+
+// <div [calendarRoot]="model" calendarDragAndDrop (eventDrop)="dropped($event)">…</div>
+// (CalendarDragAndDropRootDirective, from @fragiola/calendar-angular/drag-and-drop)
+dropped(event: CalendarEngineEventOf<"drop">) {
+    // kind: "move" (or "resize" with resize()), keyboard: whether Enter dropped it
+    console.log(event.kind, event.eventId, event.start, event.end, event.allDay);
+}
+```
+
+</Framework>
+
+To save it, listen to the model instead (`model.subscribe`, or `onEventsChange`, `@events-change` in Vue, `(eventsChange)` in Angular): it hears the
 drop and every other change the same way.
 
 ## Between the all-day row and the time grid

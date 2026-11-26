@@ -90,6 +90,55 @@ const label = computed(() => {
 
 </Framework>
 
+<Framework name="angular">
+
+```ts title="month.ts"
+import { Component } from "@angular/core";
+import { CALENDAR, createCalendarModel } from "@fragiola/calendar-angular";
+
+const dayLabel = new Intl.DateTimeFormat("en-US", {
+    dateStyle: "full",
+    timeZone: "UTC",
+});
+
+@Component({
+    selector: "app-month",
+    imports: [CALENDAR],
+    template: `
+        <div [calendarRoot]="model">
+            <div calendarDayGrid aria-label="Month">
+                <ng-template calendarWeeks let-week>
+                    <div [calendarWeek]="week">
+                        <ng-template calendarDays let-day>
+                            <div [calendarDay]="day" class="day" [class.outside]="day.outside">
+                                <span aria-hidden="true">{{ +day.date.slice(8) }}</span>
+                                <span class="sr-only">{{ label(day.date) }}</span>
+                                <div calendarDayEvents>
+                                    <ng-template calendarDayEventsItem let-segment>
+                                        <div [calendarSegment]="segment"></div>
+                                    </ng-template>
+                                </div>
+                                <button *calendarMore="let more">+{{ more.hiddenCount }} more</button>
+                            </div>
+                        </ng-template>
+                    </div>
+                </ng-template>
+            </div>
+        </div>
+    `,
+})
+export class Month {
+    readonly model = createCalendarModel({ version: 1, events: [] });
+
+    label(date: string) {
+        const [year, month, day] = date.split("-").map(Number);
+        return dayLabel.format(Date.UTC(year ?? 0, (month ?? 1) - 1, day));
+    }
+}
+```
+
+</Framework>
+
 The same element can come from `useDay(day)`, which returns its state and props
 ([hooks](/docs/api/hooks)).
 
@@ -99,6 +148,9 @@ The same element can come from `useDay(day)`, which returns its state and props
 
 In Vue: the same props (in kebab-case in a template), and slots in place of `children`; see
 [Vue primitives](/docs/api/vue).
+
+In Angular: a directive on your element, the props as its inputs, templates in place of
+`children`; see [Angular primitives](/docs/api/angular).
 
 | prop | type | description |
 | --- | --- | --- |

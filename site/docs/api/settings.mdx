@@ -29,7 +29,7 @@ model.run("settings.set", { settings: { firstDayOfWeek: null } }); // back to th
 ```
 
 A `null` in a patch removes an optional setting, so its default applies again. With the root
-(React or Vue), the `settings` prop sends the changed value as a whole patch
+(React, Vue or Angular), the `settings` prop (an input in Angular) sends the changed value as a whole patch
 ([Controlled state](/docs/guides/controlled-state)).
 
 ## Defaults

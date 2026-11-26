@@ -87,6 +87,27 @@ import { DragPreview } from "@fragiola/calendar-vue/drag-and-drop";
 
 </Framework>
 
+<Framework name="angular">
+
+```html title="all-day.html"
+<!-- imports: [CALENDAR, CalendarDragPreviewDirective] (from @fragiola/calendar-angular/drag-and-drop) -->
+<div calendarAllDayRow class="all-day-row">
+    <div aria-hidden="true" class="all-day-label">all-day</div>
+    <ng-template calendarDays let-day>
+        <div [calendarDay]="day" class="all-day-cell">
+            <div calendarDayEvents>
+                <ng-template calendarDayEventsItem let-segment>
+                    <div [calendarSegment]="segment">{{ segment.eventId }}</div>
+                </ng-template>
+            </div>
+        </div>
+    </ng-template>
+    <div *calendarDragPreview class="preview"></div>
+</div>
+```
+
+</Framework>
+
 The label is `aria-hidden` here: the row's days are named by their headers. Set
 `--calendar-row-inset` to the label's width so the decorations start at the first day.
 
@@ -103,6 +124,9 @@ The label is `aria-hidden` here: the row's days are named by their headers. Set
 
 In Vue: the same props (in kebab-case in a template), and slots in place of `children`; see
 [Vue primitives](/docs/api/vue).
+
+In Angular: a directive on your element, the props as its inputs, templates in place of
+`children`; see [Angular primitives](/docs/api/angular).
 
 `AllDayRowProps` takes the [common props](/docs/api/root#common-props) and any `div` attribute,
 and:

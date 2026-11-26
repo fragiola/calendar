@@ -49,7 +49,7 @@ import {
     timePoint,
 } from "./hit-test";
 import { type GridCells, keyTarget } from "./keyboard";
-import { attributesOf } from "./part-attributes";
+import { attributesOf, type PartAttributeOptions } from "./part-attributes";
 import {
     cellOfOccurrence,
     defaultTabStop,
@@ -1724,6 +1724,7 @@ class Engine<T extends CalendarTypes, F extends CalendarFeatures> {
     private attributes(
         part: PartName,
         payload: Readonly<Record<string, unknown>>,
+        options: PartAttributeOptions | undefined,
     ): PartAttributes {
         return attributesOf(
             this.erased(),
@@ -1738,6 +1739,7 @@ class Engine<T extends CalendarTypes, F extends CalendarFeatures> {
                 focused: this.focusPosition && this.shownAt(this.focusPosition),
             },
             this.parts,
+            options,
         );
     }
 
@@ -1756,10 +1758,11 @@ class Engine<T extends CalendarTypes, F extends CalendarFeatures> {
                     payload as Readonly<Record<string, unknown>>,
                     element,
                 ),
-            attributes: (part, payload) =>
+            attributes: (part, payload, options) =>
                 this.attributes(
                     part,
                     payload as Readonly<Record<string, unknown>>,
+                    options,
                 ),
             committed: () => {
                 this.measureLanes();

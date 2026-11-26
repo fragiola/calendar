@@ -74,6 +74,21 @@ defineProps<{ week: DayGridWeek }>();
 
 </Framework>
 
+<Framework name="angular">
+
+```html title="week-row.html"
+<!-- imports: [CALENDAR, CalendarSelectionDirective] (from @fragiola/calendar-angular/selection) -->
+<div [calendarWeek]="week" class="week" style="--calendar-row-inset: 2.5rem">
+    <div calendarWeekNumber class="week-number">{{ week.weekNumber }}</div>
+    <ng-template calendarDays let-day>
+        <div [calendarDay]="day" class="day"></div>
+    </ng-template>
+    <div *calendarSelection class="selected-range"></div>
+</div>
+```
+
+</Framework>
+
 ## Props
 
 `WeekProps`; it also takes the [common props](/docs/api/root#common-props) and every `div`
@@ -81,6 +96,9 @@ attribute.
 
 In Vue: the same props (in kebab-case in a template), and slots in place of `children`; see
 [Vue primitives](/docs/api/vue).
+
+In Angular: a directive on your element, the props as its inputs, templates in place of
+`children`; see [Angular primitives](/docs/api/angular).
 
 | prop | type | description |
 | --- | --- | --- |

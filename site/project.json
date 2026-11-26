@@ -2,8 +2,8 @@
     "contract": 1,
     "slug": "calendar",
     "title": "Calendar",
-    "description": "A headless, accessible event calendar for React and Vue: month, week, day and list views, drag and resize, recurring events and time zones, from JSON.",
-    "frameworks": ["react", "vue"],
+    "description": "A headless, accessible event calendar for React, Vue and Angular: month, week, day and list views, drag and resize, recurring events and time zones, from JSON.",
+    "frameworks": ["react", "vue", "angular"],
     "defaultFramework": "react",
     "repository": "https://github.com/fragiola/calendar",
     "keywords": [
@@ -14,6 +14,6 @@
         "recurring events",
         "time zones",
         "vue",
-        "accessibility"
+        "angular"
     ]
 }

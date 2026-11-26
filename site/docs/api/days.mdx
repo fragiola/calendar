@@ -58,10 +58,32 @@ import { Calendar } from "@fragiola/calendar-react";
 
 </Framework>
 
+<Framework name="angular">
+
+```html
+<div calendarAllDayRow class="all-day">
+    <div aria-hidden="true" class="all-day-label">all-day</div>
+    <ng-template calendarDays let-day>
+        <div [calendarDay]="day" class="all-day-cell">
+            <div calendarDayEvents>
+                <ng-template calendarDayEventsItem let-segment>
+                    <div [calendarSegment]="segment"></div>
+                </ng-template>
+            </div>
+        </div>
+    </ng-template>
+</div>
+```
+
+</Framework>
+
 ## Props
 
 In Vue: the same props (in kebab-case in a template), and slots in place of `children`; see
 [Vue primitives](/docs/api/vue).
+
+In Angular: a directive on your element, the props as its inputs, templates in place of
+`children`; see [Angular primitives](/docs/api/angular).
 
 `DaysProps` (it renders no element, so it takes no other prop):
 

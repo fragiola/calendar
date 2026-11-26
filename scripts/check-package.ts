@@ -6,15 +6,17 @@
 // - its packed `exports` (from `publishConfig.exports`) are the repo's `exports` without the source
 //   condition, and use only the `types`, `import` and `default` conditions, with targets in `dist`;
 // - publint (strict) and attw (`esm-only` profile) pass on the tarball;
-// - the core's and the React and Vue adapters' tarballs export every feature's subpath
+// - the core's and every adapter's tarballs export every feature's subpath
 //   (`FEATURES` of `check-features.ts`), their `types` and `import` targets packed;
-// - every adapter (`ADAPTERS`: each package under packages/ but the core; React and Vue today,
-//   Angular with its Epic, and a package missing from the list fails) depends on the core at
+// - every adapter (`ADAPTERS`: each package under packages/ but the core: React, Vue and
+//   Angular, and a package missing from the list fails) depends on the core at
 //   its exact version, and passes its smoke test: a scratch app outside the workspace that
 //   installs the adapter's tarball only (the core tarball comes as its dependency), typechecks,
 //   builds and loads its dev server (`reactSmoke`: a Vite + React app; `vueSmoke`: a Vite + Vue
-//   app of single-file components checked by vue-tsc on TypeScript 6; their pins the examples
-//   app's: examples/react's and examples/vue's). A package published from its build output
+//   app of single-file components checked by vue-tsc on TypeScript 6; `angularSmoke`: a zoneless
+//   Vite + Angular app (@analogjs/vite-plugin-angular) of standalone components checked by `ngc`
+//   with strict templates on TypeScript 6; their pins the examples app's: examples/react's,
+//   examples/vue's and examples/angular's). A package published from its build output
 //   (`publishConfig.directory`: an Angular one, which ng-packagr builds into `dist`) is packed from
 //   that directory: its packed `exports` are the repo's relative to it, each target a file of the
 //   tarball.
@@ -25,7 +27,6 @@
 // packed from the repo, as without the option.
 import { execFileSync, spawn } from "node:child_process";
 import {
-    existsSync,
     mkdirSync,
     mkdtempSync,
     readdirSync,
@@ -218,7 +219,7 @@ function lint(name: string, tarball: string): string[] {
               ]
     )
         .concat(
-            name === "core" || name === "react" || name === "vue"
+            name === "core" || ADAPTERS.some((adapter) => adapter.dir === name)
                 ? featureExportProblems(
                       manifest.exports,
                       FEATURES.map((feature) => feature.subpath),
@@ -280,10 +281,14 @@ export interface AdapterCheck {
     ) => Promise<void>;
 }
 
-/** The version the adapter `packages/<dir>` pins for `name` (a dependency or a dev dependency). */
-function adapterVersion(dir: string, name: string): string {
+/**
+ * The version the smoke app of `framework` installs of `name`: the examples app's
+ * (`examples/<framework>`, which pins what an app of that framework installs, the Vite plugin of
+ * its components included). Every adapter has its examples app, so a pin missing from it fails.
+ */
+function smokeVersion(framework: Framework, name: string): string {
     const manifest = JSON.parse(
-        readFileSync(join(root, "packages", dir, "package.json"), "utf8"),
+        readFileSync(join(root, "examples", framework, "package.json"), "utf8"),
     ) as {
         dependencies?: Record<string, string>;
         devDependencies?: Record<string, string>;
@@ -291,29 +296,9 @@ function adapterVersion(dir: string, name: string): string {
     const version =
         manifest.dependencies?.[name] ?? manifest.devDependencies?.[name];
     if (version === undefined) {
-        throw new Error(`packages/${dir} does not depend on ${name}`);
+        throw new Error(`examples/${framework} does not depend on ${name}`);
     }
     return version;
-}
-
-/**
- * The version the smoke app of `framework` installs of `name`: the examples app's
- * (`examples/<framework>`, which pins what an app of that framework installs: React's and Vue's
- * exist, with the Vite plugin of single-file components), else the adapter's own (the same pins:
- * AGENTS.md D22), for a framework whose examples app is not written yet.
- */
-function smokeVersion(framework: Framework, dir: string, name: string): string {
-    const examples = join(root, "examples", framework, "package.json");
-    if (existsSync(examples)) {
-        const manifest = JSON.parse(readFileSync(examples, "utf8")) as {
-            dependencies?: Record<string, string>;
-            devDependencies?: Record<string, string>;
-        };
-        const version =
-            manifest.dependencies?.[name] ?? manifest.devDependencies?.[name];
-        if (version !== undefined) return version;
-    }
-    return adapterVersion(dir, name);
 }
 
 // Everything from the React package, the core included: a React app installs that one only. A
@@ -466,7 +451,7 @@ if (container) {
  * (examples/react's); Vite compiles the JSX itself.
  */
 function writeReactSmokeApp(dir: string, core: string, react: string): void {
-    const version = (name: string) => smokeVersion("react", "react", name);
+    const version = (name: string) => smokeVersion("react", name);
     const manifest = {
         name: "calendar-smoke",
         private: true,
@@ -784,7 +769,7 @@ const VUE_SMOKE_SHIM = `declare module "*.vue" {
  * declarations checked too (no skipLibCheck).
  */
 function writeVueSmokeApp(dir: string, core: string, vue: string): void {
-    const version = (name: string) => smokeVersion("vue", "vue", name);
+    const version = (name: string) => smokeVersion("vue", name);
     const manifest = {
         name: "calendar-smoke-vue",
         private: true,
@@ -857,11 +842,324 @@ async function vueSmoke(
     await loadThroughDevServer(app, "/src/main.ts");
 }
 
+// The Angular smoke app: standalone components, bootstrapped zoneless, everything from the Angular
+// package (the core included): `CALENDAR` and the features' directives from their entries, the
+// root typed by its model's registry and features, the two-way `[(view)]` and `[(date)]`, a
+// feature's event (`(rangeSelect)`), the typed template contexts (`let-week`, `let-segment`), and
+// an injection function. `ngc` checks the templates strictly against the published declarations.
+const ANGULAR_SMOKE_MAIN = `import {
+    Component,
+    provideZonelessChangeDetection,
+    signal,
+} from "@angular/core";
+import { bootstrapApplication } from "@angular/platform-browser";
+import {
+    CALENDAR,
+    type CalendarEngineEventOf,
+    type CalendarModel,
+    createCalendarModel,
+    injectCalendarTitle,
+    type ViewType,
+} from "@fragiola/calendar-angular";
+import {
+    CalendarBusinessHoursDirective,
+    constraints,
+} from "@fragiola/calendar-angular/constraints";
+import {
+    CalendarDragAndDropRootDirective,
+    CalendarDragPreviewDirective,
+    dragAndDrop,
+} from "@fragiola/calendar-angular/drag-and-drop";
+import {
+    CalendarNowIndicatorDirective,
+    nowIndicator,
+} from "@fragiola/calendar-angular/now-indicator";
+import { recurrence } from "@fragiola/calendar-angular/recurrence";
+import {
+    CalendarResizeHandleDirective,
+    resize,
+} from "@fragiola/calendar-angular/resize";
+import {
+    CalendarSelectionDirective,
+    CalendarSelectionRootDirective,
+    selection,
+} from "@fragiola/calendar-angular/selection";
+
+type Types = {
+    events: { meeting: { room: string } };
+    calendar: undefined;
+};
+
+const features = [
+    selection(),
+    dragAndDrop(),
+    resize(),
+    nowIndicator(),
+    constraints(),
+    recurrence(),
+] as const;
+
+@Component({
+    selector: "app-title",
+    template: \`<h2>{{ text() }}</h2>\`,
+})
+class Title {
+    readonly title = injectCalendarTitle();
+    text(): string {
+        return this.title()
+            .map((part) => part.value)
+            .join("");
+    }
+}
+
+@Component({
+    selector: "app-root",
+    imports: [
+        CALENDAR,
+        Title,
+        CalendarSelectionDirective,
+        CalendarSelectionRootDirective,
+        CalendarDragAndDropRootDirective,
+        CalendarDragPreviewDirective,
+        CalendarResizeHandleDirective,
+        CalendarNowIndicatorDirective,
+        CalendarBusinessHoursDirective,
+    ],
+    template: \`
+        <div
+            [calendarRoot]="model"
+            [(view)]="view"
+            [(date)]="date"
+            weekNumberColumn
+            calendarSelection
+            calendarDragAndDrop
+            (rangeSelect)="selected($event)"
+            (eventDrop)="dropped($event)"
+        >
+            <app-title />
+            <button calendarPrevious>Previous</button>
+            <button calendarToday>Today</button>
+            <button calendarNext>Next</button>
+            <button calendarViewButton="month">Month</button>
+            <button calendarViewButton="week">Week</button>
+            @if (view() === "month") {
+                <div calendarDayGrid aria-label="Month">
+                    <ng-template calendarWeeks let-week>
+                        <div [calendarWeek]="week">
+                            <div calendarWeekNumber>{{ week.weekNumber }}</div>
+                            <ng-template calendarDays let-day>
+                                <div [calendarDay]="day">
+                                    <div calendarDayEvents>
+                                        <ng-template calendarDayEventsItem let-segment>
+                                            <div [calendarSegment]="segment">{{ titleOf(segment.eventId) }}</div>
+                                        </ng-template>
+                                    </div>
+                                    <button *calendarMore="let more">+{{ more.hiddenCount }}</button>
+                                </div>
+                            </ng-template>
+                            <div *calendarSelection></div>
+                            <div *calendarDragPreview></div>
+                        </div>
+                    </ng-template>
+                </div>
+            } @else {
+                <div calendarTimeGrid aria-label="Week">
+                    <div calendarColumnHeaders>
+                        <ng-template calendarColumnHeadersItem let-date>
+                            <div [calendarColumnHeader]="date">{{ date }}</div>
+                        </ng-template>
+                    </div>
+                    <div calendarScroller style="height: 600px; overflow: auto">
+                        <ng-template calendarSlotRows let-slot>
+                            <div [calendarSlotRow]="slot">
+                                <div calendarSlotLabel>{{ slot.time }}</div>
+                                <ng-template calendarSlots let-column>
+                                    <div [calendarSlot]="column.date"></div>
+                                </ng-template>
+                            </div>
+                        </ng-template>
+                        <div calendarColumns>
+                            <ng-template calendarColumnsItem let-column>
+                                <div [calendarColumn]="column">
+                                    <div *calendarBusinessHours></div>
+                                    <div calendarColumnEvents>
+                                        <ng-template calendarColumnEventsItem let-segment>
+                                            <div [calendarTimeEvent]="segment" #event="calendarTimeEvent">
+                                                {{ titleOf(segment.eventId) }}
+                                                @if (event.state()?.focused) { • }
+                                                <div *calendarResizeHandle="'end'"></div>
+                                            </div>
+                                        </ng-template>
+                                    </div>
+                                    <div *calendarSelection></div>
+                                    <div *calendarDragPreview></div>
+                                    <div *calendarNowIndicator="let now">{{ now.position.time }}</div>
+                                </div>
+                            </ng-template>
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+    \`,
+})
+class App {
+    readonly model: CalendarModel<Types, typeof features> = createCalendarModel<
+        Types,
+        typeof features
+    >(
+        {
+            version: 1,
+            events: [
+                {
+                    id: "standup",
+                    kind: "meeting",
+                    title: "Standup",
+                    start: "2026-11-26T09:00:00-03:00",
+                    end: "2026-11-26T09:15:00-03:00",
+                    allDay: false,
+                    data: { room: "Blue" },
+                    recurrence: { rule: "FREQ=WEEKLY;BYDAY=MO,TH" },
+                },
+            ],
+            settings: { timeZone: "America/Sao_Paulo" },
+            view: { type: "week", anchorDate: "2026-11-26" },
+        },
+        { features },
+    );
+    readonly view = signal<ViewType>("week");
+    readonly date = signal("2026-11-26");
+
+    titleOf(id: string): string | undefined {
+        return this.model.get("event-by", { id })?.title;
+    }
+
+    selected(event: CalendarEngineEventOf<"select">): void {
+        console.log(event.range);
+    }
+
+    dropped(event: CalendarEngineEventOf<"drop">): void {
+        console.log(event.kind);
+    }
+}
+
+bootstrapApplication(App, {
+    providers: [provideZonelessChangeDetection()],
+}).catch((error: unknown) => console.error(error));
+`;
+
+/**
+ * A scratch Vite + Angular app in `dir` (@analogjs/vite-plugin-angular) that depends on the Angular
+ * tarball only (the core tarball comes as its dependency), on the Angular tools and TypeScript 6.0
+ * (examples/angular's pins).
+ */
+function writeAngularSmokeApp(
+    dir: string,
+    core: string,
+    angular: string,
+): void {
+    const version = (name: string) => smokeVersion("angular", name);
+    const manifest = {
+        name: "calendar-smoke-angular",
+        private: true,
+        type: "module",
+        dependencies: {
+            "@angular/common": version("@angular/common"),
+            "@angular/compiler": version("@angular/compiler"),
+            "@angular/core": version("@angular/core"),
+            "@angular/platform-browser": version("@angular/platform-browser"),
+            "@fragiola/calendar-angular": `file:${angular}`,
+            rxjs: version("rxjs"),
+        },
+        devDependencies: {
+            "@analogjs/vite-plugin-angular": version(
+                "@analogjs/vite-plugin-angular",
+            ),
+            "@angular/build": version("@angular/build"),
+            "@angular/compiler-cli": version("@angular/compiler-cli"),
+            typescript: version("typescript"),
+            vite: version("vite"),
+        },
+    };
+    writeFileSync(
+        join(dir, "package.json"),
+        `${JSON.stringify(manifest, null, 4)}\n`,
+    );
+    // the core tarball for the version the Angular tarball pins; the Analog plugin's TypeScript is
+    // the app's (6.0), and @angular/build's native helpers keep their prebuilt binaries
+    writeFileSync(
+        join(dir, "pnpm-workspace.yaml"),
+        [
+            "overrides:",
+            `  "@fragiola/calendar": "file:${core}"`,
+            "packageExtensions:",
+            '  "@analogjs/vite-plugin-angular":',
+            "    peerDependencies:",
+            '      typescript: "*"',
+            "allowBuilds:",
+            "  esbuild: true",
+            '  "@parcel/watcher": false',
+            "  lmdb: false",
+            "  msgpackr-extract: false",
+            "",
+        ].join("\n"),
+    );
+    writeFileSync(
+        join(dir, "vite.config.js"),
+        `import angular from "@analogjs/vite-plugin-angular";\nimport { defineConfig } from "vite";\n\nexport default defineConfig({ plugins: [angular({ tsconfig: "tsconfig.json" })] });\n`,
+    );
+    writeFileSync(
+        join(dir, "index.html"),
+        `<!doctype html>\n<html lang="en">\n<body>\n<app-root></app-root>\n<script type="module" src="/src/main.ts"></script>\n</body>\n</html>\n`,
+    );
+    // strict, strict templates, with the published declarations checked too (no skipLibCheck)
+    const tsconfig = {
+        compilerOptions: {
+            target: "ES2022",
+            lib: ["ES2022", "DOM", "DOM.Iterable"],
+            module: "ESNext",
+            moduleResolution: "bundler",
+            strict: true,
+            noUncheckedIndexedAccess: true,
+            verbatimModuleSyntax: true,
+            useDefineForClassFields: false,
+            types: [],
+        },
+        angularCompilerOptions: {
+            strictTemplates: true,
+            strictInjectionParameters: true,
+            strictInputAccessModifiers: true,
+        },
+        include: ["src"],
+    };
+    writeFileSync(
+        join(dir, "tsconfig.json"),
+        `${JSON.stringify(tsconfig, null, 4)}\n`,
+    );
+    mkdirSync(join(dir, "src"));
+    writeFileSync(join(dir, "src/main.ts"), ANGULAR_SMOKE_MAIN);
+}
+
+/**
+ * The Angular smoke test: the scratch zoneless Vite + Angular app installs the Angular tarball,
+ * typechecks (ngc, strict templates), builds and loads its dev server.
+ */
+async function angularSmoke(
+    app: string,
+    tarballs: { core: string; adapter: string },
+): Promise<void> {
+    writeAngularSmokeApp(app, tarballs.core, tarballs.adapter);
+    run("pnpm", ["install", "--no-frozen-lockfile"], app);
+    run("pnpm", ["exec", "ngc", "-p", "tsconfig.json", "--noEmit"], app);
+    run("pnpm", ["exec", "vite", "build"], app);
+    await loadThroughDevServer(app, "/src/main.ts");
+}
+
 /** Every adapter, one per package under packages/ but the core (`unlistedPackages` checks it). */
 export const ADAPTERS: readonly AdapterCheck[] = [
-    // the Angular adapter joins with its Epic, with its smoke app
     { dir: "react", framework: "react", smoke: reactSmoke },
     { dir: "vue", framework: "vue", smoke: vueSmoke },
+    { dir: "angular", framework: "angular", smoke: angularSmoke },
 ];
 
 /** The packages/ directories that are neither the core nor an adapter of `adapters`. */

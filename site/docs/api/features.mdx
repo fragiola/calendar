@@ -54,11 +54,41 @@ const FEATURES = [selection(), dragAndDrop(), resize()] as const;
 
 </Framework>
 
-Each adapter's entry (`@fragiola/calendar-react/<entry>`, `@fragiola/calendar-vue/<entry>`) re-exports
-the core's `@fragiola/calendar/<entry>` and adds the feature's parts and hooks (Vue's composables of
-the same names), so an app installs one package. A feature's command,
+<Framework name="angular">
+
+```ts title="planner.ts"
+import { Component } from "@angular/core";
+import { CALENDAR } from "@fragiola/calendar-angular";
+import { dragAndDrop } from "@fragiola/calendar-angular/drag-and-drop";
+import { resize } from "@fragiola/calendar-angular/resize";
+import { selection } from "@fragiola/calendar-angular/selection";
+
+// a const tuple, read once by the root (a model created with it types its events)
+const FEATURES = [selection(), dragAndDrop(), resize()] as const;
+
+@Component({
+    selector: "app-planner",
+    imports: [CALENDAR],
+    template: `
+        <div calendarRoot [features]="features" defaultView="week">
+            <!-- the time grid, with *calendarSelection, *calendarDragPreview and *calendarResizeHandle -->
+        </div>
+    `,
+})
+export class Planner {
+    readonly features = FEATURES;
+}
+```
+
+</Framework>
+
+Each adapter's entry (`@fragiola/calendar-react/<entry>`, `@fragiola/calendar-vue/<entry>`,
+`@fragiola/calendar-angular/<entry>`) re-exports the core's `@fragiola/calendar/<entry>` and adds
+the feature's parts and hooks (Vue's composables of the same names, Angular's directives and
+injection functions), so an app installs one package. A feature's command,
 key, setting or document field in a model without it is refused, naming the feature; a feature's
-root callback (`onSelect`, or `@select` on a `typedCalendar` root in Vue) is a type error without it.
+root callback (`onSelect`, or `@select` on a `typedCalendar` root in Vue) is a type error without it
+(in Angular, its root directive warns once and never emits).
 
 ## The features
 

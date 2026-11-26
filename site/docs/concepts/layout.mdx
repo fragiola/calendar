@@ -95,6 +95,16 @@ style="position: absolute; top: 37.5%; height: 6.25%; inset-inline-start: 50%; w
 
 </Framework>
 
+<Framework name="angular">
+
+```html
+<!-- a segment { top: 0.375, height: 0.0625, column: 1, columns: 2, span: 1 } renders
+style="position: absolute; top: 37.5%; height: 6.25%; inset-inline-start: 50%; width: 50%" -->
+<div [calendarTimeEvent]="segment" class="event"></div>
+```
+
+</Framework>
+
 ## Lists
 
 `model.get("list")` lays out the visible days of any view as an agenda: the days that have
@@ -106,7 +116,7 @@ your "no events" message.
 A layout keeps the objects of what did not change: a week row, a column, a slot, a list day and a
 segment are the same objects while they are equal and laid out from the same events. Moving one
 event makes the rows or columns it left and entered new, and nothing else, so a part, a memo or a
-stable children function (a stable slot in Vue) re-renders only what changed
+stable children function (a stable slot in Vue, a template in Angular) re-renders only what changed
 ([Composition](/docs/concepts/composition), [Performance](/docs/guides/performance)).
 
 ```ts

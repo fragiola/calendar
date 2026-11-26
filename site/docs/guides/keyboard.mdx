@@ -181,14 +181,67 @@ const message = ref("");
 
 </Framework>
 
+<Framework name="angular">
+
+```ts title="keyboard-week.ts"
+import { Component, signal } from "@angular/core";
+import {
+    type Announcement,
+    CALENDAR,
+    createCalendarModel,
+} from "@fragiola/calendar-angular";
+import { dragAndDrop } from "@fragiola/calendar-angular/drag-and-drop";
+
+const features = [dragAndDrop()] as const;
+
+function words(announcement: Announcement): string {
+    switch (announcement.kind) {
+        case "grab":
+            return "Grabbed. Arrows move it, Enter drops it, Escape cancels.";
+        case "drag-over":
+            return announcement.preview
+                ? `To ${announcement.preview.start}.`
+                : "It cannot go there.";
+        case "drop":
+            return "Moved.";
+        case "drag-cancel":
+            return "Left where it was.";
+        case "select-extend":
+            return announcement.range ? "Range selected." : "Not selectable.";
+    }
+}
+
+@Component({
+    selector: "app-keyboard-week",
+    imports: [CALENDAR],
+    template: `
+        <div [calendarRoot]="model" (announce)="message.set(words($event.announcement))">
+            <div role="status" aria-live="polite">{{ message() }}</div>
+            <!-- the time grid -->
+        </div>
+    `,
+})
+export class KeyboardWeek {
+    readonly model = createCalendarModel(
+        { version: 1, events: [], calendars: [], settings: {} },
+        { features },
+    );
+    readonly message = signal("");
+    readonly words = words;
+}
+```
+
+</Framework>
+
 The example's `announce.ts` words each announcement with the event's title and its new times
 from `Intl`. A live region renders again on every key: keep the grid's per-row calls stable so
 the rows do not render again too (in React, children functions declared outside the component; in
-Vue, slots that read only their scope, which Vue compiles stable; see
+Vue, slots that read only their scope, which Vue compiles stable; in Angular, the templates, which
+render again only for the layout objects that changed; see
 [Performance](/docs/guides/performance)).
 
 ## Touch and pointers
 
 A mouse drag starts after 5 pixels (`dragThreshold`); a touch needs a long press
 (`longPressDelay`, 500 ms) unless the event is already focused, so a swipe still scrolls. Both
-are props of `Calendar.Root` (`drag-threshold`, `long-press-delay` in a Vue template).
+are props of `Calendar.Root` (`drag-threshold`, `long-press-delay` in a Vue template, inputs of `[calendarRoot]` in Angular).

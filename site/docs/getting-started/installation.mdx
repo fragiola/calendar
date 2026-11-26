@@ -1,6 +1,6 @@
 ---
 title: Installation
-description: Install the React or the Vue package, which brings the core and re-exports it, and import each opt-in feature from its own entry.
+description: Install the React, the Vue or the Angular package, which brings the core and re-exports it, and import each opt-in feature from its own entry.
 ---
 
 Each framework has one package, which depends on the core `@fragiola/calendar` (at the exact same
@@ -62,6 +62,34 @@ so no compiler plugin is needed beyond your app's own.
 
 </Framework>
 
+<Framework name="angular">
+
+An Angular app installs `@fragiola/calendar-angular`:
+
+<Tabs items={["pnpm", "npm", "yarn"]}>
+    <Tab value="pnpm">
+        ```sh
+        pnpm add @fragiola/calendar-angular
+        ```
+    </Tab>
+    <Tab value="npm">
+        ```sh
+        npm install @fragiola/calendar-angular
+        ```
+    </Tab>
+    <Tab value="yarn">
+        ```sh
+        yarn add @fragiola/calendar-angular
+        ```
+    </Tab>
+</Tabs>
+
+`@angular/core` (`^22`) is the peer dependency: your app provides it. The package is standalone
+directives and signals, built with partial compilation (your app's Angular compiler links it); it
+needs no zone.js.
+
+</Framework>
+
 Each package has no other runtime dependency, and ships ES modules only, with their type
 declarations.
 
@@ -106,12 +134,34 @@ onto Vue (kebab-case props, scoped slots for children functions, listeners for c
 
 </Framework>
 
+<Framework name="angular">
+
+The primitives are standalone directives, one per part (`CalendarDayDirective` on
+`[calendarDay]`), and `CALENDAR` lists the main entry's for a component's `imports`. The
+injection functions, the model and every core type are named exports of the same package:
+
+```ts
+import {
+    CALENDAR,
+    createCalendarModel,
+    injectCalendarTitle,
+    type CalendarEventJson,
+} from "@fragiola/calendar-angular";
+```
+
+The pages of the API reference show the React props; [Angular primitives](/docs/api/angular)
+maps each onto Angular (a directive on your element, inputs and outputs, templates for children
+functions, `[(…)]` for controlled values).
+
+</Framework>
+
 ## Import a feature from its entry
 
 What not every calendar needs is an opt-in feature, each on its own entry, so a calendar that
 does not drag never ships the drag code. An entry exports the feature's factory, its parts and
-its hooks (composables in Vue). The entries are the same in both packages
-(`@fragiola/calendar-vue/selection`, …):
+its hooks (composables in Vue, directives and injection functions in Angular). The entries are
+the same in every package (`@fragiola/calendar-vue/selection`,
+`@fragiola/calendar-angular/selection`, …):
 
 | entry | factory | parts and hooks |
 | --- | --- | --- |
@@ -140,6 +190,20 @@ const features = [selection(), dragAndDrop()] as const;
 ```ts
 import { dragAndDrop, DragPreview } from "@fragiola/calendar-vue/drag-and-drop";
 import { selection } from "@fragiola/calendar-vue/selection";
+
+const features = [selection(), dragAndDrop()] as const;
+```
+
+</Framework>
+
+<Framework name="angular">
+
+```ts
+import {
+    CalendarDragPreviewDirective,
+    dragAndDrop,
+} from "@fragiola/calendar-angular/drag-and-drop";
+import { selection } from "@fragiola/calendar-angular/selection";
 
 const features = [selection(), dragAndDrop()] as const;
 ```
@@ -187,6 +251,18 @@ alias one of them:
 ```ts
 import { Calendar } from "@fragiola/calendar-vue";
 import { Calendar as DatePicker } from "@fragiola/primitives-vue";
+```
+
+</Framework>
+
+<Framework name="angular">
+
+`@fragiola/primitives-angular/calendar` (its date picker) exports `CalendarGrid`, `CalendarCell`,
+…: no name of the calendar's, whose directives end in `Directive`, so both import side by side:
+
+```ts
+import { CALENDAR } from "@fragiola/calendar-angular";
+import { CalendarCell, CalendarGrid } from "@fragiola/primitives-angular/calendar";
 ```
 
 </Framework>

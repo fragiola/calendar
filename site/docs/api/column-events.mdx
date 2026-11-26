@@ -79,6 +79,35 @@ import TimedEvent from "./timed-event.vue";
 
 </Framework>
 
+<Framework name="angular">
+
+```ts title="timed-event.ts"
+import { Component, computed } from "@angular/core";
+import { injectCalendar, injectTimeEvent } from "@fragiola/calendar-angular";
+
+// on the event's element: <div [calendarTimeEvent]="segment" appTimedEvent class="event">
+@Component({ selector: "[appTimedEvent]", template: "{{ title() }}" })
+export class TimedEvent {
+    private readonly event = injectTimeEvent();
+    private readonly model = injectCalendar().model;
+    readonly title = computed(() => {
+        const state = this.event.state();
+        return state && this.model().get("event-by", { id: state.eventId })?.title;
+    });
+}
+```
+
+```html title="events.html"
+<!-- imports: [CALENDAR, TimedEvent] -->
+<div calendarColumnEvents class="events">
+    <ng-template calendarColumnEventsItem let-segment>
+        <div [calendarTimeEvent]="segment" appTimedEvent class="event"></div>
+    </ng-template>
+</div>
+```
+
+</Framework>
+
 The title is model data: the event component reads it, the library renders no text.
 
 ## Attributes
@@ -94,6 +123,9 @@ The title is model data: the event component reads it, the library renders no te
 
 In Vue: the same props (in kebab-case in a template), and slots in place of `children`; see
 [Vue primitives](/docs/api/vue).
+
+In Angular: a directive on your element, the props as its inputs, templates in place of
+`children`; see [Angular primitives](/docs/api/angular).
 
 `ColumnEventsProps` takes the [common props](/docs/api/root#common-props) and any `div`
 attribute, and:

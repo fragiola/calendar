@@ -32,8 +32,9 @@ it then holds no lanes of its own, and a resize of the calendar measures again.
 ## The "+N more" button
 
 `Calendar.More` goes in a `Calendar.Day`. It renders only while `hiddenCount` is more than zero,
-and its children are elements or a function of its state (in Vue, its default slot's scope:
-`hiddenCount`, `hiddenOccurrenceIds`, `date`):
+and its children are elements or a function of its state (in Vue, its default slot's scope;
+in Angular, its template's, `*calendarMore="let more"`: `hiddenCount`, `hiddenOccurrenceIds`,
+`date`):
 
 <Framework name="react">
 
@@ -65,6 +66,21 @@ and its children are elements or a function of its state (in Vue, its default sl
 
 </Framework>
 
+<Framework name="angular">
+
+```html
+<div [calendarDay]="day" class="day">
+    <div calendarDayEvents class="events">
+        <ng-template calendarDayEventsItem let-segment>
+            <div [calendarSegment]="segment" appEventSegment></div>
+        </ng-template>
+    </div>
+    <button *calendarMore="let more" class="more">+{{ more.hiddenCount }} more</button>
+</div>
+```
+
+</Framework>
+
 On the keyboard it is the last item of the day's events: Down from the day's last event focuses
 it, Enter on a day whose events are all hidden focuses it, Up goes back and Escape returns to the
 day. It stays outside the roving focus (`tabindex="-1"`), so Tab never stops on it.
@@ -72,7 +88,7 @@ day. It stays outside the roving focus (`tabindex="-1"`), so Tab never stops on 
 ## Opening a popover from the more click
 
 A press on the button, Enter on it, or an assistive technology's click is the engine's
-`more-click`, which the root reports (`onMoreClick` in React, `@more-click` in Vue) with the day
+`more-click`, which the root reports (`onMoreClick` in React, `@more-click` in Vue, `(moreClick)` in Angular) with the day
 and the hidden occurrences. The popover opens from that callback.
 
 <Framework name="react">
@@ -250,6 +266,101 @@ function items() {
 
 </Framework>
 
+<Framework name="angular">
+
+With Fragiola UI's popover for Angular, the "+N more" element is the popover's trigger
+(`kitPopoverTrigger` on the `*calendarMore` button). The popover's `open` is the app's: the
+trigger's own toggle asks to change it, which the engine's event already did, so a change whose
+reason is `trigger-press` is ignored (React's `eventDetails.cancel()`) and a press on an open
+popover's "+N more" keeps it open:
+
+```ts title="busy-month.ts"
+import { Component, signal } from "@angular/core";
+import { CALENDAR, createCalendarModel } from "@fragiola/calendar-angular";
+import { MorePopover } from "./more-popover";
+
+@Component({
+    selector: "app-busy-month",
+    imports: [CALENDAR, MorePopover],
+    template: `
+        <div [calendarRoot]="model" (moreClick)="open.set($event.date)">
+            <div calendarDayGrid aria-label="Month">
+                <ng-template calendarWeeks let-week>
+                    <div [calendarWeek]="week" class="week">
+                        <ng-template calendarDays let-day>
+                            <div [calendarDay]="day" class="day">
+                                <div calendarDayEvents>
+                                    <ng-template calendarDayEventsItem let-segment>
+                                        <div [calendarSegment]="segment"></div>
+                                    </ng-template>
+                                </div>
+                                <app-more-popover
+                                    [date]="day.date"
+                                    [open]="open() === day.date"
+                                    (closed)="open.set(null)"
+                                />
+                            </div>
+                        </ng-template>
+                    </div>
+                </ng-template>
+            </div>
+        </div>
+    `,
+})
+export class BusyMonth {
+    readonly model = createCalendarModel({
+        version: 1,
+        events: [],
+        calendars: [],
+        settings: { dayMaxEvents: 2 },
+        view: { type: "month", anchorDate: "2026-11-26" },
+    });
+    // the day whose popover is open
+    readonly open = signal<string | null>(null);
+}
+```
+
+```ts title="more-popover.ts"
+import { Component, input, output } from "@angular/core";
+import { CALENDAR, injectCalendar } from "@fragiola/calendar-angular";
+import { POPOVER, type PopoverOpenChange } from "#/components/ui/popover";
+
+@Component({
+    selector: "app-more-popover",
+    imports: [CALENDAR, POPOVER],
+    host: { class: "contents" },
+    template: `
+        <ng-container kitPopover [open]="open()" (openChange)="change($event)">
+            <button *calendarMore="let more" kitPopoverTrigger class="more">+{{ more.hiddenCount }} more</button>
+            <kit-popover-content align="start">
+                <ul>
+                    @for (item of items(); track item.occurrenceId) {
+                        <li>{{ model().get("event-by", { id: item.eventId })?.title }}</li>
+                    }
+                </ul>
+            </kit-popover-content>
+        </ng-container>
+    `,
+})
+export class MorePopover {
+    readonly date = input.required<string>();
+    readonly open = input(false);
+    readonly closed = output();
+    protected readonly model = injectCalendar().model;
+
+    /** The day's events, read as the open popover renders. */
+    protected items() {
+        return this.model().get("list").days.find((day) => day.date === this.date())?.items ?? [];
+    }
+
+    protected change({ open, reason }: PopoverOpenChange) {
+        if (!open && reason !== "trigger-press") this.closed.emit();
+    }
+}
+```
+
+</Framework>
+
 The popover lists every event of the day, not only the hidden ones: `model.get("list")` gives
 any view's visible days with their occurrences. Escape and a press outside close it.
 
@@ -266,6 +377,14 @@ again with the new value, so the right day's popover opens. See
 The days' slot reads `open`, a ref: when it changes, the rows render again with the new value, so
 the right day's popover opens. See [Composition](/docs/concepts/composition) for when a slot is
 called again.
+
+</Framework>
+
+<Framework name="angular">
+
+The days' template reads `open()`, a signal of the component: each day's view is checked again
+with the template it is in, so the right day's popover opens. See
+[Composition](/docs/concepts/composition) for when a template renders again.
 
 </Framework>
 
@@ -305,6 +424,18 @@ function openDay({ date }: { date: string }) {
         <!-- the month, or the day as a Calendar.List -->
     </Calendar.Root>
 </template>
+```
+
+</Framework>
+
+<Framework name="angular">
+
+```ts
+// <div [calendarRoot]="model" (moreClick)="openDay($event)"> the month, or the day as a [calendarList] </div>
+openDay({ date }: CalendarEngineEventOf<"more-click">) {
+    this.model.run("view.set", { type: "day" });
+    this.model.run("view.go-to", { date });
+}
 ```
 
 </Framework>

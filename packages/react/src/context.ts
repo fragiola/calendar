@@ -14,6 +14,7 @@ import type {
     DayCell,
     DayGridWeek,
     ListDay,
+    PartAttributeOptions,
     TimeGridColumn,
     TimeSegment,
     TimeSlot,
@@ -52,6 +53,8 @@ export interface CalendarContextValue {
     readonly installed: ReadonlySet<string>;
     /** warns once per message and root */
     readonly warn: (message: string) => void;
+    /** how the app renders the parts (the root's `weekNumberColumn`), for every part's attributes */
+    readonly partOptions: PartAttributeOptions;
 }
 
 export const CalendarContext = React.createContext<CalendarContextValue | null>(

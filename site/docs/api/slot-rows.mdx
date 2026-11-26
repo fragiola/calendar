@@ -70,12 +70,31 @@ import { Calendar } from "@fragiola/calendar-vue";
 
 </Framework>
 
+<Framework name="angular">
+
+```html title="slots.html"
+<!-- a row's template renders again only when its slot's object changed -->
+<ng-template calendarSlotRows let-slot>
+    <div [calendarSlotRow]="slot" class="slot-row">
+        <div calendarSlotLabel class="slot-label">{{ slot.time.endsWith(":00") ? slot.time : "" }}</div>
+        <ng-template calendarSlots let-column>
+            <div [calendarSlot]="column.date" class="slot"></div>
+        </ng-template>
+    </div>
+</ng-template>
+```
+
+</Framework>
+
 It renders an hour label on the full hours and one cell per day in every row.
 
 ## Props
 
 In Vue: the same props (in kebab-case in a template), and slots in place of `children`; see
 [Vue primitives](/docs/api/vue).
+
+In Angular: a directive on your element, the props as its inputs, templates in place of
+`children`; see [Angular primitives](/docs/api/angular).
 
 `SlotRowsProps`:
 

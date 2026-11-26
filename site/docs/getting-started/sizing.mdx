@@ -70,6 +70,27 @@ stay outside it, so they stay in view.
 
 </Framework>
 
+<Framework name="angular">
+
+```html
+<div calendarTimeGrid aria-label="Week" class="grid">
+    <div calendarColumnHeaders class="headers">
+        <ng-template calendarColumnHeadersItem let-date>
+            <div [calendarColumnHeader]="date"></div>
+        </ng-template>
+    </div>
+    <div calendarAllDayRow class="all-day"><!-- … --></div>
+    <div calendarScroller #scroller class="scroller">
+        <div class="body">
+            <ng-template calendarSlotRows let-slot><!-- … --></ng-template>
+            <div calendarColumns class="columns"><!-- … --></div>
+        </div>
+    </div>
+</div>
+```
+
+</Framework>
+
 ```css
 .scroller { flex: 1; min-height: 0; overflow: auto; }
 .slot-row { height: 2rem; }
@@ -104,6 +125,28 @@ onMounted(() => scrollToMorning(scroller.value?.$el ?? null));
 function scrollToMorning(element: HTMLElement | null) {
     const eight = element?.querySelector<HTMLElement>('[data-time="08:00"]');
     if (element && eight) element.scrollTop = eight.offsetTop - 8;
+}
+```
+
+</Framework>
+
+<Framework name="angular">
+
+The scroller is your element: a `viewChild` reads it, after the first render.
+
+```ts
+import { afterNextRender, type ElementRef, viewChild } from "@angular/core";
+
+// fields and the constructor of the component
+private readonly scroller = viewChild.required<ElementRef<HTMLElement>>("scroller");
+
+constructor() {
+    afterNextRender(() => scrollToMorning(this.scroller().nativeElement));
+}
+
+function scrollToMorning(element: HTMLElement) {
+    const eight = element.querySelector<HTMLElement>('[data-time="08:00"]');
+    if (eight) element.scrollTop = eight.offsetTop - 8;
 }
 ```
 

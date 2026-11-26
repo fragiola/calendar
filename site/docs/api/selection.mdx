@@ -127,6 +127,63 @@ function create(event: CalendarEngineEventOf<"select">) {
 
 </Framework>
 
+<Framework name="angular">
+
+```ts title="select-to-create.ts"
+import { Component } from "@angular/core";
+import {
+    CALENDAR,
+    type CalendarEngineEventOf,
+    createCalendarModel,
+} from "@fragiola/calendar-angular";
+import {
+    CalendarSelectionDirective,
+    CalendarSelectionRootDirective,
+    selection,
+} from "@fragiola/calendar-angular/selection";
+
+const FEATURES = [selection()] as const;
+
+@Component({
+    selector: "app-select-to-create",
+    imports: [CALENDAR, CalendarSelectionDirective, CalendarSelectionRootDirective],
+    template: `
+        <div [calendarRoot]="model" calendarSelection (rangeSelect)="create($event)">
+            <div calendarTimeGrid aria-label="Week">
+                <div calendarColumns>
+                    <ng-template calendarColumnsItem let-column>
+                        <div [calendarColumn]="column">
+                            <div
+                                *calendarSelection="let selection"
+                                class="selection"
+                                [class.selection-pending]="selection.pending"
+                            ></div>
+                        </div>
+                    </ng-template>
+                </div>
+            </div>
+        </div>
+    `,
+})
+export class SelectToCreate {
+    readonly model = createCalendarModel(
+        { version: 1, events: [], calendars: [], view: { type: "week", anchorDate: "2026-11-26" } },
+        { features: FEATURES },
+    );
+
+    create(event: CalendarEngineEventOf<"select">) {
+        this.model.run("event.add", {
+            title: "New event",
+            start: event.range.start,
+            end: event.range.end,
+            allDay: event.range.allDay,
+        });
+    }
+}
+```
+
+</Framework>
+
 A real grid also renders its slot rows (see [Calendar.TimeGrid](/docs/api/time-grid)); here the
 selected range becomes an event. See [Selecting ranges](/docs/guides/selecting-ranges).
 
@@ -144,6 +201,9 @@ selected range becomes an event. See [Selecting ranges](/docs/guides/selecting-r
 
 In Vue: the same props (in kebab-case in a template), and slots in place of `children`; see
 [Vue primitives](/docs/api/vue).
+
+In Angular: a directive on your element, the props as its inputs, templates in place of
+`children`; see [Angular primitives](/docs/api/angular).
 
 `SelectionProps` takes the [common props](/docs/api/root#common-props) and any `div` attribute,
 and:

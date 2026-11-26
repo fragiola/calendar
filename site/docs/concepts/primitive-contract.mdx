@@ -60,6 +60,32 @@ it once and every part composes the same way.
 
 </Framework>
 
+<Framework name="angular">
+
+| attribute | what it does |
+| --- | --- |
+| the element | the directive's element is the part: its tag, attributes, classes and `style` are yours (`<section calendarDayGrid>`). Never `asChild` |
+| `exportAs` | the part's state as a signal: `#event="calendarTimeEvent"`, then `event.state()` (`undefined` until its input is set) |
+| `class` | yours, as on any element (the part sets none); a class from the state binds the state signal (`[class.dragging]="event.state()?.dragging"`), or CSS on the `data-*` attributes |
+| `style` | yours, merged under the part's structural keys, which win |
+| listeners | yours, next to the part's own |
+| any other attribute | yours, on the element (`aria-label`, `id`, `data-*`, …) |
+
+```html
+<div
+    [calendarTimeEvent]="segment"
+    #event="calendarTimeEvent"
+    class="event"
+    [class.event-dragging]="event.state()?.dragging"
+    [style.opacity]="event.state()?.grabbed ? 0.6 : 1"
+    (dblclick)="openEditor(segment.eventId)"
+>
+    {{ title }}
+</div>
+```
+
+</Framework>
+
 ## What a part guarantees
 
 - **Headless.** No CSS, no class name, no text, no `aria-label`, no date rendered as text. The
@@ -112,10 +138,28 @@ A collection part's default slot is called per entity ([Composition](/docs/conce
 
 </Framework>
 
+<Framework name="angular">
+
+A part holds the elements you write inside it; one rendered only in some states hands its state to
+its template:
+
+```html
+<button *calendarMore="let more" class="more">+{{ more.hiddenCount }} more</button>
+
+<div [calendarSegment]="segment" #chip="calendarSegment">
+    {{ chip.state()?.continuesBefore ? "… " + title : title }}
+</div>
+```
+
+A collection is a template called per entity ([Composition](/docs/concepts/composition)).
+
+</Framework>
+
 
 ## Part hooks
 
-What a part does is also a hook (a composable in Vue) with one shape, `{ state, props }`: put
+What a part does is also a hook (a composable in Vue; in Angular, the directive is the part and an
+injection function gives its `{ state }`) with one shape, `{ state, props }`: put
 `props` on any element of yours (it holds the role, the attributes, the ref, the handlers and the
 structural style).
 
@@ -151,6 +195,27 @@ const { state, props: part } = useTimeEvent(() => props.segment);
 <template>
     <article v-bind="part" class="card">{{ state.allDay ? "All day" : "" }}</article>
 </template>
+```
+
+</Framework>
+
+<Framework name="angular">
+
+The part functions give the enclosing part's `{ state }`, a signal, to a component on it or inside
+it: the directive registers the element.
+
+```ts title="event-card.ts"
+import { Component } from "@angular/core";
+import { injectTimeEvent } from "@fragiola/calendar-angular";
+
+// <article [calendarTimeEvent]="segment" appEventCard class="card"></article>
+@Component({
+    selector: "[appEventCard]",
+    template: `{{ event.state()?.allDay ? "All day" : "" }}`,
+})
+export class EventCard {
+    protected readonly event = injectTimeEvent();
+}
 ```
 
 </Framework>

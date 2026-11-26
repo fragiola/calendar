@@ -16,6 +16,7 @@ import type {
     DayCell,
     DayGridWeek,
     ListDay,
+    PartAttributeOptions,
     TimeGridColumn,
     TimeSegment,
     TimeSlot,
@@ -59,6 +60,11 @@ export interface CalendarContextValue {
     readonly installed: ReadonlySet<string>;
     /** warns once per message and root */
     readonly warn: (message: string) => void;
+    /**
+     * how the app renders the parts (the root's `week-number-column`), for every part's
+     * attributes: its fields read the root's props, so a read tracks them
+     */
+    readonly partOptions: PartAttributeOptions;
 }
 
 export const CalendarKey: InjectionKey<CalendarContextValue> =

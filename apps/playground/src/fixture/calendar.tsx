@@ -43,6 +43,7 @@ export function urlOptions(): {
     view: ViewType;
     date: string;
     rtl: boolean;
+    weekNumbers: boolean;
 } {
     const query = new URLSearchParams(window.location.search);
     const view = query.get("view") as ViewType | null;
@@ -50,6 +51,7 @@ export function urlOptions(): {
         view: view && VIEWS.includes(view) ? view : "month",
         date: query.get("date") ?? "2026-11-26",
         rtl: query.get("dir") === "rtl",
+        weekNumbers: query.get("weeks") === "1",
     };
 }
 
@@ -95,6 +97,8 @@ function Title(props: { occurrenceId: string; eventId: string }) {
 
 /** What the features add to the parts: rendered only when the fixture installs them. */
 export interface FixtureParts {
+    /** a month's rows render their week number (`?weeks=1`) */
+    weekNumbers?: boolean;
     selection?: boolean;
     drag?: boolean;
     resize?: boolean;
@@ -137,6 +141,11 @@ function Month(props: {
             count?.(`week ${week.id}`);
             return (
                 <Calendar.Week week={week}>
+                    {parts.weekNumbers ? (
+                        <Calendar.WeekNumber>
+                            {(state) => state.weekNumber}
+                        </Calendar.WeekNumber>
+                    ) : null}
                     <Calendar.Days>
                         {(day) => (
                             <Calendar.Day day={day}>
@@ -372,6 +381,7 @@ export function Fixture<const F extends CalendarFeatures = readonly []>(
                 defaultDate={options.date}
                 features={props.features}
                 now={() => NOW}
+                weekNumberColumn={options.weekNumbers}
                 onEventClick={on}
                 onDateClick={on}
                 onMoreClick={on}
@@ -379,7 +389,13 @@ export function Fixture<const F extends CalendarFeatures = readonly []>(
                 {...featureCallbacks(props.features, on)}
             >
                 <Toolbar />
-                <View parts={props.parts ?? {}} count={props.count} />
+                <View
+                    parts={{
+                        ...props.parts,
+                        weekNumbers: options.weekNumbers,
+                    }}
+                    count={props.count}
+                />
             </Calendar.Root>
             {props.children}
         </div>

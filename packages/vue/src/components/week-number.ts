@@ -21,7 +21,10 @@ export interface WeekNumberSlots extends RenderSlot<WeekNumberState> {
     default?: SlotFunction<WeekNumberState>;
 }
 
-/** The row header of a month's row (`role="rowheader"`): renders what the app gives it. */
+/**
+ * The row header of a month's row (`role="rowheader"`): renders what the app gives it. Give the
+ * root `week-number-column`, so the grid counts its column (a missing one warns once).
+ */
 export const WeekNumber: CalendarComponent<WeekNumberProps, WeekNumberSlots> =
     definePrimitive<WeekNumberProps, WeekNumberSlots>(
         "WeekNumber",
@@ -29,6 +32,11 @@ export const WeekNumber: CalendarComponent<WeekNumberProps, WeekNumberSlots> =
         (props, { attrs, slots }) => {
             const context = useCalendarContext("WeekNumber");
             const row = useRequired(WeekKey, "WeekNumber", "Calendar.Week");
+            if (!context.partOptions.weekNumberColumn) {
+                context.warn(
+                    "Calendar.WeekNumber is rendered without the root's week-number-column: the grid does not count its column (aria-colcount)",
+                );
+            }
             const part = usePart(context, "week-number", () => ({
                 weekId: row.value.week.id,
             }));

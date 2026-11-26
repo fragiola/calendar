@@ -37,6 +37,19 @@ A grid needs a name, and an icon button needs one too:
 
 </Framework>
 
+<Framework name="angular">
+
+```html
+<div calendarDayGrid aria-label="November 2026"><!-- … --></div>
+
+<button calendarPrevious aria-label="Previous month">
+    <svg lucideChevronLeft aria-hidden="true"></svg>
+</button>
+<button calendarViewButton="week">Week</button>
+```
+
+</Framework>
+
 `Calendar.ViewButton` sets `aria-pressed` for the view shown; `Calendar.Previous`, `Today` and
 `Next` are `disabled` (and carry `data-disabled`) when the model cannot run their command.
 
@@ -103,6 +116,43 @@ function timesText(start: string, end: string): string {
 
 </Framework>
 
+<Framework name="angular">
+
+```ts title="timed-event.ts"
+import { Component, computed } from "@angular/core";
+import { injectCalendar, injectTimeEvent } from "@fragiola/calendar-angular";
+
+// <div [calendarTimeEvent]="segment" appTimedEvent></div>
+@Component({
+    selector: "[appTimedEvent]",
+    host: { "[attr.aria-label]": "title() + ', ' + times()" },
+    template: `
+        <span>{{ title() }}</span>
+        <span aria-hidden="true">{{ times() }}</span>
+    `,
+})
+export class TimedEvent {
+    private readonly event = injectTimeEvent();
+    private readonly model = injectCalendar().model;
+    protected readonly title = computed(() => {
+        const state = this.event.state();
+        return state ? this.model().get("event-by", { id: state.eventId })?.title : "";
+    });
+    protected readonly times = computed(() => {
+        const state = this.event.state();
+        const occurrence = state && this.model().get("occurrence-by", { id: state.occurrenceId });
+        return occurrence ? timesText(occurrence.start, occurrence.end) : "";
+    });
+}
+
+function timesText(start: string, end: string): string {
+    return new Intl.DateTimeFormat("en-US", { hour: "numeric", minute: "2-digit" })
+        .formatRange(Date.parse(start), Date.parse(end));
+}
+```
+
+</Framework>
+
 ## Say the dates
 
 A day cell of a month shows "26"; a screen reader needs "Thursday, November 26". The date is data
@@ -132,6 +182,22 @@ write it as visually hidden text.
         <EventSegment :segment="segment" />
     </Calendar.DayEvents>
 </Calendar.Day>
+```
+
+</Framework>
+
+<Framework name="angular">
+
+```html
+<div [calendarDay]="day">
+    <span aria-hidden="true">{{ +day.date.slice(8) }}</span>
+    <span class="visually-hidden">{{ dayInWords(day.date) }}</span>
+    <div calendarDayEvents>
+        <ng-template calendarDayEventsItem let-segment>
+            <div [calendarSegment]="segment" appEventSegment></div>
+        </ng-template>
+    </div>
+</div>
 ```
 
 </Framework>
@@ -176,7 +242,7 @@ The keys follow the reading direction: in a right-to-left calendar, Left moves t
 ## Word the announcements
 
 A drag by the keyboard, or a selection grown with Shift, is announced as data: `onAnnounce`
-(`@announce` in Vue) receives what happened (`grab`, `drag-over`, `drop`, `drag-cancel`, `select-extend`) with the
+(`@announce` in Vue, `(announce)` in Angular) receives what happened (`grab`, `drag-over`, `drop`, `drag-cancel`, `select-extend`) with the
 occurrence and its times. Write the words into a live region of your own:
 
 <Framework name="react">
@@ -219,6 +285,26 @@ function announce({ announcement }: { announcement: Announcement }) {
         <!-- … -->
     </Calendar.Root>
 </template>
+```
+
+</Framework>
+
+<Framework name="angular">
+
+```ts
+import { signal } from "@angular/core";
+import type { CalendarEngineEventOf } from "@fragiola/calendar-angular";
+
+// a field and a method of the component; the template:
+// <div [calendarRoot]="model" (announce)="announce($event)">
+//     <div role="status" aria-live="polite">{{ message() }}</div> …
+// </div>
+readonly message = signal("");
+
+announce({ announcement }: CalendarEngineEventOf<"announce">) {
+    if (announcement.kind === "grab") this.message.set("Grabbed. Arrows move it, Enter drops it.");
+    if (announcement.kind === "drag-cancel") this.message.set("Left where it was.");
+}
 ```
 
 </Framework>

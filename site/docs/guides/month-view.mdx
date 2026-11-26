@@ -14,7 +14,7 @@ looks like, what an event shows and every word on screen are yours.
 ## The parts of a month
 
 `Calendar.DayGrid` is the grid (`role="grid"`). Inside it, `Calendar.Weeks` calls your function (in Vue,
-its scoped slot) once per row, `Calendar.Week` is the row, and `Calendar.Day` a day (`role="gridcell"`, the roving
+its scoped slot; in Angular, its template) once per row, `Calendar.Week` is the row, and `Calendar.Day` a day (`role="gridcell"`, the roving
 focus). A day's events go in `Calendar.DayEvents` (a list), one `Calendar.Segment` each.
 
 <Framework name="react">
@@ -214,13 +214,125 @@ const { model } = useCalendar();
 
 </Framework>
 
-The month's title, the weekday names and the day numbers are data you format: the hooks (composables in Vue) give
+<Framework name="angular">
+
+```ts title="month-calendar.ts"
+import { Component } from "@angular/core";
+import { CALENDAR, createCalendarModel } from "@fragiola/calendar-angular";
+import { EventSegment } from "./event-segment";
+import { Toolbar } from "./toolbar";
+import { Weekday } from "./weekday";
+
+@Component({
+    selector: "app-month-calendar",
+    imports: [CALENDAR, EventSegment, Toolbar, Weekday],
+    template: `
+        <div [calendarRoot]="model" class="month">
+            <div appToolbar class="toolbar"></div>
+            <div calendarDayGrid aria-label="Month" class="grid">
+                <div calendarColumnHeaders class="weekdays">
+                    <ng-template calendarColumnHeadersItem let-date>
+                        <div [calendarColumnHeader]="date" [appWeekday]="date" class="weekday"></div>
+                    </ng-template>
+                </div>
+                <ng-template calendarWeeks let-week>
+                    <div [calendarWeek]="week" class="week">
+                        <ng-template calendarDays let-day>
+                            <div [calendarDay]="day" class="day">
+                                <span aria-hidden="true">{{ +day.date.slice(8) }}</span>
+                                <div calendarDayEvents class="events">
+                                    <ng-template calendarDayEventsItem let-segment>
+                                        <div [calendarSegment]="segment" appEventSegment class="segment"></div>
+                                    </ng-template>
+                                </div>
+                            </div>
+                        </ng-template>
+                    </div>
+                </ng-template>
+            </div>
+        </div>
+    `,
+})
+export class MonthCalendar {
+    readonly model = createCalendarModel({
+        version: 1,
+        events: [
+            {
+                id: "offsite",
+                title: "Team offsite",
+                start: "2026-11-24",
+                end: "2026-11-27",
+                allDay: true,
+            },
+        ],
+        calendars: [],
+        settings: { locale: "en-US" },
+        view: { type: "month", anchorDate: "2026-11-26" },
+    });
+}
+```
+
+```ts title="toolbar.ts"
+import { Component } from "@angular/core";
+import { CALENDAR, injectCalendarTitle } from "@fragiola/calendar-angular";
+
+@Component({
+    selector: "[appToolbar]",
+    imports: [CALENDAR],
+    template: `
+        <h2>{{ text() }}</h2>
+        <button calendarToday>Today</button>
+        <button calendarPrevious aria-label="Previous month">‹</button>
+        <button calendarNext aria-label="Next month">›</button>
+    `,
+})
+export class Toolbar {
+    private readonly title = injectCalendarTitle(); // the month, as Intl parts (a signal)
+    protected text() {
+        return this.title().map((part) => part.value).join("");
+    }
+}
+```
+
+```ts title="weekday.ts"
+import { Component, input } from "@angular/core";
+import { injectDayHeader } from "@fragiola/calendar-angular";
+
+@Component({ selector: "[appWeekday]", template: "{{ text() }}" })
+export class Weekday {
+    readonly appWeekday = input.required<string>();
+    private readonly parts = injectDayHeader(() => this.appWeekday(), { weekday: "short" });
+    protected text() {
+        return this.parts().map((part) => part.value).join("");
+    }
+}
+```
+
+```ts title="event-segment.ts"
+import { Component, computed } from "@angular/core";
+import { injectCalendar, injectSegment } from "@fragiola/calendar-angular";
+
+@Component({ selector: "[appEventSegment]", template: "{{ title() }}" })
+export class EventSegment {
+    private readonly segment = injectSegment();
+    private readonly model = injectCalendar().model;
+    protected readonly title = computed(() => {
+        const state = this.segment.state();
+        return state && this.model().get("event-by", { id: state.eventId })?.title;
+    });
+}
+```
+
+</Framework>
+
+The month's title, the weekday names and the day numbers are data you format: the hooks (composables in Vue, injection functions in Angular) give
 `Intl.DateTimeFormat` parts in the calendar's locale, and you join them (or style each part).
 `Calendar.Previous`, `Calendar.Next` and `Calendar.Today` run `view.previous`, `view.next` and
 `view.today`, and carry `data-disabled` when the model cannot run them (outside `validRange`).
 
-`Calendar.Week` takes a function of each day, as above (in Vue, its `#day` slot), or elements (its
-default slot): put a `Calendar.WeekNumber` (a row header) before `Calendar.Days` when the row has more than its days.
+`Calendar.Week` takes a function of each day, as above (in Vue, its `#day` slot; in Angular, a `calendarDays` template), or elements (its
+default slot): put a `Calendar.WeekNumber` (a row header) before `Calendar.Days` when the row has more than its days,
+and give the root `weekNumberColumn` (`week-number-column` in Vue, `weekNumberColumn` in Angular) so the grid counts its column.
 
 <Framework name="react">
 
@@ -248,6 +360,19 @@ default slot): put a `Calendar.WeekNumber` (a row header) before `Calendar.Days`
         <Calendar.Day :day="day" class="day" />
     </Calendar.Days>
 </Calendar.Week>
+```
+
+</Framework>
+
+<Framework name="angular">
+
+```html
+<div [calendarWeek]="week" class="week">
+    <div calendarWeekNumber class="week-number">{{ week.weekNumber }}</div>
+    <ng-template calendarDays let-day>
+        <div [calendarDay]="day" class="day"></div>
+    </ng-template>
+</div>
 ```
 
 </Framework>
@@ -334,7 +459,7 @@ A day with hidden events renders `Calendar.More`, the "+N more" button. What it 
 
 ## Opening a day from the month
 
-A press on a day is the engine's `date-click` (`onDateClick`, `@date-click` in Vue), and a press
+A press on a day is the engine's `date-click` (`onDateClick`, `@date-click` in Vue, `(dateClick)` in Angular), and a press
 on an event its `event-click` (`onEventClick`, `@event-click`). The month example opens a day's agenda from its "+N more":
 
 <Framework name="react">
@@ -372,5 +497,17 @@ function openDay({ date }: { date: string }) {
 
 </Framework>
 
-`useCalendarView()` follows the view (in Vue, a computed), so a component renders again when the view changes, and one component can choose
+<Framework name="angular">
+
+```ts
+// <div [calendarRoot]="model" (moreClick)="openDay($event)"> the month, or the day as a list </div>
+openDay({ date }: CalendarEngineEventOf<"more-click">) {
+    this.model.run("view.set", { type: "day" });
+    this.model.run("view.go-to", { date });
+}
+```
+
+</Framework>
+
+`useCalendarView()` follows the view (in Vue, a computed; in Angular, `injectCalendarView()`, a signal), so a component renders again when the view changes, and one component can choose
 between `Calendar.DayGrid` and another view's parts.

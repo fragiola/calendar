@@ -126,6 +126,18 @@ The composable returns a computed ref, and takes a value, a ref or a getter
 
 </Framework>
 
+<Framework name="angular">
+
+```ts
+readonly parts = injectDayHeader("2026-11-26", { weekday: "long", day: "numeric" });
+// this.parts() in en-US: [{ type: "day", value: "26" }, { type: "literal", value: " " }, { type: "weekday", value: "Thursday" }]
+```
+
+The function returns a signal, and takes a value, a signal or a getter
+(`injectDayHeader(() => this.date())`), so it follows an input.
+
+</Framework>
+
 The core's date helpers (`parsePlainDate`, `addDays`, `wallClockToInstant`, `formatInstant`, …)
 are exported for your own code ([Date helpers](/docs/api/date-helpers)). A date from a date picker
 (`{ year, month, day }`, a `PlainDate`) goes to `view.go-to` as it is.

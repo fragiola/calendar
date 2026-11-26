@@ -89,6 +89,28 @@ defineProps<{ highlighted: string | null }>();
 
 </Framework>
 
+<Framework name="angular">
+
+```html title="day-columns.html"
+<!-- the template reads `highlighted()`, the component's signal: a column is checked again with it -->
+<div calendarColumns style="position: absolute; inset: 0; display: flex">
+    <ng-template calendarColumnsItem let-column>
+        <div [calendarColumn]="column" class="column">
+            <div calendarColumnEvents>
+                <ng-template calendarColumnEventsItem let-segment>
+                    <div
+                        [calendarTimeEvent]="segment"
+                        [attr.data-highlighted]="segment.eventId === highlighted() ? '' : null"
+                    ></div>
+                </ng-template>
+            </div>
+        </div>
+    </ng-template>
+</div>
+```
+
+</Framework>
+
 When `highlighted` changes every column is called again, so the highlight is always current; any
 other render of the app re-renders only the columns whose layout changed.
 
@@ -104,6 +126,9 @@ other render of the app re-renders only the columns whose layout changed.
 
 In Vue: the same props (in kebab-case in a template), and slots in place of `children`; see
 [Vue primitives](/docs/api/vue).
+
+In Angular: a directive on your element, the props as its inputs, templates in place of
+`children`; see [Angular primitives](/docs/api/angular).
 
 `ColumnsProps` takes the [common props](/docs/api/root#common-props) and any `div` attribute, and:
 

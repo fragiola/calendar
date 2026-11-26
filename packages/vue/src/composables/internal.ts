@@ -97,9 +97,12 @@ export function usePart<P extends PartName>(
     const { model } = context;
     const attributes = useCalendarValue(context, () => {
         const engine = context.engine.value;
+        const options = {
+            weekNumberColumn: context.partOptions.weekNumberColumn,
+        };
         return engine
-            ? engine.adapter.attributes(part, payload())
-            : partAttributes(model, part, payload());
+            ? engine.adapter.attributes(part, payload(), options)
+            : partAttributes(model, part, payload(), options);
     });
     const props = computed(() => {
         context.engine.value;

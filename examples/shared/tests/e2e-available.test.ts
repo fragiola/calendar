@@ -41,8 +41,8 @@ describe("a spec's examples", () => {
 describe("a complete framework", () => {
     const available = ["month"];
 
-    it("is React and Vue: each ships every example (Angular joins with its Epic)", () => {
-        expect(COMPLETE_FRAMEWORKS).toEqual(["react", "vue"]);
+    it("is every framework: each ships every example", () => {
+        expect(COMPLETE_FRAMEWORKS).toEqual(["react", "vue", "angular"]);
     });
 
     it("fails a spec whose example it lacks, instead of skipping it", () => {
@@ -52,9 +52,9 @@ describe("a complete framework", () => {
         expect(skipOrFail("react", available, ["month"])).toBeUndefined();
     });
 
-    it("skips for a framework that is not complete yet", () => {
-        expect(skipOrFail("angular", available, ["rtl"])).toBe(
-            "angular has no rtl example",
+    it("fails for Angular too, which ships every example since its Epic", () => {
+        expect(() => skipOrFail("angular", available, ["rtl"])).toThrow(
+            /angular has no rtl example, but every angular example is required/,
         );
     });
 });

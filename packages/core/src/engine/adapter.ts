@@ -8,6 +8,7 @@ import type { NoPayload } from "../commands/types";
 import type { ViewType } from "../document/calendar-document";
 import type { PartAttributes } from "../features/types";
 import type { CalendarModel } from "../model/calendar-model";
+import type { PartAttributeOptions } from "./part-attributes";
 
 /** Each part the engine knows, with what names one of its elements. */
 export interface PartPayloadMap {
@@ -112,11 +113,13 @@ export interface CalendarEngineAdapter {
      * a part's attributes: `data-calendar-part` (an `event` is named where it shows: `segment`,
      * `time-event` or `list-event`), the model's (`data-date`, `data-today`, …), the engine's
      * (`role`, `tabindex`, `data-focused`) and the features' (`data-selected`, `data-dragging`,
-     * `data-grabbed`, `data-resizing`); before an engine exists, `partAttributes` gives the same
+     * `data-grabbed`, `data-resizing`); before an engine exists, `partAttributes` gives the same.
+     * `options` say how the app renders the parts (`weekNumberColumn`: a month's week numbers)
      */
     attributes<P extends PartName>(
         part: P,
         payload: PartPayloadMap[P],
+        options?: PartAttributeOptions,
     ): PartAttributes;
     /**
      * the adapter committed a render: the engine measures (`dayMaxEvents: "auto"`) and gives focus
