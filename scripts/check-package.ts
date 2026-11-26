@@ -14,7 +14,7 @@
 //   installs the adapter's tarball only (the core tarball comes as its dependency), typechecks,
 //   builds and loads its dev server (`reactSmoke`: a Vite + React app; `vueSmoke`: a Vite + Vue
 //   app of single-file components checked by vue-tsc on TypeScript 6; their pins the examples
-//   app's, the adapter's own until it exists). A package published from its build output
+//   app's: examples/react's and examples/vue's). A package published from its build output
 //   (`publishConfig.directory`: an Angular one, which ng-packagr builds into `dist`) is packed from
 //   that directory: its packed `exports` are the repo's relative to it, each target a file of the
 //   tarball.
@@ -297,19 +297,12 @@ function adapterVersion(dir: string, name: string): string {
 }
 
 /**
- * What a smoke app needs that no adapter depends on (the Vite plugin of single-file components),
- * pinned as `../primitives` pins it, until the examples app pins it (it wins then).
- */
-const SMOKE_ONLY: Readonly<Record<string, string>> = {
-    "@vitejs/plugin-vue": "6.0.11",
-};
-
-/**
  * The version the smoke app of `framework` installs of `name`: the examples app's
- * (`examples/<framework>`) once it exists, else the adapter's own (the same pins: AGENTS.md D22).
+ * (`examples/<framework>`, which pins what an app of that framework installs: React's and Vue's
+ * exist, with the Vite plugin of single-file components), else the adapter's own (the same pins:
+ * AGENTS.md D22), for a framework whose examples app is not written yet.
  */
 function smokeVersion(framework: Framework, dir: string, name: string): string {
-    const pinned = SMOKE_ONLY[name];
     const examples = join(root, "examples", framework, "package.json");
     if (existsSync(examples)) {
         const manifest = JSON.parse(readFileSync(examples, "utf8")) as {
@@ -320,7 +313,6 @@ function smokeVersion(framework: Framework, dir: string, name: string): string {
             manifest.dependencies?.[name] ?? manifest.devDependencies?.[name];
         if (version !== undefined) return version;
     }
-    if (pinned !== undefined) return pinned;
     return adapterVersion(dir, name);
 }
 
@@ -471,7 +463,7 @@ if (container) {
 /**
  * A scratch Vite + React app in \`dir\` that depends on the React tarball only: the core tarball is
  * installed as its dependency, never declared by the app. Its versions are the examples app's
- * (the adapter's own until it exists); Vite compiles the JSX itself.
+ * (examples/react's); Vite compiles the JSX itself.
  */
 function writeReactSmokeApp(dir: string, core: string, react: string): void {
     const version = (name: string) => smokeVersion("react", "react", name);
@@ -788,7 +780,7 @@ const VUE_SMOKE_SHIM = `declare module "*.vue" {
 /**
  * A scratch Vite + Vue app in \`dir\` that depends on the Vue tarball only (the core tarball
  * stands in for its dependency). vue-tsc runs on TypeScript 6 (it does not run on TypeScript 7
- * yet), pinned by the adapter (the examples app's once it exists), with the published
+ * yet), its versions examples/vue's (`@vitejs/plugin-vue` included), with the published
  * declarations checked too (no skipLibCheck).
  */
 function writeVueSmokeApp(dir: string, core: string, vue: string): void {
