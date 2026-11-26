@@ -1,5 +1,6 @@
 import {
     expect,
+    type Frame,
     type FrameLocator,
     type Locator,
     type Page,
@@ -74,7 +75,7 @@ export async function openExample(
     await expect(stage.locator(ROOT).first()).toBeVisible();
     // the engine attaches in a layout effect: the grid's tab stop is its first write
     await expect(
-        stage.locator(`${ROOT} [tabindex="0"]`).first(),
+        stage.locator(`${ROOT} [data-calendar-part][tabindex="0"]`).first(),
     ).toBeAttached();
     return stage;
 }
@@ -200,4 +201,27 @@ export async function drag(
     await page.mouse.move(from.x + 8, from.y + 8, { steps: 4 });
     await page.mouse.move(to.x, to.y, { steps: 10 });
     await page.mouse.up();
+}
+
+/**
+ * Waits until a page (or a frame) has painted twice: every event queued before it (a pointer, a
+ * touch, a message) has been handled and its render committed. A negative check runs after it,
+ * never after a fixed delay.
+ */
+export async function settled(target: Page | Frame) {
+    await target.evaluate(
+        () =>
+            new Promise<void>((resolve) =>
+                requestAnimationFrame(() =>
+                    requestAnimationFrame(() => resolve()),
+                ),
+            ),
+    );
+}
+
+/** The frame of a hosted example (`openHosted`'s iframe). */
+export function hostedFrame(page: Page): Frame {
+    const frame = page.frames().find((one) => one !== page.mainFrame());
+    if (!frame) throw new Error("no hosted frame");
+    return frame;
 }

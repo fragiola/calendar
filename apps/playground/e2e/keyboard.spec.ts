@@ -9,7 +9,9 @@ test("month: one tab stop on today, arrows move by a day and a week", async ({
     page,
 }) => {
     await openFixture(page, "bare");
-    await expect(page.locator('[tabindex="0"]')).toHaveCount(1);
+    await expect(
+        page.locator('[data-calendar-part][tabindex="0"]'),
+    ).toHaveCount(1);
     // from the toolbar's last button, Tab enters the grid once
     await page.getByRole("button", { name: "List" }).focus();
     await page.keyboard.press("Tab");
