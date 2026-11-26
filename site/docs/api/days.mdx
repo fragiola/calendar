@@ -20,6 +20,8 @@ render a `Calendar.Day`.
 
 ## Usage
 
+<Framework name="react">
+
 ```tsx
 import { Calendar } from "@fragiola/calendar-react";
 
@@ -37,7 +39,29 @@ import { Calendar } from "@fragiola/calendar-react";
 </Calendar.AllDayRow>;
 ```
 
+</Framework>
+
+<Framework name="vue">
+
+```vue
+<Calendar.AllDayRow class="all-day">
+    <div aria-hidden="true" class="all-day-label">all-day</div>
+    <Calendar.Days v-slot="{ day }">
+        <Calendar.Day :day="day" class="all-day-cell">
+            <Calendar.DayEvents v-slot="{ segment }">
+                <Calendar.Segment :segment="segment" />
+            </Calendar.DayEvents>
+        </Calendar.Day>
+    </Calendar.Days>
+</Calendar.AllDayRow>
+```
+
+</Framework>
+
 ## Props
+
+In Vue: the same props (in kebab-case in a template), and slots in place of `children`; see
+[Vue primitives](/docs/api/vue).
 
 `DaysProps` (it renders no element, so it takes no other prop):
 

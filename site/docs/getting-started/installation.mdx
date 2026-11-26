@@ -1,22 +1,73 @@
 ---
 title: Installation
-description: Install the React package, which brings the core and re-exports it, and import each opt-in feature from its own entry.
+description: Install the React or the Vue package, which brings the core and re-exports it, and import each opt-in feature from its own entry.
 ---
 
-The React package `@fragiola/calendar-react` depends on the core `@fragiola/calendar` (at the
-exact same version) and re-exports all of it, so an app installs and imports one package. It
-needs React 19 and has no other runtime dependency.
+Each framework has one package, which depends on the core `@fragiola/calendar` (at the exact same
+version) and re-exports all of it, so an app installs and imports one package: the `Calendar.*`
+primitives, the hooks or composables, the model and every core type.
 
 ## Install the package
 
-```bash
-pnpm add @fragiola/calendar-react
-```
+<Framework name="react">
 
-`react` and `react-dom` (`^19`) are peer dependencies: your app provides them. The package ships
-ES modules only, with their type declarations.
+A React app installs `@fragiola/calendar-react`:
+
+<Tabs items={["pnpm", "npm", "yarn"]}>
+    <Tab value="pnpm">
+        ```sh
+        pnpm add @fragiola/calendar-react
+        ```
+    </Tab>
+    <Tab value="npm">
+        ```sh
+        npm install @fragiola/calendar-react
+        ```
+    </Tab>
+    <Tab value="yarn">
+        ```sh
+        yarn add @fragiola/calendar-react
+        ```
+    </Tab>
+</Tabs>
+
+`react` and `react-dom` (`^19`) are peer dependencies: your app provides them.
+
+</Framework>
+
+<Framework name="vue">
+
+A Vue app installs `@fragiola/calendar-vue`:
+
+<Tabs items={["pnpm", "npm", "yarn"]}>
+    <Tab value="pnpm">
+        ```sh
+        pnpm add @fragiola/calendar-vue
+        ```
+    </Tab>
+    <Tab value="npm">
+        ```sh
+        npm install @fragiola/calendar-vue
+        ```
+    </Tab>
+    <Tab value="yarn">
+        ```sh
+        yarn add @fragiola/calendar-vue
+        ```
+    </Tab>
+</Tabs>
+
+`vue` (`^3.5`) is the peer dependency: your app provides it. The primitives are render functions,
+so no compiler plugin is needed beyond your app's own.
+
+</Framework>
+
+Each package has no other runtime dependency, and ships ES modules only, with their type
+declarations.
 
 ## Import the parts
+
+<Framework name="react">
 
 The primitives are one namespace, `Calendar`; the hooks, the model and every core type are named
 exports of the same package:
@@ -30,11 +81,37 @@ import {
 } from "@fragiola/calendar-react";
 ```
 
+</Framework>
+
+<Framework name="vue">
+
+The primitives are one namespace, `Calendar`, and `typedCalendar<Types, typeof features>()` gives
+the same namespace typed by your registry and features (what React writes as type arguments, a
+template cannot). The composables, the model and every core type are named exports of the same
+package:
+
+```ts
+import {
+    Calendar,
+    createCalendarModel,
+    typedCalendar,
+    useCalendarTitle,
+    type CalendarEventJson,
+} from "@fragiola/calendar-vue";
+```
+
+The pages of the API reference show the React props; [Vue primitives](/docs/api/vue) maps each
+onto Vue (kebab-case props, scoped slots for children functions, listeners for callbacks,
+`v-model` for controlled values).
+
+</Framework>
+
 ## Import a feature from its entry
 
 What not every calendar needs is an opt-in feature, each on its own entry, so a calendar that
 does not drag never ships the drag code. An entry exports the feature's factory, its parts and
-its hooks:
+its hooks (composables in Vue). The entries are the same in both packages
+(`@fragiola/calendar-vue/selection`, …):
 
 | entry | factory | parts and hooks |
 | --- | --- | --- |
@@ -47,6 +124,8 @@ its hooks:
 | `@fragiola/calendar-react/recurrence` | `recurrence()` | |
 | `@fragiola/calendar-react/event-sources` | `eventSources()` | |
 
+<Framework name="react">
+
 ```tsx
 import { dragAndDrop, DragPreview } from "@fragiola/calendar-react/drag-and-drop";
 import { selection } from "@fragiola/calendar-react/selection";
@@ -54,9 +133,41 @@ import { selection } from "@fragiola/calendar-react/selection";
 const features = [selection(), dragAndDrop()] as const;
 ```
 
+</Framework>
+
+<Framework name="vue">
+
+```ts
+import { dragAndDrop, DragPreview } from "@fragiola/calendar-vue/drag-and-drop";
+import { selection } from "@fragiola/calendar-vue/selection";
+
+const features = [selection(), dragAndDrop()] as const;
+```
+
+</Framework>
+
 [Features](/docs/concepts/features) explains how a model takes them.
 
+## Without a framework
+
+The core is published on its own as `@fragiola/calendar`, for code that renders nothing: handling
+calendar JSON on a server, a script or a test that runs no framework.
+
+```sh
+pnpm add @fragiola/calendar
+```
+
+```ts
+import { createCalendarModel, type CalendarDocument } from "@fragiola/calendar";
+```
+
+An app never needs it: it comes with its framework's package. The framework-neutral snippets of
+these docs (the model, the commands, the JSON, the date helpers) import from the core; in an app,
+the same names come from its framework's package.
+
 ## Using it beside Fragiola Primitives
+
+<Framework name="react">
 
 `@fragiola/primitives-react` also exports a `Calendar`: its date picker. In a file that uses
 both, alias one of them:
@@ -66,10 +177,24 @@ import { Calendar } from "@fragiola/calendar-react";
 import { Calendar as DatePicker } from "@fragiola/primitives-react";
 ```
 
+</Framework>
+
+<Framework name="vue">
+
+`@fragiola/primitives-vue` also exports a `Calendar`: its date picker. In a file that uses both,
+alias one of them:
+
+```ts
+import { Calendar } from "@fragiola/calendar-vue";
+import { Calendar as DatePicker } from "@fragiola/primitives-vue";
+```
+
+</Framework>
+
 A date the date picker gives (`{ year, month, day }`) is the calendar's `PlainDate` too, so it
 goes to `view.go-to` with no conversion:
 
-```tsx
+```ts
 model.run("view.go-to", { date: { year: 2026, month: 11, day: 26 } });
 ```
 

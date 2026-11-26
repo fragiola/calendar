@@ -16,10 +16,17 @@ The hooks read what the calendar shows and re-render when it changes. Every hook
 A value hook re-renders only when its value changes: records and arrays are compared entry by
 entry, and the layouts keep the identity of unchanged rows.
 
+In Vue, each hook is a composable of the same name, from `@fragiola/calendar-vue` and its feature
+entries: a value composable returns a computed ref, a part composable `{ state, props }` of
+computed refs (`v-bind="props"`), and their arguments take a value, a ref or a getter
+([Vue primitives](/docs/api/vue)).
+
 ## `useCalendar`
 
 The model and the engine of the enclosing root. Pass the registry and the features as type
 arguments (a child cannot infer them through context).
+
+<Framework name="react">
 
 ```tsx
 import { useCalendar } from "@fragiola/calendar-react";
@@ -35,6 +42,33 @@ function DeleteButton({ eventId }: { eventId: string }) {
 }
 ```
 
+</Framework>
+
+<Framework name="vue">
+
+```vue title="delete-button.vue"
+<script setup lang="ts">
+import { useCalendar } from "@fragiola/calendar-vue";
+import type { features, Types } from "./calendar";
+
+defineProps<{ eventId: string }>();
+const { model } = useCalendar<Types, typeof features>();
+</script>
+
+<template>
+
+    <button
+        v-if="model.can('event.remove', { eventId })"
+        type="button"
+        @click="model.run('event.remove', { eventId })"
+    >
+        Delete
+    </button>
+</template>
+```
+
+</Framework>
+
 `UseCalendarResult<T, F>`:
 
 | field | type | description |
@@ -47,6 +81,8 @@ function DeleteButton({ eventId }: { eventId: string }) {
 A calendar ref kept by the component, which re-renders when the root it is given to mounts or
 unmounts: pass it as the root's `calendarRef` and read `current` in render or in handlers, from
 outside the root (a toolbar next to it, a menu).
+
+<Framework name="react">
 
 ```tsx
 import { Calendar, useCalendarRef } from "@fragiola/calendar-react";
@@ -64,9 +100,37 @@ function Planner() {
 }
 ```
 
+</Framework>
+
+<Framework name="vue">
+
+```vue title="planner.vue"
+<script setup lang="ts">
+import { typedCalendar, useCalendarRef } from "@fragiola/calendar-vue";
+import type { Types } from "./calendar";
+
+// a typed root takes the typed ref
+const Calendar = typedCalendar<Types>();
+// not a Vue ref: the template reads `calendar.value` too
+const calendar = useCalendarRef<Types>();
+</script>
+
+<template>
+
+    <button type="button" @click="calendar.value?.model.run('view.today', {})">
+        Today
+    </button>
+    <Calendar.Root :calendar-ref="calendar"><!-- the grid --></Calendar.Root>
+</template>
+```
+
+</Framework>
+
 ## `createCalendarRef`
 
-The same ref, created outside React (a module, a test); it does not re-render anything.
+The same ref, created outside a component (a module, a test); it does not re-render anything.
+
+<Framework name="react">
 
 ```ts
 import { createCalendarRef } from "@fragiola/calendar-react";
@@ -75,6 +139,20 @@ export const calendar = createCalendarRef<Types>();
 // <Calendar.Root calendarRef={calendar}> … then:
 calendar.current?.model.run("view.next", {});
 ```
+
+</Framework>
+
+<Framework name="vue">
+
+```ts
+import { createCalendarRef } from "@fragiola/calendar-vue";
+
+export const calendar = createCalendarRef<Types>();
+// <Calendar.Root :calendar-ref="calendar"> … then:
+calendar.value?.model.run("view.next", {});
+```
+
+</Framework>
 
 `CalendarRef<T, F>`:
 
@@ -94,6 +172,8 @@ calendar.current?.model.run("view.next", {});
 The view the root shows, re-rendering when it changes: what to render (a month, a time grid, a
 list) and the ranges for your own UI.
 
+<Framework name="react">
+
 ```tsx
 import { useCalendarView } from "@fragiola/calendar-react";
 
@@ -104,6 +184,31 @@ function View() {
     return <WeekGrid />;
 }
 ```
+
+</Framework>
+
+<Framework name="vue">
+
+```vue title="view.vue"
+<script setup lang="ts">
+import { useCalendarView } from "@fragiola/calendar-vue";
+import Agenda from "./agenda.vue";
+import MonthGrid from "./month-grid.vue";
+import WeekGrid from "./week-grid.vue";
+
+// a computed ref: the template unwraps it
+const view = useCalendarView();
+</script>
+
+<template>
+
+    <MonthGrid v-if="view.type === 'month'" />
+    <Agenda v-else-if="view.type === 'list'" />
+    <WeekGrid v-else />
+</template>
+```
+
+</Framework>
 
 `CalendarView`:
 
@@ -120,6 +225,8 @@ function View() {
 The view's title as `Intl.DateTimeFormat` range parts in the calendar's locale (`get("title-parts")`):
 a month view's month, another view's days. Pass `Intl` options to change it.
 
+<Framework name="react">
+
 ```tsx
 import { useCalendarTitle } from "@fragiola/calendar-react";
 
@@ -129,60 +236,151 @@ function Title() {
 }
 ```
 
+</Framework>
+
+<Framework name="vue">
+
+```vue title="title.vue"
+<script setup lang="ts">
+import { useCalendarTitle } from "@fragiola/calendar-vue";
+
+const parts = useCalendarTitle({ month: "long", year: "numeric" });
+</script>
+
+<template>
+
+    <h2>{{ parts.map((part) => part.value).join("") }}</h2>
+</template>
+```
+
+</Framework>
+
 ## `useDayHeader`
 
 A column's header as `Intl` parts (`get("day-header-by")`): the weekday in a month view, the
 weekday and the day in a time grid; `useDayHeader(date, format?)`.
+
+<Framework name="react">
 
 ```tsx
 const parts = useDayHeader("2026-11-26", { weekday: "short", day: "numeric" });
 // [{ type: "weekday", value: "Thu" }, { type: "literal", value: " " }, { type: "day", value: "26" }]
 ```
 
+</Framework>
+
+<Framework name="vue">
+
+```ts
+// the date and the format: values, refs or getters (() => props.date)
+const parts = useDayHeader("2026-11-26", { weekday: "short", day: "numeric" });
+// parts.value: [{ type: "weekday", value: "Thu" }, { type: "literal", value: " " }, { type: "day", value: "26" }]
+```
+
+</Framework>
+
 ## `useSlotLabel`
 
 A slot's time (`HH:mm`) as `Intl` parts (`get("slot-label-by")`), by default `{ hour: "numeric",
 minute: "2-digit" }`; `useSlotLabel(time, format?)`.
+
+<Framework name="react">
 
 ```tsx
 const parts = useSlotLabel("13:00", { hour: "numeric" });
 // "1 PM" in en-US, "13" in pt-BR
 ```
 
+</Framework>
+
+<Framework name="vue">
+
+```ts
+const parts = useSlotLabel("13:00", { hour: "numeric" });
+// parts.value: "1 PM" in en-US, "13" in pt-BR
+```
+
+</Framework>
+
 ## `useDayGrid`
 
 The day grid shown (a month, or a time grid's all-day row), with the lanes the engine measured for
 `dayMaxEvents: "auto"`; `null` in a list view. `Calendar.Weeks` reads it.
+
+<Framework name="react">
 
 ```tsx
 const grid = useDayGrid();
 const busiest = Math.max(0, ...(grid?.weeks ?? []).map((week) => week.lanes));
 ```
 
+</Framework>
+
+<Framework name="vue">
+
+```ts
+const grid = useDayGrid();
+const busiest = computed(() =>
+    Math.max(0, ...(grid.value?.weeks ?? []).map((week) => week.lanes)),
+);
+```
+
+</Framework>
+
 ## `useTimeGrid`
 
 The time grid shown (week, day and `days` views; `null` otherwise): its columns, slots and timed
 segments with their fractions. `Calendar.SlotRows` and `Calendar.Columns` read it.
+
+<Framework name="react">
 
 ```tsx
 const grid = useTimeGrid();
 const slotCount = grid?.slots.length ?? 0;
 ```
 
+</Framework>
+
+<Framework name="vue">
+
+```ts
+const grid = useTimeGrid();
+const slotCount = computed(() => grid.value?.slots.length ?? 0);
+```
+
+</Framework>
+
 ## `useListLayout`
 
 The visible days with their occurrences, empty days left out (`get("list")`, any view's days):
 `Calendar.ListDays` reads it.
+
+<Framework name="react">
 
 ```tsx
 const { days } = useListLayout();
 const count = days.reduce((sum, day) => sum + day.items.length, 0);
 ```
 
+</Framework>
+
+<Framework name="vue">
+
+```ts
+const list = useListLayout();
+const count = computed(() =>
+    list.value.days.reduce((sum, day) => sum + day.items.length, 0),
+);
+```
+
+</Framework>
+
 ## `useDay`
 
 A part hook: a day of a day grid, its state and the props of its element (`role="gridcell"`,
 `data-date`, the roving tab stop, its registration). `Calendar.Day` is built on it.
+
+<Framework name="react">
 
 ```tsx
 import { type DayCell, useDay } from "@fragiola/calendar-react";
@@ -192,6 +390,27 @@ function DayCellButton({ day }: { day: DayCell }) {
     return <td {...props} className={state.focused ? "focused" : undefined} />;
 }
 ```
+
+</Framework>
+
+<Framework name="vue">
+
+```vue title="day-cell-button.vue"
+<script setup lang="ts">
+import { type DayCell, useDay } from "@fragiola/calendar-vue";
+
+const props = defineProps<{ day: DayCell }>();
+// computed refs; `cell` holds the template ref that registers the element
+const { state, props: cell } = useDay(() => props.day);
+</script>
+
+<template>
+
+    <td v-bind="cell" :class="state.focused ? 'focused' : undefined" />
+</template>
+```
+
+</Framework>
 
 `DayState`:
 
@@ -208,9 +427,22 @@ function DayCellButton({ day }: { day: DayCell }) {
 A part hook: a slot of a time grid (`{ date, time }`), its state and props (`role="gridcell"`,
 `data-date`, `data-time`, the roving tab stop). `Calendar.Slot` is built on it.
 
+<Framework name="react">
+
 ```tsx
 const { state, props } = useSlot({ date: "2026-11-26", time: "09:30" });
 ```
+
+</Framework>
+
+<Framework name="vue">
+
+```ts
+const { state, props } = useSlot({ date: "2026-11-26", time: "09:30" });
+// <div v-bind="props" />
+```
+
+</Framework>
 
 `SlotState`:
 
@@ -229,10 +461,23 @@ A part hook: a day-grid segment inside a `Calendar.Week` or `Calendar.AllDayRow`
 props (`role="listitem"`, its ids, the roving tab stop, its place in its lane as `style`).
 `Calendar.Segment` is built on it.
 
+<Framework name="react">
+
 ```tsx
 const { state, props } = useSegment(segment);
 return <li {...props} data-kind={state.allDay ? "all-day" : "timed"} />;
 ```
+
+</Framework>
+
+<Framework name="vue">
+
+```ts
+const { state, props } = useSegment(() => segment);
+// <li v-bind="props" :data-kind="state.allDay ? 'all-day' : 'timed'" />
+```
+
+</Framework>
 
 `SegmentState` extends `EventState` with:
 
@@ -245,9 +490,21 @@ return <li {...props} data-kind={state.allDay ? "all-day" : "timed"} />;
 A part hook: a timed segment inside a `Calendar.Column`, its state and props, its position as
 percentages of the column in `style`. `Calendar.TimeEvent` is built on it.
 
+<Framework name="react">
+
 ```tsx
 const { state, props } = useTimeEvent(segment);
 ```
+
+</Framework>
+
+<Framework name="vue">
+
+```ts
+const { state, props } = useTimeEvent(() => segment);
+```
+
+</Framework>
 
 `TimeEventState` extends `EventState` with:
 
@@ -260,9 +517,21 @@ const { state, props } = useTimeEvent(segment);
 A part hook: an occurrence on a list view's day, inside a `Calendar.ListDay`, its state and props
 (`role="listitem"`, its ids, a tab stop of its own). `Calendar.ListEvent` is built on it.
 
+<Framework name="react">
+
 ```tsx
 const { state, props } = useListEvent(item);
 ```
+
+</Framework>
+
+<Framework name="vue">
+
+```ts
+const { state, props } = useListEvent(() => item);
+```
+
+</Framework>
 
 `ListEventState` extends `EventState` with:
 
@@ -307,6 +576,8 @@ The navigation buttons share `CommandButtonState`:
 From `@fragiola/calendar-react/selection`, with `selection()`: the selected range and the one
 being selected, re-rendering when either changes.
 
+<Framework name="react">
+
 ```tsx
 import { useSelection } from "@fragiola/calendar-react/selection";
 
@@ -316,6 +587,27 @@ function SelectedRange() {
     return <p>{shown ? `${shown.start} to ${shown.end}` : "Nothing selected"}</p>;
 }
 ```
+
+</Framework>
+
+<Framework name="vue">
+
+```vue title="selected-range.vue"
+<script setup lang="ts">
+import { useSelection } from "@fragiola/calendar-vue/selection";
+import { computed } from "vue";
+
+const selection = useSelection();
+const shown = computed(() => selection.value.preview ?? selection.value.range);
+</script>
+
+<template>
+
+    <p>{{ shown ? `${shown.start} to ${shown.end}` : "Nothing selected" }}</p>
+</template>
+```
+
+</Framework>
 
 `CalendarSelection`:
 
@@ -330,6 +622,8 @@ From `@fragiola/calendar-react/drag-and-drop` (or `/resize`): the occurrence bei
 resized where it would land, its times and its segments in the layout's shape; `null` for none or
 a refused target. `DragPreview` renders from it; use it for a label of the new times.
 
+<Framework name="react">
+
 ```tsx
 import { useDragPreview } from "@fragiola/calendar-react/drag-and-drop";
 
@@ -339,16 +633,48 @@ function DropTimes() {
 }
 ```
 
+</Framework>
+
+<Framework name="vue">
+
+```vue title="drop-times.vue"
+<script setup lang="ts">
+import { useDragPreview } from "@fragiola/calendar-vue/drag-and-drop";
+
+const preview = useDragPreview();
+</script>
+
+<template>
+
+    <output v-if="preview">{{ preview.start }}</output>
+</template>
+```
+
+</Framework>
+
 ## `useNowPosition`
 
 From `@fragiola/calendar-react/now-indicator`, with `nowIndicator()`: the current time's place in
 the time grid, ticked by the engine's clock (`NowPosition`: today's date, the time and its fraction
 of a column); `null` when not in view and before the engine (a server render has no "now").
 
+<Framework name="react">
+
 ```tsx
 const now = useNowPosition();
 const label = now ? `Now, ${now.time}` : null;
 ```
+
+</Framework>
+
+<Framework name="vue">
+
+```ts
+const now = useNowPosition();
+const label = computed(() => (now.value ? `Now, ${now.value.time}` : null));
+```
+
+</Framework>
 
 ## `useBusinessHours`
 
@@ -356,7 +682,20 @@ From `@fragiola/calendar-react/constraints`, with `constraints()`: the business 
 visible days (`get("business-hours-in")`) as instants and time-grid fractions
 (`BusinessHoursRange`), only `date`'s when given: `useBusinessHours(date?)`.
 
+<Framework name="react">
+
 ```tsx
 const hours = useBusinessHours("2026-11-26");
 const open = hours.length > 0;
 ```
+
+</Framework>
+
+<Framework name="vue">
+
+```ts
+const hours = useBusinessHours("2026-11-26");
+const open = computed(() => hours.value.length > 0);
+```
+
+</Framework>

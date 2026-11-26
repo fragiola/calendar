@@ -24,6 +24,8 @@ it (visually hidden if you like), as the library renders no text.
 
 ## Usage
 
+<Framework name="react">
+
 ```tsx
 import { Calendar, type DayCell } from "@fragiola/calendar-react";
 
@@ -52,12 +54,51 @@ function MonthDay({ day }: { day: DayCell }) {
 }
 ```
 
+</Framework>
+
+<Framework name="vue">
+
+```vue title="month-day.vue"
+<script setup lang="ts">
+import { Calendar, type DayCell } from "@fragiola/calendar-vue";
+import { computed } from "vue";
+
+const dayLabel = new Intl.DateTimeFormat("en-US", {
+    dateStyle: "full",
+    timeZone: "UTC",
+});
+
+const props = defineProps<{ day: DayCell }>();
+const label = computed(() => {
+    const [year, month, date] = props.day.date.split("-").map(Number);
+    return { date, full: dayLabel.format(Date.UTC(year ?? 0, (month ?? 1) - 1, date)) };
+});
+</script>
+
+<template>
+
+    <Calendar.Day :day="day" :class="day.outside ? 'day outside' : 'day'">
+        <span aria-hidden="true">{{ label.date }}</span>
+        <span class="sr-only">{{ label.full }}</span>
+        <Calendar.DayEvents v-slot="{ segment }">
+            <Calendar.Segment :segment="segment" />
+        </Calendar.DayEvents>
+        <Calendar.More v-slot="{ hiddenCount }">+{{ hiddenCount }} more</Calendar.More>
+    </Calendar.Day>
+</template>
+```
+
+</Framework>
+
 The same element can come from `useDay(day)`, which returns its state and props
 ([hooks](/docs/api/hooks)).
 
 ## Props
 
 `DayProps`; it also takes the [common props](/docs/api/root#common-props) and every `div` attribute.
+
+In Vue: the same props (in kebab-case in a template), and slots in place of `children`; see
+[Vue primitives](/docs/api/vue).
 
 | prop | type | description |
 | --- | --- | --- |

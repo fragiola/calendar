@@ -12,7 +12,25 @@ export async function openFixture(
     await page.goto(`/fixtures/${name}/?${new URLSearchParams(query)}`);
     await expect(page.locator('[data-calendar-part="root"]')).toBeVisible();
     // the engine attaches in a layout effect: the tab stop is its first write
-    await expect(page.locator('[tabindex="0"]').first()).toBeAttached();
+    await expect(
+        page.locator('[data-calendar-part][tabindex="0"]').first(),
+    ).toBeAttached();
+}
+
+/**
+ * Waits until the page has painted twice: every event queued before it (a pointer, a touch, a
+ * message) has been handled and its render committed. A negative check runs after it, not after a
+ * fixed delay.
+ */
+export async function settled(page: Page) {
+    await page.evaluate(
+        () =>
+            new Promise<void>((resolve) =>
+                requestAnimationFrame(() =>
+                    requestAnimationFrame(() => resolve()),
+                ),
+            ),
+    );
 }
 
 /** A day of a day grid (a month's day, an all-day cell). */
@@ -34,7 +52,8 @@ export const event = (scope: Page | Locator, occurrenceId: string) =>
     scope.getByRole("listitem", { name: occurrenceId, exact: true });
 
 /** The engine's events, as the fixture logs them. */
-export const log = (page: Page) => page.getByTestId("log").locator("li");
+export const log = (page: Page) =>
+    page.getByTestId("log").getByRole("listitem");
 
 /** The element that has DOM focus: its part, date, time and occurrence id. */
 export function focused(page: Page) {

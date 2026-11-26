@@ -105,10 +105,26 @@ model.get("today"); // "2026-11-26" in the display zone
 The package renders no date. A title, a day's header and a slot's label are `Intl` parts in the
 calendar's `locale`, which you join, style or replace:
 
+<Framework name="react">
+
 ```tsx
 const parts = useDayHeader("2026-11-26", { weekday: "long", day: "numeric" });
 // in en-US: [{ type: "day", value: "26" }, { type: "literal", value: " " }, { type: "weekday", value: "Thursday" }]
 ```
+
+</Framework>
+
+<Framework name="vue">
+
+```ts
+const parts = useDayHeader("2026-11-26", { weekday: "long", day: "numeric" });
+// parts.value in en-US: [{ type: "day", value: "26" }, { type: "literal", value: " " }, { type: "weekday", value: "Thursday" }]
+```
+
+The composable returns a computed ref, and takes a value, a ref or a getter
+(`useDayHeader(() => props.date)`), so it follows a prop.
+
+</Framework>
 
 The core's date helpers (`parsePlainDate`, `addDays`, `wallClockToInstant`, `formatInstant`, …)
 are exported for your own code ([Date helpers](/docs/api/date-helpers)). A date from a date picker

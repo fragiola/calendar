@@ -33,6 +33,8 @@ list views): show it from `useCalendarView()`.
 
 ## Usage
 
+<Framework name="react">
+
 ```tsx
 import { Calendar } from "@fragiola/calendar-react";
 
@@ -83,6 +85,55 @@ export function WeekGrid() {
 }
 ```
 
+</Framework>
+
+<Framework name="vue">
+
+```vue title="week-grid.vue"
+<script setup lang="ts">
+import { Calendar } from "@fragiola/calendar-vue";
+</script>
+
+<template>
+
+    <Calendar.TimeGrid aria-label="Week" class="grid">
+        <Calendar.ColumnHeaders v-slot="{ date }" class="headers">
+            <Calendar.ColumnHeader :date="date">{{ date }}</Calendar.ColumnHeader>
+        </Calendar.ColumnHeaders>
+        <Calendar.AllDayRow class="all-day">
+            <template #day="{ day }">
+                <Calendar.Day :day="day">
+                    <Calendar.DayEvents v-slot="{ segment }">
+                        <Calendar.Segment :segment="segment" />
+                    </Calendar.DayEvents>
+                </Calendar.Day>
+            </template>
+        </Calendar.AllDayRow>
+        <Calendar.Scroller class="scroller">
+            <div class="body">
+                <Calendar.SlotRows v-slot="{ slot }">
+                    <Calendar.SlotRow :slot="slot" class="slot-row">
+                        <Calendar.SlotLabel>{{ slot.time }}</Calendar.SlotLabel>
+                        <Calendar.Slots v-slot="{ column }">
+                            <Calendar.Slot :date="column.date" />
+                        </Calendar.Slots>
+                    </Calendar.SlotRow>
+                </Calendar.SlotRows>
+                <Calendar.Columns v-slot="{ column }" class="columns">
+                    <Calendar.Column :column="column">
+                        <Calendar.ColumnEvents v-slot="{ segment }">
+                            <Calendar.TimeEvent :segment="segment" />
+                        </Calendar.ColumnEvents>
+                    </Calendar.Column>
+                </Calendar.Columns>
+            </div>
+        </Calendar.Scroller>
+    </Calendar.TimeGrid>
+</template>
+```
+
+</Framework>
+
 The grid's name is yours: give it an `aria-label` (or `aria-labelledby` a title you render). The
 `body` wrapper is the containing block the columns' layer is laid over: give it
 `position: relative` and the columns `position: absolute` over the slot rows (see
@@ -98,6 +149,9 @@ The grid's name is yours: give it an `aria-label` (or `aria-labelledby` a title 
 | `role` | `grid` |
 
 ## Props
+
+In Vue: the same props (in kebab-case in a template), and slots in place of `children`; see
+[Vue primitives](/docs/api/vue).
 
 `TimeGridProps` takes the [common props](/docs/api/root#common-props) (`render`, `className`,
 `style`, `ref`) and any `div` attribute, and:

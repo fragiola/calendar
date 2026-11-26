@@ -28,6 +28,8 @@ It renders nothing in a view without a day grid.
 Children as a function are called per day (the row wraps them in `Calendar.Days`); children as
 elements let you put a corner cell first:
 
+<Framework name="react">
+
 ```tsx
 import { Calendar } from "@fragiola/calendar-react";
 import { DragPreview } from "@fragiola/calendar-react/drag-and-drop";
@@ -57,6 +59,34 @@ export function AllDay() {
 }
 ```
 
+</Framework>
+
+<Framework name="vue">
+
+```vue title="all-day.vue"
+<script setup lang="ts">
+import { Calendar } from "@fragiola/calendar-vue";
+import { DragPreview } from "@fragiola/calendar-vue/drag-and-drop";
+</script>
+
+<template>
+
+    <Calendar.AllDayRow class="all-day-row">
+        <div aria-hidden="true" class="all-day-label">all-day</div>
+        <Calendar.Days v-slot="{ day }">
+            <Calendar.Day :day="day" class="all-day-cell">
+                <Calendar.DayEvents v-slot="{ segment }">
+                    <Calendar.Segment :segment="segment">{{ segment.eventId }}</Calendar.Segment>
+                </Calendar.DayEvents>
+            </Calendar.Day>
+        </Calendar.Days>
+        <DragPreview class="preview" />
+    </Calendar.AllDayRow>
+</template>
+```
+
+</Framework>
+
 The label is `aria-hidden` here: the row's days are named by their headers. Set
 `--calendar-row-inset` to the label's width so the decorations start at the first day.
 
@@ -70,6 +100,9 @@ The label is `aria-hidden` here: the row's days are named by their headers. Set
 | `role` | `row` |
 
 ## Props
+
+In Vue: the same props (in kebab-case in a template), and slots in place of `children`; see
+[Vue primitives](/docs/api/vue).
 
 `AllDayRowProps` takes the [common props](/docs/api/root#common-props) and any `div` attribute,
 and:

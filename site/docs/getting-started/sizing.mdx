@@ -32,6 +32,8 @@ A time grid is usually taller than its box. Put its slot rows and its columns in
 nears its edges and drops its cached hit boxes when it scrolls. The header row and the all-day row
 stay outside it, so they stay in view.
 
+<Framework name="react">
+
 ```tsx
 <Calendar.TimeGrid aria-label="Week" className="grid">
     <Calendar.ColumnHeaders className="headers">
@@ -47,13 +49,38 @@ stay outside it, so they stay in view.
 </Calendar.TimeGrid>
 ```
 
+</Framework>
+
+<Framework name="vue">
+
+```vue
+<Calendar.TimeGrid aria-label="Week" class="grid">
+    <Calendar.ColumnHeaders v-slot="{ date }" class="headers">
+        <Calendar.ColumnHeader :date="date" />
+    </Calendar.ColumnHeaders>
+    <Calendar.AllDayRow class="all-day"><!-- … --></Calendar.AllDayRow>
+    <Calendar.Scroller ref="scroller" class="scroller">
+        <div class="body">
+            <Calendar.SlotRows><!-- … --></Calendar.SlotRows>
+            <Calendar.Columns class="columns"><!-- … --></Calendar.Columns>
+        </div>
+    </Calendar.Scroller>
+</Calendar.TimeGrid>
+```
+
+</Framework>
+
 ```css
 .scroller { flex: 1; min-height: 0; overflow: auto; }
 .slot-row { height: 2rem; }
 ```
 
-The scroll position is yours. To open the grid at 08:00, scroll the scroller when it mounts,
-for instance with a ref callback that finds the slot row of that time (`data-time`):
+The scroll position is yours. To open the grid at 08:00, scroll the scroller when it mounts to
+the slot row of that time (`data-time`):
+
+<Framework name="react">
+
+A ref callback receives the scroller's element:
 
 ```tsx
 function scrollToMorning(element: HTMLElement | null) {
@@ -61,6 +88,26 @@ function scrollToMorning(element: HTMLElement | null) {
     if (element && eight) element.scrollTop = eight.offsetTop - 8;
 }
 ```
+
+</Framework>
+
+<Framework name="vue">
+
+A template ref on a part is its component, and `$el` its element: read it in `onMounted`.
+
+```ts
+import { type ComponentPublicInstance, onMounted, useTemplateRef } from "vue";
+
+const scroller = useTemplateRef<ComponentPublicInstance>("scroller");
+onMounted(() => scrollToMorning(scroller.value?.$el ?? null));
+
+function scrollToMorning(element: HTMLElement | null) {
+    const eight = element?.querySelector<HTMLElement>('[data-time="08:00"]');
+    if (element && eight) element.scrollTop = eight.offsetTop - 8;
+}
+```
+
+</Framework>
 
 ## Lay the columns over the slots
 

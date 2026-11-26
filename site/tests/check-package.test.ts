@@ -10,12 +10,17 @@ import {
 
 // `pnpm check:package` packs every package and checks what would be published.
 describe("the package check", () => {
-    it("lists the React adapter with its smoke app, and fails a package that is neither the core nor listed", () => {
+    it("lists the React and Vue adapters with their smoke apps, and fails a package that is neither the core nor listed", () => {
         expect(
             ADAPTERS.map(({ dir, framework }) => ({ dir, framework })),
-        ).toEqual([{ dir: "react", framework: "react" }]);
-        expect(unlistedPackages(["core", "react"])).toEqual([]);
-        expect(unlistedPackages(["core", "react", "vue"])).toEqual(["vue"]);
+        ).toEqual([
+            { dir: "react", framework: "react" },
+            { dir: "vue", framework: "vue" },
+        ]);
+        expect(unlistedPackages(["core", "react", "vue"])).toEqual([]);
+        expect(unlistedPackages(["core", "react", "vue", "angular"])).toEqual([
+            "angular",
+        ]);
         expect(unlistedPackages(["core", "react"], [])).toEqual(["react"]);
     });
 

@@ -16,6 +16,8 @@ yours.
 `ResizeHandle` goes in a `Calendar.TimeEvent` or a `Calendar.Segment`; `edge` is `"start"` or
 `"end"`. It carries `data-edge` and sets no geometry: put it at its edge yourself.
 
+<Framework name="react">
+
 ```tsx
 import { Calendar, type Segment, type TimeSegment } from "@fragiola/calendar-react";
 import { DragPreview, ResizeHandle, resize } from "@fragiola/calendar-react/resize";
@@ -48,6 +50,53 @@ function AllDayEvent({ segment }: { segment: Segment }) {
 <DragPreview className="preview" />;
 ```
 
+</Framework>
+
+<Framework name="vue">
+
+```vue title="timed-event.vue"
+<script setup lang="ts">
+import { Calendar, type TimeSegment } from "@fragiola/calendar-vue";
+import { ResizeHandle } from "@fragiola/calendar-vue/resize";
+
+defineProps<{ segment: TimeSegment }>();
+</script>
+
+<template>
+    <Calendar.TimeEvent :segment="segment" class="event">
+        <span class="event-box"><!-- the title and times --></span>
+        <ResizeHandle edge="start" class="handle" />
+        <ResizeHandle edge="end" class="handle" />
+    </Calendar.TimeEvent>
+</template>
+```
+
+```vue title="all-day-event.vue"
+<script setup lang="ts">
+import { Calendar, type Segment } from "@fragiola/calendar-vue";
+import { ResizeHandle } from "@fragiola/calendar-vue/resize";
+
+defineProps<{ segment: Segment }>();
+</script>
+
+<template>
+    <!-- an all-day event resizes from its last day: no handle where it goes on in the next row -->
+    <Calendar.Segment :segment="segment" class="segment">
+        <span><!-- the title --></span>
+        <ResizeHandle v-if="!segment.continuesAfter" edge="end" class="segment-handle" />
+    </Calendar.Segment>
+</template>
+```
+
+```vue
+<!-- in each Calendar.Column, and in each row, as for a move -->
+<DragPreview class="preview" />
+```
+
+The model's features are `[resize()] as const`, from `@fragiola/calendar-vue/resize`.
+
+</Framework>
+
 ```css
 .handle {
     position: absolute;
@@ -74,8 +123,9 @@ A `Calendar.TimeEvent` and a `Calendar.Segment` are positioned by the layout, so
 already the containing block of what you put in them. The event being resized carries
 `data-resizing`. The handles are hidden from assistive technology: the keyboard has its own way.
 
-`DragPreview` and `useDragPreview` are exported by `@fragiola/calendar-react/resize` too, so a
-calendar that resizes without dragging imports nothing else.
+`DragPreview` and `useDragPreview` are exported by `@fragiola/calendar-react/resize` (and
+`@fragiola/calendar-vue/resize`) too, so a calendar that resizes without dragging imports nothing
+else.
 
 ## On the keyboard
 
@@ -87,7 +137,7 @@ Shift:
 
 With `dragAndDrop()`, the arrows alone still move it. Enter commits one command (an `event.resize`, or a `batch` of a
 move and a resize when both changed), Escape cancels. Each step is an announcement
-(`onAnnounce`) your live region words.
+(the root's `onAnnounce`, `@announce` in Vue) your live region words.
 
 ## What a resize may do
 
@@ -108,6 +158,6 @@ model.run("event.resize", {
   the minutes between the points, so a resize across a daylight saving change lands where the
   pointer is.
 
-A refused edge shows no preview and its release runs nothing. The root's `onEventDrop` hears a
-resize with `kind: "resize"`. With `recurrence()`, a resize of one occurrence takes a scope as a
+A refused edge shows no preview and its release runs nothing. The root's `onEventDrop` (`@event-drop`) hears
+a resize with `kind: "resize"`. With `recurrence()`, a resize of one occurrence takes a scope as a
 move does: see [Recurring events](/docs/guides/recurring-events).

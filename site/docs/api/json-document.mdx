@@ -62,7 +62,7 @@ data), `CalendarDataOf<T>` (a calendar's data) and `DataField<D>` (`data`, requi
 type allows `undefined`).
 
 ```ts
-import type { CalendarDocument } from "@fragiola/calendar-react";
+import type { CalendarDocument } from "@fragiola/calendar";
 
 type Types = {
     events: { meeting: { room: string }; reminder: undefined };
@@ -176,7 +176,7 @@ import {
     CalendarValidationError,
     createCalendarModel,
     validateCalendar,
-} from "@fragiola/calendar-react";
+} from "@fragiola/calendar";
 
 const issues = validateCalendar(untrusted);
 if (issues.length > 0) {
@@ -207,5 +207,5 @@ objects; the document is a writable copy.
 const json = model.get("calendar-json", { includeView: true });
 localStorage.setItem("calendar", JSON.stringify(json));
 
-declare const model: import("@fragiola/calendar-react").CalendarModel;
+declare const model: import("@fragiola/calendar").CalendarModel;
 ```

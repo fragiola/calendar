@@ -9,7 +9,7 @@
 // - `validateSite(site)` checks the same things in memory (the tests run it on the sources).
 
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
-import { join, relative, sep } from "node:path";
+import { dirname, join, relative, sep } from "node:path";
 
 /** v1.1 to v1.7 keep the file format: `project.json` keeps `"contract": 1`. */
 export const CONTRACT = 1;
@@ -20,6 +20,54 @@ export const CONTRACT = 1;
  * reserved `/ai` link.
  */
 export const CONTRACT_VERSION = "1.7";
+
+/**
+ * Where `www`'s contract is: `www/CONTRACT.md` beside the nearest ancestor of `from` that has one
+ * (the repository's checkout sits beside `www`, a worktree a few levels below it), or `undefined`
+ * where no `www` is checked out (CI).
+ */
+export function findWwwContract(
+    from: string = import.meta.dirname,
+): string | undefined {
+    for (let dir = from; ; dir = dirname(dir)) {
+        const file = join(dir, "www", "CONTRACT.md");
+        if (existsSync(file)) return file;
+        if (dirname(dir) === dir) return undefined;
+    }
+}
+
+/** The version a contract file states in its title (`# Site export contract, v1.7`). */
+export function contractVersionOf(source: string): string | undefined {
+    return /^# Site export contract, v(\d+\.\d+)\s*$/m.exec(source)?.[1];
+}
+
+/**
+ * The contract version to export against: `www`'s, read from its `CONTRACT.md` when it is checked
+ * out, otherwise the version this export implements (`CONTRACT_VERSION`, pinned for CI).
+ */
+export function contractVersion(file: string | undefined): {
+    version: string;
+    source: "www" | "pinned";
+} {
+    if (file === undefined || !existsSync(file)) {
+        return { version: CONTRACT_VERSION, source: "pinned" };
+    }
+    const version = contractVersionOf(readFileSync(file, "utf8"));
+    if (version === undefined) {
+        throw new Error(`${file}: no "# Site export contract, v<x.y>" title`);
+    }
+    return { version, source: "www" };
+}
+
+/** A problem when `www`'s contract is not the version this export implements. */
+export function contractVersionProblem(version: {
+    version: string;
+    source: "www" | "pinned";
+}): string | undefined {
+    return version.version === CONTRACT_VERSION
+        ? undefined
+        : `www's CONTRACT.md is v${version.version}, this export implements v${CONTRACT_VERSION} (site/contract.ts): update the export to it`;
+}
 
 /** v1.2 (§2, §3.2): lengths in characters (Unicode code points). */
 export const LIMITS = {

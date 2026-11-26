@@ -24,7 +24,7 @@ Plus `model.dispatch(input)` (`run` for untrusted JSON), `model.use(middleware)`
 `model.subscribe(listener)`. [Model](/docs/api/model) lists every key.
 
 ```ts
-import { createCalendarModel } from "@fragiola/calendar-react";
+import { createCalendarModel } from "@fragiola/calendar";
 
 const model = createCalendarModel({
     version: 1,
@@ -87,7 +87,7 @@ an error without calling `next`), **rewrite** (assign `ctx.payload`, then call `
 **observe** (call `next`, look at the result). `veto` builds the error.
 
 ```ts
-import { veto } from "@fragiola/calendar-react";
+import { veto } from "@fragiola/calendar";
 
 const stop = model.use((ctx, next) => {
     if (ctx.command === "event.remove" && ctx.meta?.source === "assistant") {

@@ -13,9 +13,11 @@ looks like, what an event shows and every word on screen are yours.
 
 ## The parts of a month
 
-`Calendar.DayGrid` is the grid (`role="grid"`). Inside it, `Calendar.Weeks` calls your function
-once per row, `Calendar.Week` is the row, and `Calendar.Day` a day (`role="gridcell"`, the roving
+`Calendar.DayGrid` is the grid (`role="grid"`). Inside it, `Calendar.Weeks` calls your function (in Vue,
+its scoped slot) once per row, `Calendar.Week` is the row, and `Calendar.Day` a day (`role="gridcell"`, the roving
 focus). A day's events go in `Calendar.DayEvents` (a list), one `Calendar.Segment` each.
+
+<Framework name="react">
 
 ```tsx
 import {
@@ -111,13 +113,116 @@ function EventSegment({ segment }: { segment: Segment }) {
 }
 ```
 
-The month's title, the weekday names and the day numbers are data you format: the hooks give
+</Framework>
+
+<Framework name="vue">
+
+```vue title="month-calendar.vue"
+<script setup lang="ts">
+import { Calendar, createCalendarModel } from "@fragiola/calendar-vue";
+import EventSegment from "./event-segment.vue";
+import Toolbar from "./toolbar.vue";
+import Weekday from "./weekday.vue";
+
+const model = createCalendarModel({
+    version: 1,
+    events: [
+        {
+            id: "offsite",
+            title: "Team offsite",
+            start: "2026-11-24",
+            end: "2026-11-27",
+            allDay: true,
+        },
+    ],
+    calendars: [],
+    settings: { locale: "en-US" },
+    view: { type: "month", anchorDate: "2026-11-26" },
+});
+</script>
+
+<template>
+    <Calendar.Root :model="model" class="month">
+        <Toolbar />
+        <Calendar.DayGrid aria-label="Month" class="grid">
+            <Calendar.ColumnHeaders v-slot="{ date }" class="weekdays">
+                <Weekday :date="date" />
+            </Calendar.ColumnHeaders>
+            <Calendar.Weeks v-slot="{ week }">
+                <Calendar.Week :week="week" class="week">
+                    <template #day="{ day }">
+                        <Calendar.Day :day="day" class="day">
+                            <span aria-hidden="true">{{ Number(day.date.slice(8)) }}</span>
+                            <Calendar.DayEvents v-slot="{ segment }" class="events">
+                                <EventSegment :segment="segment" />
+                            </Calendar.DayEvents>
+                        </Calendar.Day>
+                    </template>
+                </Calendar.Week>
+            </Calendar.Weeks>
+        </Calendar.DayGrid>
+    </Calendar.Root>
+</template>
+```
+
+```vue title="toolbar.vue"
+<script setup lang="ts">
+import { Calendar, useCalendarTitle } from "@fragiola/calendar-vue";
+
+const title = useCalendarTitle(); // the month, as Intl parts (a computed)
+</script>
+
+<template>
+    <div class="toolbar">
+        <h2>{{ title.map((part) => part.value).join("") }}</h2>
+        <Calendar.Today>Today</Calendar.Today>
+        <Calendar.Previous aria-label="Previous month">‹</Calendar.Previous>
+        <Calendar.Next aria-label="Next month">›</Calendar.Next>
+    </div>
+</template>
+```
+
+```vue title="weekday.vue"
+<script setup lang="ts">
+import { Calendar, useDayHeader } from "@fragiola/calendar-vue";
+
+const props = defineProps<{ date: string }>();
+const parts = useDayHeader(() => props.date, { weekday: "short" });
+</script>
+
+<template>
+    <Calendar.ColumnHeader :date="date" class="weekday">{{
+        parts.map((part) => part.value).join("")
+    }}</Calendar.ColumnHeader>
+</template>
+```
+
+```vue title="event-segment.vue"
+<script setup lang="ts">
+import { Calendar, type Segment, useCalendar } from "@fragiola/calendar-vue";
+
+defineProps<{ segment: Segment }>();
+const { model } = useCalendar();
+</script>
+
+<template>
+    <Calendar.Segment :segment="segment" class="segment">{{
+        model.get("event-by", { id: segment.eventId })?.title
+    }}</Calendar.Segment>
+</template>
+```
+
+</Framework>
+
+The month's title, the weekday names and the day numbers are data you format: the hooks (composables in Vue) give
 `Intl.DateTimeFormat` parts in the calendar's locale, and you join them (or style each part).
 `Calendar.Previous`, `Calendar.Next` and `Calendar.Today` run `view.previous`, `view.next` and
 `view.today`, and carry `data-disabled` when the model cannot run them (outside `validRange`).
 
-`Calendar.Week` takes a function of each day, as above, or elements: put a
-`Calendar.WeekNumber` (a row header) before `Calendar.Days` when the row has more than its days.
+`Calendar.Week` takes a function of each day, as above (in Vue, its `#day` slot), or elements (its
+default slot): put a `Calendar.WeekNumber` (a row header) before `Calendar.Days` when the row has more than its days.
+
+<Framework name="react">
 
 ```tsx
 <Calendar.Week week={week} className="week">
@@ -129,6 +234,23 @@ The month's title, the weekday names and the day numbers are data you format: th
     </Calendar.Days>
 </Calendar.Week>
 ```
+
+</Framework>
+
+<Framework name="vue">
+
+```vue
+<Calendar.Week :week="week" class="week">
+    <Calendar.WeekNumber v-slot="{ weekNumber }" class="week-number">
+        {{ weekNumber }}
+    </Calendar.WeekNumber>
+    <Calendar.Days v-slot="{ day }">
+        <Calendar.Day :day="day" class="day" />
+    </Calendar.Days>
+</Calendar.Week>
+```
+
+</Framework>
 
 The numbers follow the `weekNumbers` setting (`"locale"` or `"iso"`): see
 [Locales and week numbers](/docs/guides/locales-and-week-numbers).
@@ -212,8 +334,10 @@ A day with hidden events renders `Calendar.More`, the "+N more" button. What it 
 
 ## Opening a day from the month
 
-A press on a day is the engine's `date-click` (`onDateClick`), and a press on an event its
-`event-click` (`onEventClick`). The month example opens a day's agenda from its "+N more":
+A press on a day is the engine's `date-click` (`onDateClick`, `@date-click` in Vue), and a press
+on an event its `event-click` (`onEventClick`, `@event-click`). The month example opens a day's agenda from its "+N more":
+
+<Framework name="react">
 
 ```tsx
 <Calendar.Root
@@ -227,5 +351,26 @@ A press on a day is the engine's `date-click` (`onDateClick`), and a press on an
 </Calendar.Root>
 ```
 
-`useCalendarView()` re-renders a component when the view changes, so one component can choose
+</Framework>
+
+<Framework name="vue">
+
+```vue
+<script setup lang="ts">
+function openDay({ date }: { date: string }) {
+    model.run("view.set", { type: "day" });
+    model.run("view.go-to", { date });
+}
+</script>
+
+<template>
+    <Calendar.Root :model="model" @more-click="openDay">
+        <!-- the month, or the day as a list -->
+    </Calendar.Root>
+</template>
+```
+
+</Framework>
+
+`useCalendarView()` follows the view (in Vue, a computed), so a component renders again when the view changes, and one component can choose
 between `Calendar.DayGrid` and another view's parts.

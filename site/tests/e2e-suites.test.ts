@@ -10,7 +10,7 @@ import {
     needOf,
 } from "../../scripts/e2e-suites.ts";
 
-// the examples apps the calendar will have (React, Vue and Angular Epics); none exist yet
+// the examples apps the calendar will have (React and Vue exist; Angular comes with its Epic)
 const EXAMPLES = ["angular", "react", "vue"];
 const ALL = { playground: true, examples: EXAMPLES };
 const NONE = { playground: false, examples: [] };
@@ -87,7 +87,18 @@ describe("the E2E suites a change runs", () => {
     });
 
     it("finds the examples apps with a Playwright config, and none in a missing folder", () => {
-        expect(examplesFrameworks()).toEqual(["react"]);
+        expect(examplesFrameworks()).toEqual(["react", "vue"]);
+        // a change confined to Vue runs only examples vue, among the apps there are
+        expect(
+            e2eSuites(
+                [
+                    "packages/vue/src/components/day-grid.ts",
+                    "examples/vue/src/examples/month/index.vue",
+                    "examples/vue/src/components/ui/dialog.ts",
+                ],
+                examplesFrameworks(),
+            ),
+        ).toEqual({ playground: false, examples: ["vue"] });
         expect(examplesFrameworks(join(tmpdir(), "no-such-examples"))).toEqual(
             [],
         );

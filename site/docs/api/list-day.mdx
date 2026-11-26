@@ -17,6 +17,8 @@ the day's events. It calls its children function once per occurrence of the day,
 
 ## Usage
 
+<Framework name="react">
+
 ```tsx
 import { Calendar, type ListDay } from "@fragiola/calendar-react";
 
@@ -41,6 +43,35 @@ export function Day(props: { day: ListDay }) {
 }
 ```
 
+</Framework>
+
+<Framework name="vue">
+
+```vue title="day.vue"
+<script setup lang="ts">
+import { Calendar, type ListDay } from "@fragiola/calendar-vue";
+
+defineProps<{ day: ListDay }>();
+</script>
+
+<template>
+
+    <h3 :id="`day-${day.date}`">{{ day.date }}</h3>
+    <Calendar.ListDay
+        v-slot="{ item }"
+        :day="day"
+        :aria-labelledby="`day-${day.date}`"
+        :class="day.today ? 'events events-today' : 'events'"
+    >
+        <Calendar.ListEvent :item="item">
+            {{ item.allDay ? "All day" : "" }} {{ item.eventId }}
+        </Calendar.ListEvent>
+    </Calendar.ListDay>
+</template>
+```
+
+</Framework>
+
 ## Attributes
 
 | attribute | value |
@@ -50,6 +81,9 @@ export function Day(props: { day: ListDay }) {
 | `role` | `list` |
 
 ## Props
+
+In Vue: the same props (in kebab-case in a template), and slots in place of `children`; see
+[Vue primitives](/docs/api/vue).
 
 `ListDayProps` takes the [common props](/docs/api/root#common-props) and any `div` attribute, and:
 

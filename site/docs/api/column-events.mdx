@@ -19,6 +19,8 @@ segment of the day, usually a `Calendar.TimeEvent`.
 
 ## Usage
 
+<Framework name="react">
+
 ```tsx
 import { Calendar, type TimeSegment, useCalendar } from "@fragiola/calendar-react";
 
@@ -41,6 +43,42 @@ export function Events() {
 }
 ```
 
+</Framework>
+
+<Framework name="vue">
+
+```vue title="timed-event.vue"
+<script setup lang="ts">
+import { Calendar, type TimeSegment, useCalendar } from "@fragiola/calendar-vue";
+
+defineProps<{ segment: TimeSegment }>();
+const { model } = useCalendar();
+</script>
+
+<template>
+
+    <Calendar.TimeEvent :segment="segment" class="event">
+        {{ model.get("event-by", { id: segment.eventId })?.title }}
+    </Calendar.TimeEvent>
+</template>
+```
+
+```vue title="events.vue"
+<script setup lang="ts">
+import { Calendar } from "@fragiola/calendar-vue";
+import TimedEvent from "./timed-event.vue";
+</script>
+
+<template>
+
+    <Calendar.ColumnEvents v-slot="{ segment }" class="events">
+        <TimedEvent :segment="segment" />
+    </Calendar.ColumnEvents>
+</template>
+```
+
+</Framework>
+
 The title is model data: the event component reads it, the library renders no text.
 
 ## Attributes
@@ -53,6 +91,9 @@ The title is model data: the event component reads it, the library renders no te
 | `style` | `position: absolute; inset: 0` (structural) |
 
 ## Props
+
+In Vue: the same props (in kebab-case in a template), and slots in place of `children`; see
+[Vue primitives](/docs/api/vue).
 
 `ColumnEventsProps` takes the [common props](/docs/api/root#common-props) and any `div`
 attribute, and:

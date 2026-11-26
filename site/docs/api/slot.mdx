@@ -24,6 +24,8 @@ are yours.
 
 ## Usage
 
+<Framework name="react">
+
 ```tsx
 import { Calendar } from "@fragiola/calendar-react";
 
@@ -44,6 +46,37 @@ export function Cell(props: { date: string; time: string }) {
 }
 ```
 
+</Framework>
+
+<Framework name="vue">
+
+```vue title="cell.vue"
+<script setup lang="ts">
+import { Calendar, type SlotState } from "@fragiola/calendar-vue";
+
+defineProps<{ date: string; time: string }>();
+
+function slotClass(state: SlotState) {
+    return [
+        "slot",
+        state.selected ? "slot-selected" : "",
+        state.businessHours ? "" : "slot-closed",
+    ].join(" ");
+}
+</script>
+
+<template>
+
+    <Calendar.Slot :date="date" :aria-label="`${date} ${time}`">
+        <template #render="{ props, state }">
+            <div v-bind="props" :class="slotClass(state)" />
+        </template>
+    </Calendar.Slot>
+</template>
+```
+
+</Framework>
+
 The cell's state (`SlotState`, on the [hooks page](/docs/api/hooks)) styles it; or style
 `[data-selected]` and `[data-business-hours]` in CSS. `useSlot` gives the same props for an
 element of your own.
@@ -58,6 +91,9 @@ element of your own.
 | `role`, `tabindex` | `gridcell`, the roving focus |
 
 ## Props
+
+In Vue: the same props (in kebab-case in a template), and slots in place of `children`; see
+[Vue primitives](/docs/api/vue).
 
 `SlotProps` takes the [common props](/docs/api/root#common-props) and any `div` attribute, and:
 

@@ -14,7 +14,7 @@ import {
     addDaysInZone,
     formatInstant,
     parseDateTime,
-} from "@fragiola/calendar-react";
+} from "@fragiola/calendar";
 
 const parsed = parseDateTime("2026-10-31T09:00:00-04:00");
 if (parsed.ok) {
@@ -70,7 +70,7 @@ those first (`validateTimeZone`, `validateLocale`).
 | `lastDateOfRange(range)` | the last day a range covers (the day before `end`) |
 
 ```ts
-import { addDays, dayOfWeek, formatPlainDate } from "@fragiola/calendar-react";
+import { addDays, dayOfWeek, formatPlainDate } from "@fragiola/calendar";
 
 const thursday = { year: 2026, month: 11, day: 26 };
 dayOfWeek(thursday); // 4
@@ -120,7 +120,7 @@ Each takes `FormatOptions` (`Intl.DateTimeFormatOptions` without `timeZone`) and
 | `formatInstantParts(at, zone, locale, options)` | an instant on a zone's wall clock (an event's start) |
 
 ```ts
-import { formatDateParts } from "@fragiola/calendar-react";
+import { formatDateParts } from "@fragiola/calendar";
 
 const parts = formatDateParts({ year: 2026, month: 11, day: 26 }, "pt-BR", {
     weekday: "long",

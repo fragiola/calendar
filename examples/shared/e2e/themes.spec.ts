@@ -14,8 +14,10 @@ type ThemeName = (typeof THEMES)[number]["name"];
 /** The shapes of the week example: a slot, an event's box, the grid, a header, the all-day lane. */
 async function shapes(page: Page) {
     const nine = slot(page, "2026-11-26", "09:00");
+    // the box the example draws inside each timed event (its test id)
     const event = page
-        .locator('[data-calendar-part="time-event"] > span')
+        .locator('[data-calendar-part="time-event"]')
+        .getByTestId("event-box")
         .first();
     const header = page.locator('[data-calendar-part="column-header"]').first();
     const lane = page

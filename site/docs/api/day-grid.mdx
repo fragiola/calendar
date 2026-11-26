@@ -24,6 +24,8 @@ sets none. It renders `data-calendar-part="day-grid"`.
 
 ## Usage
 
+<Framework name="react">
+
 ```tsx
 import { Calendar } from "@fragiola/calendar-react";
 
@@ -52,6 +54,39 @@ function MonthGrid() {
 }
 ```
 
+</Framework>
+
+<Framework name="vue">
+
+```vue title="month-grid.vue"
+<script setup lang="ts">
+import { Calendar } from "@fragiola/calendar-vue";
+</script>
+
+<template>
+
+    <Calendar.DayGrid aria-label="November 2026" class="month">
+        <Calendar.ColumnHeaders v-slot="{ date }" class="weekdays">
+            <Calendar.ColumnHeader :date="date">{{ date }}</Calendar.ColumnHeader>
+        </Calendar.ColumnHeaders>
+        <Calendar.Weeks v-slot="{ week }">
+            <Calendar.Week :week="week" class="week">
+                <template #day="{ day }">
+                    <Calendar.Day :day="day" class="day">
+                        <span aria-hidden="true">{{ Number(day.date.slice(8)) }}</span>
+                        <Calendar.DayEvents v-slot="{ segment }">
+                            <Calendar.Segment :segment="segment" />
+                        </Calendar.DayEvents>
+                    </Calendar.Day>
+                </template>
+            </Calendar.Week>
+        </Calendar.Weeks>
+    </Calendar.DayGrid>
+</template>
+```
+
+</Framework>
+
 A month view shows six weeks by default (`fixedWeekCount`); give the weeks a height in your CSS
 (a grid of rows, or `flex: 1` each). See the [month view guide](/docs/guides/month-view).
 
@@ -61,6 +96,9 @@ A month view shows six weeks by default (`fixedWeekCount`); give the weeks a hei
 
 `DayGridProps`; it also takes the [common props](/docs/api/root#common-props) and every `div`
 attribute.
+
+In Vue: the same props (in kebab-case in a template), and slots in place of `children`; see
+[Vue primitives](/docs/api/vue).
 
 | prop | type | description |
 | --- | --- | --- |

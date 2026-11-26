@@ -11,6 +11,8 @@ and the words of each announcement.
 
 A grid needs a name, and an icon button needs one too:
 
+<Framework name="react">
+
 ```tsx
 <Calendar.DayGrid aria-label="November 2026">{/* … */}</Calendar.DayGrid>
 
@@ -20,6 +22,21 @@ A grid needs a name, and an icon button needs one too:
 <Calendar.ViewButton view="week">Week</Calendar.ViewButton>
 ```
 
+</Framework>
+
+<Framework name="vue">
+
+```vue
+<Calendar.DayGrid aria-label="November 2026"><!-- … --></Calendar.DayGrid>
+
+<Calendar.Previous aria-label="Previous month">
+    <ChevronLeft aria-hidden="true" />
+</Calendar.Previous>
+<Calendar.ViewButton view="week">Week</Calendar.ViewButton>
+```
+
+</Framework>
+
 `Calendar.ViewButton` sets `aria-pressed` for the view shown; `Calendar.Previous`, `Today` and
 `Next` are `disabled` (and carry `data-disabled`) when the model cannot run their command.
 
@@ -27,6 +44,8 @@ A grid needs a name, and an icon button needs one too:
 
 An event's part is a `listitem` inside its day's `list`. Its accessible name is its content, or an
 `aria-label` you give it: say what a sighted reader sees, the title and the times.
+
+<Framework name="react">
 
 ```tsx
 function TimedEvent({ segment }: { segment: TimeSegment }) {
@@ -48,11 +67,50 @@ function timesText(start: string, end: string): string {
 }
 ```
 
+</Framework>
+
+<Framework name="vue">
+
+```vue title="timed-event.vue"
+<script setup lang="ts">
+import { Calendar, type TimeSegment, useCalendar } from "@fragiola/calendar-vue";
+
+const props = defineProps<{ segment: TimeSegment }>();
+const { model } = useCalendar();
+
+function title() {
+    return model.get("event-by", { id: props.segment.eventId })?.title;
+}
+
+function times() {
+    const occurrence = model.get("occurrence-by", { id: props.segment.occurrenceId });
+    return occurrence ? timesText(occurrence.start, occurrence.end) : "";
+}
+
+function timesText(start: string, end: string): string {
+    return new Intl.DateTimeFormat("en-US", { hour: "numeric", minute: "2-digit" })
+        .formatRange(Date.parse(start), Date.parse(end));
+}
+</script>
+
+<template>
+    <Calendar.TimeEvent :segment="segment" :aria-label="`${title()}, ${times()}`">
+        <span>{{ title() }}</span>
+        <span aria-hidden="true">{{ times() }}</span>
+    </Calendar.TimeEvent>
+</template>
+```
+
+</Framework>
+
 ## Say the dates
 
 A day cell of a month shows "26"; a screen reader needs "Thursday, November 26". The date is data
-on every day, column and slot (`data-date`, and the `day.date` your children function receives):
+on every day, column and slot (`data-date`, and the `day.date` your children function or slot
+receives):
 write it as visually hidden text.
+
+<Framework name="react">
 
 ```tsx
 <Calendar.Day day={day}>
@@ -61,6 +119,22 @@ write it as visually hidden text.
     <Calendar.DayEvents>{(segment) => <EventSegment segment={segment} />}</Calendar.DayEvents>
 </Calendar.Day>
 ```
+
+</Framework>
+
+<Framework name="vue">
+
+```vue
+<Calendar.Day :day="day">
+    <span aria-hidden="true">{{ Number(day.date.slice(8)) }}</span>
+    <span class="visually-hidden">{{ dayInWords(day.date) }}</span>
+    <Calendar.DayEvents v-slot="{ segment }">
+        <EventSegment :segment="segment" />
+    </Calendar.DayEvents>
+</Calendar.Day>
+```
+
+</Framework>
 
 ```ts
 function dayInWords(date: string): string {
@@ -102,8 +176,10 @@ The keys follow the reading direction: in a right-to-left calendar, Left moves t
 ## Word the announcements
 
 A drag by the keyboard, or a selection grown with Shift, is announced as data: `onAnnounce`
-receives what happened (`grab`, `drag-over`, `drop`, `drag-cancel`, `select-extend`) with the
+(`@announce` in Vue) receives what happened (`grab`, `drag-over`, `drop`, `drag-cancel`, `select-extend`) with the
 occurrence and its times. Write the words into a live region of your own:
+
+<Framework name="react">
 
 ```tsx
 const [message, setMessage] = useState("");
@@ -119,5 +195,32 @@ const [message, setMessage] = useState("");
     {/* … */}
 </Calendar.Root>
 ```
+
+</Framework>
+
+<Framework name="vue">
+
+```vue
+<script setup lang="ts">
+import type { Announcement } from "@fragiola/calendar-vue";
+import { ref } from "vue";
+
+const message = ref("");
+
+function announce({ announcement }: { announcement: Announcement }) {
+    if (announcement.kind === "grab") message.value = "Grabbed. Arrows move it, Enter drops it.";
+    if (announcement.kind === "drag-cancel") message.value = "Left where it was.";
+}
+</script>
+
+<template>
+    <Calendar.Root :model="model" @announce="announce">
+        <div role="status" aria-live="polite">{{ message }}</div>
+        <!-- … -->
+    </Calendar.Root>
+</template>
+```
+
+</Framework>
 
 The [keyboard example](/examples/keyboard) words every announcement.

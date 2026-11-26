@@ -18,6 +18,8 @@ design) and its lines are yours.
 
 ## Usage
 
+<Framework name="react">
+
 ```tsx
 import { Calendar, type TimeSlot } from "@fragiola/calendar-react";
 
@@ -38,7 +40,35 @@ export function Row(props: { slot: TimeSlot }) {
 }
 ```
 
-A `className` function of the state draws a stronger line on the full hours.
+</Framework>
+
+<Framework name="vue">
+
+```vue title="row.vue"
+<script setup lang="ts">
+import { Calendar, type TimeSlot } from "@fragiola/calendar-vue";
+
+defineProps<{ slot: TimeSlot }>();
+</script>
+
+<template>
+
+    <Calendar.SlotRow
+        :slot="slot"
+        :class="slot.time.endsWith(':00') ? 'row row-hour' : 'row'"
+    >
+        <Calendar.SlotLabel>{{ slot.time }}</Calendar.SlotLabel>
+        <Calendar.Slots v-slot="{ column }">
+            <Calendar.Slot :date="column.date" />
+        </Calendar.Slots>
+    </Calendar.SlotRow>
+</template>
+```
+
+</Framework>
+
+The class (a `className` function of the state in React, read from the `slot` prop in Vue) draws a
+stronger line on the full hours.
 
 ## Attributes
 
@@ -49,6 +79,9 @@ A `className` function of the state draws a stronger line on the full hours.
 | `role` | `row` |
 
 ## Props
+
+In Vue: the same props (in kebab-case in a template), and slots in place of `children`; see
+[Vue primitives](/docs/api/vue).
 
 `SlotRowProps` takes the [common props](/docs/api/root#common-props) and any `div` attribute
 (but `slot`), and:

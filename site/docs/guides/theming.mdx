@@ -32,6 +32,8 @@ the examples' own convention, not the package's, so name yours as you like.
 
 The markup reads them, so switching a theme is switching an attribute on an ancestor:
 
+<Framework name="react">
+
 ```tsx
 <Calendar.Root
     model={model}
@@ -44,6 +46,23 @@ The markup reads them, so switching a theme is switching an attribute on an ance
     </Calendar.SlotRows>
 </Calendar.Root>
 ```
+
+</Framework>
+
+<Framework name="vue">
+
+```vue
+<Calendar.Root
+    :model="model"
+    class="font-(family-name:--cal-font) [--calendar-lane-size:var(--cal-lane-size)]"
+>
+    <Calendar.SlotRows v-slot="{ slot }">
+        <Calendar.SlotRow :slot="slot" class="flex h-(--cal-slot-height)" />
+    </Calendar.SlotRows>
+</Calendar.Root>
+```
+
+</Framework>
 
 Note the hand-over on the root: the theme's lane height becomes the package's
 `--calendar-lane-size`, which the day-grid segments read ([Layout](/docs/concepts/layout)).

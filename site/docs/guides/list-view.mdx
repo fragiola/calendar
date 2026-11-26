@@ -12,9 +12,12 @@ the times, the empty state and the look are yours.
 
 ## A month as an agenda
 
-`Calendar.List` holds the view; its children are elements or a function of its state, whose
-`empty` says whether the range has any event. `Calendar.ListDays` calls your function per day,
+`Calendar.List` holds the view; its children are elements or a function of its state (in Vue,
+its slot's scope), whose `empty` says whether the range has any event. `Calendar.ListDays` calls
+your function (its scoped slot) per day,
 `Calendar.ListDay` is that day's list (`role="list"`), and `Calendar.ListEvent` an item.
+
+<Framework name="react">
 
 ```tsx
 import {
@@ -99,6 +102,93 @@ function Item({ item }: { item: ListItem }) {
 }
 ```
 
+</Framework>
+
+<Framework name="vue">
+
+```vue title="agenda.vue"
+<script setup lang="ts">
+import { Calendar, createCalendarModel } from "@fragiola/calendar-vue";
+import Item from "./item.vue";
+
+/** A day in words, for its heading (the day is data: the words are yours). */
+function dayText(date: string, locale: string): string {
+    return new Intl.DateTimeFormat(locale, {
+        weekday: "long",
+        month: "long",
+        day: "numeric",
+        timeZone: "UTC",
+    }).format(Date.parse(`${date}T00:00:00Z`));
+}
+
+const model = createCalendarModel({
+    version: 1,
+    events: [],
+    calendars: [],
+    settings: { locale: "en-US" },
+    view: { type: "list", anchorDate: "2026-11-26" },
+});
+</script>
+
+<template>
+    <Calendar.Root :model="model">
+        <Calendar.List v-slot="{ empty }" class="agenda">
+            <p v-if="empty">Nothing planned this month.</p>
+            <Calendar.ListDays v-else v-slot="{ day }">
+                <section :key="day.date">
+                    <h3 :id="`day-${day.date}`">
+                        {{ dayText(day.date, model.state.settings.locale) }}
+                    </h3>
+                    <Calendar.ListDay
+                        v-slot="{ item }"
+                        :day="day"
+                        :aria-labelledby="`day-${day.date}`"
+                    >
+                        <Item :item="item" />
+                    </Calendar.ListDay>
+                </section>
+            </Calendar.ListDays>
+        </Calendar.List>
+    </Calendar.Root>
+</template>
+```
+
+```vue title="item.vue"
+<script setup lang="ts">
+import { Calendar, type ListItem, useCalendar } from "@fragiola/calendar-vue";
+
+const props = defineProps<{ item: ListItem }>();
+const { model } = useCalendar();
+
+// read in the template: it renders again when the item or the model's state changes
+function title() {
+    const occurrence = model.get("occurrence-by", { id: props.item.occurrenceId });
+    // an occurrence renamed alone has its own title (recurrence()), else its event's
+    return occurrence?.title ?? model.get("event-by", { id: props.item.eventId })?.title;
+}
+
+function time() {
+    const occurrence = model.get("occurrence-by", { id: props.item.occurrenceId });
+    if (!occurrence || props.item.allDay) return "All day";
+    const { locale, timeZone } = model.state.settings;
+    return new Intl.DateTimeFormat(locale, {
+        hour: "numeric",
+        minute: "2-digit",
+        timeZone: timeZone === "local" ? undefined : timeZone,
+    }).format(Date.parse(occurrence.start));
+}
+</script>
+
+<template>
+    <Calendar.ListEvent :item="item" class="item">
+        <span>{{ time() }}</span>
+        <span>{{ title() }}</span>
+    </Calendar.ListEvent>
+</template>
+```
+
+</Framework>
+
 A list view covers the anchor date's month, or `duration` days from it when the view has one
 (`view: { type: "list", anchorDate, duration: 14 }`); Previous and Next step by the same. Name each day's list by its heading (`aria-labelledby`): the library sets no name.
 
@@ -112,6 +202,8 @@ and the flags say whether it started before or goes on after.
 example opens a day as an agenda from its "+N more": it switches to the `day` view and renders
 `Calendar.List` instead of a time grid.
 
+<Framework name="react">
+
 ```tsx
 import { useCalendarView } from "@fragiola/calendar-react";
 
@@ -121,11 +213,32 @@ function MonthOrDay() {
 }
 ```
 
+</Framework>
+
+<Framework name="vue">
+
+```vue title="month-or-day.vue"
+<script setup lang="ts">
+import { useCalendarView } from "@fragiola/calendar-vue";
+import DayAgenda from "./day-agenda.vue";
+import MonthGrid from "./month-grid.vue";
+
+const view = useCalendarView(); // a computed
+</script>
+
+<template>
+    <DayAgenda v-if="view.type === 'day'" />
+    <MonthGrid v-else />
+</template>
+```
+
+</Framework>
+
 `DayAgenda` is the `Calendar.List` above; `MonthGrid` is the month of
 [Month view](/docs/guides/month-view).
 
 ## The keyboard
 
 Each list event is a tab stop (`tabindex="0"`), in document order: Tab goes through the agenda,
-and Enter on an event is its `event-click` (`onEventClick`). See
+and Enter on an event is its `event-click` (`onEventClick`, `@event-click`). See
 [Keyboard](/docs/guides/keyboard).

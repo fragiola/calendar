@@ -9,7 +9,7 @@ rest. The model holds them resolved (`model.state.settings`, `model.get("setting
 may change, and the controls for them, are yours.
 
 ```ts
-import { createCalendarModel } from "@fragiola/calendar-react";
+import { createCalendarModel } from "@fragiola/calendar";
 
 const model = createCalendarModel({
     version: 1,
@@ -28,8 +28,8 @@ model.run("settings.set", { settings: { hiddenDays: [0, 6] } }); // a work week
 model.run("settings.set", { settings: { firstDayOfWeek: null } }); // back to the locale's
 ```
 
-A `null` in a patch removes an optional setting, so its default applies again. With the React
-root, the `settings` prop sends the changed value as a whole patch
+A `null` in a patch removes an optional setting, so its default applies again. With the root
+(React or Vue), the `settings` prop sends the changed value as a whole patch
 ([Controlled state](/docs/guides/controlled-state)).
 
 ## Defaults
@@ -119,8 +119,8 @@ An `EventConstraint` is `"business-hours"` (which needs `businessHours`) or a no
 | `end` | `string` | the same, exclusive; open when absent |
 
 ```ts
-import { createCalendarModel } from "@fragiola/calendar-react";
-import { constraints } from "@fragiola/calendar-react/constraints";
+import { createCalendarModel } from "@fragiola/calendar";
+import { constraints } from "@fragiola/calendar/constraints";
 
 const model = createCalendarModel(
     {

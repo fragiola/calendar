@@ -4,14 +4,15 @@ description: createCalendarModel and the model it returns. Its state, its five v
 ---
 
 The model is the calendar's data, its view and its rules, in plain Node: no DOM, no framework.
-`createCalendarModel(json, options)` loads a document and returns a `CalendarModel`; a React app
-usually lets `Calendar.Root` create it, or creates it once (`useState`) and passes it as `model`.
+`createCalendarModel(json, options)` loads a document and returns a `CalendarModel`; an app
+usually lets `Calendar.Root` create it, or creates it once (`useState` in React, `setup` in Vue)
+and passes it as `model`.
 What the model never holds is yours: the screen (focus, gestures, measurements: the
 [engine](/docs/api/engine)), the app's policy (undo, persistence) and every word on screen.
 
 ```ts
-import { createCalendarModel } from "@fragiola/calendar-react";
-import { recurrence } from "@fragiola/calendar-react/recurrence";
+import { createCalendarModel } from "@fragiola/calendar";
+import { recurrence } from "@fragiola/calendar/recurrence";
 
 type Types = {
     events: { meeting: { room: string }; reminder: undefined };

@@ -17,10 +17,11 @@ package places every event and wires the keyboard; the markup, the words and the
 A registry types what the app keeps on its events: each event kind and the type of its `data`
 ([Typed data](/docs/concepts/typed-data)). The document is plain JSON, as a server would send it:
 all-day dates are `YYYY-MM-DD`, timed values RFC 3339 date-times with their offset, and `end` is
-exclusive.
+exclusive. (The types are the core's, `@fragiola/calendar`; both framework packages re-export
+them.)
 
 ```ts title="calendar-data.ts"
-import type { CalendarDocument } from "@fragiola/calendar-react";
+import type { CalendarDocument } from "@fragiola/calendar";
 
 export type Types = {
     events: { meeting: { room: string }; focus: undefined };
@@ -68,7 +69,11 @@ export const document: CalendarDocument<Types> = {
 ## Create the model and the root
 
 `createCalendarModel` loads the document (it throws a `CalendarValidationError` on an invalid
-one) and `Calendar.Root` shows it. Keep the model in state so it lives as long as the component.
+one) and `Calendar.Root` shows it.
+
+<Framework name="react">
+
+Keep the model in state so it lives as long as the component.
 
 ```tsx title="team-week.tsx"
 import { Calendar, createCalendarModel } from "@fragiola/calendar-react";
@@ -86,15 +91,46 @@ export function TeamWeek() {
 }
 ```
 
+</Framework>
+
+<Framework name="vue">
+
+`<script setup>` runs once per component, so the model created there lives as long as the
+component. `typedCalendar<Types>()` gives the `Calendar` namespace typed by your registry: the
+root takes this model (a template passes no type argument).
+
+```vue title="team-week.vue"
+<script setup lang="ts">
+import { createCalendarModel, typedCalendar } from "@fragiola/calendar-vue";
+import { document, type Types } from "./calendar-data";
+import Toolbar from "./toolbar.vue";
+import WeekGrid from "./week-grid.vue";
+
+const Calendar = typedCalendar<Types>();
+const model = createCalendarModel<Types>(document);
+</script>
+
+<template>
+    <Calendar.Root :model="model" class="calendar">
+        <Toolbar />
+        <WeekGrid />
+    </Calendar.Root>
+</template>
+```
+
+</Framework>
+
 </Step>
 <Step>
 
 ## Add the toolbar
 
-The title is data: `useCalendarTitle` gives `Intl` parts in the calendar's locale, which you
-join. `Calendar.Previous`, `Calendar.Today` and `Calendar.Next` are buttons that run
+The title is data: `useCalendarTitle` gives `Intl` parts in the calendar's locale (in Vue, a
+computed), which you join. `Calendar.Previous`, `Calendar.Today` and `Calendar.Next` are buttons that run
 `view.previous`, `view.today` and `view.next`, with `data-disabled` when the model cannot run
 them. Their labels are yours.
+
+<Framework name="react">
 
 ```tsx
 import { Calendar, useCalendarTitle } from "@fragiola/calendar-react";
@@ -112,15 +148,40 @@ function Toolbar() {
 }
 ```
 
+</Framework>
+
+<Framework name="vue">
+
+```vue title="toolbar.vue"
+<script setup lang="ts">
+import { Calendar, useCalendarTitle } from "@fragiola/calendar-vue";
+
+const title = useCalendarTitle();
+</script>
+
+<template>
+    <div class="toolbar">
+        <h2>{{ title.map((part) => part.value).join("") }}</h2>
+        <Calendar.Today>Today</Calendar.Today>
+        <Calendar.Previous aria-label="Previous week">‹</Calendar.Previous>
+        <Calendar.Next aria-label="Next week">›</Calendar.Next>
+    </div>
+</template>
+```
+
+</Framework>
+
 </Step>
 <Step>
 
 ## Assemble the time grid
 
 `Calendar.TimeGrid` is the grid (`role="grid"`). Inside it, each collection part calls your
-function per entity of the layout: `ColumnHeaders` per day, `Days` per day of the all-day row,
+function (in Vue, its default scoped slot) per entity of the layout: `ColumnHeaders` per day, `Days` per day of the all-day row,
 `SlotRows` per slot, `Slots` per day of a slot's row, `Columns` per day, `ColumnEvents` per timed
 event of that day ([Composition](/docs/concepts/composition)).
+
+<Framework name="react">
 
 ```tsx
 import {
@@ -202,6 +263,90 @@ function SlotTime({ time }: { time: string }) {
 }
 ```
 
+</Framework>
+
+<Framework name="vue">
+
+```vue title="week-grid.vue"
+<script setup lang="ts">
+import { Calendar } from "@fragiola/calendar-vue";
+import AllDayEvent from "./all-day-event.vue";
+import DayHeader from "./day-header.vue";
+import SlotTime from "./slot-time.vue";
+import TimedEvent from "./timed-event.vue";
+</script>
+
+<template>
+    <Calendar.TimeGrid aria-label="Week" class="grid">
+        <Calendar.ColumnHeaders v-slot="{ date }" class="headers">
+            <DayHeader :date="date" />
+        </Calendar.ColumnHeaders>
+        <Calendar.AllDayRow class="all-day">
+            <Calendar.Days v-slot="{ day }">
+                <Calendar.Day :day="day" class="all-day-cell">
+                    <Calendar.DayEvents v-slot="{ segment }">
+                        <AllDayEvent :segment="segment" />
+                    </Calendar.DayEvents>
+                </Calendar.Day>
+            </Calendar.Days>
+        </Calendar.AllDayRow>
+        <Calendar.Scroller class="scroller">
+            <div class="body">
+                <Calendar.SlotRows v-slot="{ slot }">
+                    <Calendar.SlotRow :slot="slot" class="slot-row">
+                        <Calendar.SlotLabel class="slot-label">
+                            <SlotTime v-if="slot.time.endsWith(':00')" :time="slot.time" />
+                        </Calendar.SlotLabel>
+                        <Calendar.Slots v-slot="{ column }">
+                            <Calendar.Slot :date="column.date" class="slot" />
+                        </Calendar.Slots>
+                    </Calendar.SlotRow>
+                </Calendar.SlotRows>
+                <Calendar.Columns v-slot="{ column }" class="columns">
+                    <Calendar.Column :column="column" class="column">
+                        <Calendar.ColumnEvents v-slot="{ segment }">
+                            <TimedEvent :segment="segment" />
+                        </Calendar.ColumnEvents>
+                    </Calendar.Column>
+                </Calendar.Columns>
+            </div>
+        </Calendar.Scroller>
+    </Calendar.TimeGrid>
+</template>
+```
+
+A composable takes a value, a ref or a getter: a getter on a prop follows the prop.
+
+```vue title="day-header.vue"
+<script setup lang="ts">
+import { Calendar, useDayHeader } from "@fragiola/calendar-vue";
+
+const props = defineProps<{ date: string }>();
+const parts = useDayHeader(() => props.date);
+</script>
+
+<template>
+    <Calendar.ColumnHeader :date="date" class="header">
+        {{ parts.map((part) => part.value).join("") }}
+    </Calendar.ColumnHeader>
+</template>
+```
+
+```vue title="slot-time.vue"
+<script setup lang="ts">
+import { useSlotLabel } from "@fragiola/calendar-vue";
+
+const props = defineProps<{ time: string }>();
+const parts = useSlotLabel(() => props.time, { hour: "numeric" });
+</script>
+
+<template>
+    <span>{{ parts.map((part) => part.value).join("") }}</span>
+</template>
+```
+
+</Framework>
+
 </Step>
 <Step>
 
@@ -210,6 +355,8 @@ function SlotTime({ time }: { time: string }) {
 An event's part places itself: a `Calendar.Segment` in its lane and over its days, a
 `Calendar.TimeEvent` at its times as percentages of its column. What it shows is yours: read the
 title from the model (an occurrence of a recurring event may have its own).
+
+<Framework name="react">
 
 ```tsx
 function useTitle(occurrenceId: string, eventId: string) {
@@ -236,6 +383,62 @@ function TimedEvent({ segment }: { segment: TimeSegment }) {
     );
 }
 ```
+
+</Framework>
+
+<Framework name="vue">
+
+```ts title="title-of.ts"
+import type { CalendarModel } from "@fragiola/calendar-vue";
+import type { Types } from "./calendar-data";
+
+export function titleOf(
+    model: CalendarModel<Types>,
+    occurrenceId: string,
+    eventId: string,
+) {
+    return (
+        model.get("occurrence-by", { id: occurrenceId })?.title ??
+        model.get("event-by", { id: eventId })?.title
+    );
+}
+```
+
+```vue title="all-day-event.vue"
+<script setup lang="ts">
+import { Calendar, type Segment, useCalendar } from "@fragiola/calendar-vue";
+import type { Types } from "./calendar-data";
+import { titleOf } from "./title-of";
+
+defineProps<{ segment: Segment }>();
+const { model } = useCalendar<Types>();
+</script>
+
+<template>
+    <Calendar.Segment :segment="segment" class="segment">
+        {{ titleOf(model, segment.occurrenceId, segment.eventId) }}
+    </Calendar.Segment>
+</template>
+```
+
+```vue title="timed-event.vue"
+<script setup lang="ts">
+import { Calendar, type TimeSegment, useCalendar } from "@fragiola/calendar-vue";
+import type { Types } from "./calendar-data";
+import { titleOf } from "./title-of";
+
+defineProps<{ segment: TimeSegment }>();
+const { model } = useCalendar<Types>();
+</script>
+
+<template>
+    <Calendar.TimeEvent :segment="segment" class="event">
+        {{ titleOf(model, segment.occurrenceId, segment.eventId) }}
+    </Calendar.TimeEvent>
+</template>
+```
+
+</Framework>
 
 </Step>
 <Step>

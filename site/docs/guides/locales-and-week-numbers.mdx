@@ -26,17 +26,19 @@ moves its columns.
 
 ## Formatting as data
 
-Three hooks give the text of the calendar as parts, in the calendar's locale, so you choose the
+Three hooks (composables in Vue) give the text of the calendar as parts, in the calendar's locale, so you choose the
 markup and the separators:
 
-| hook | gives |
+| hook or composable | gives |
 | --- | --- |
 | `useCalendarTitle(format?)` | the view's title: a month view's month, another view's days |
 | `useDayHeader(date, format?)` | a day's header: the weekday in a month, the weekday and day in a time grid |
 | `useSlotLabel(time, format?)` | a slot's time (`HH:mm`), such as 9 AM or 09:00 |
 
-Each takes optional `Intl.DateTimeFormat` options. Joining the parts' values is enough for most
+Each takes optional `Intl.DateTimeFormat` options (in Vue, each argument may also be a ref or a getter, and the result is a `ComputedRef`). Joining the parts' values is enough for most
 headers:
+
+<Framework name="react">
 
 ```tsx
 import {
@@ -59,6 +61,39 @@ function Weekday({ date }: { date: string }) {
 }
 ```
 
+</Framework>
+
+<Framework name="vue">
+
+```vue title="title.vue"
+<script setup lang="ts">
+import { useCalendarTitle } from "@fragiola/calendar-vue";
+
+const parts = useCalendarTitle();
+</script>
+
+<template>
+    <h2>{{ parts.map((part) => part.value).join("") }}</h2>
+</template>
+```
+
+```vue title="weekday.vue"
+<script setup lang="ts">
+import { Calendar, useDayHeader } from "@fragiola/calendar-vue";
+
+const props = defineProps<{ date: string }>();
+const parts = useDayHeader(() => props.date, { weekday: "short" });
+</script>
+
+<template>
+    <Calendar.ColumnHeader :date="date">{{
+        parts.map((part) => part.value).join("")
+    }}</Calendar.ColumnHeader>
+</template>
+```
+
+</Framework>
+
 In `ja-JP`, the same components show `2026年11月` and `木`; in `de-DE`, `November 2026` and `Do`.
 
 ## Week numbers
@@ -68,6 +103,8 @@ or `"iso"` (ISO 8601: weeks start on Monday, week 1 holds the year's first Thurs
 number is its middle day's. `Calendar.WeekNumber` is a row header that gives the number in its
 state:
 
+<Framework name="react">
+
 ```tsx
 <Calendar.Week week={week}>
     <Calendar.WeekNumber className="week-number">
@@ -76,6 +113,21 @@ state:
     <Calendar.Days>{(day) => <Calendar.Day day={day} />}</Calendar.Days>
 </Calendar.Week>
 ```
+
+</Framework>
+
+<Framework name="vue">
+
+```vue
+<Calendar.Week :week="week">
+    <Calendar.WeekNumber v-slot="{ weekNumber }" class="week-number">
+        {{ weekNumber }}
+    </Calendar.WeekNumber>
+    <Calendar.Days v-slot="{ day }"><Calendar.Day :day="day" /></Calendar.Days>
+</Calendar.Week>
+```
+
+</Framework>
 
 The core's `weekOfYear` and `isoWeekOfYear` compute the same numbers outside a view, as
 `{ week, year }` (the week-year).

@@ -6,13 +6,16 @@ description: You assemble the calendar from its parts and own the markup between
 There is no `<Calendar view="month" />`. You assemble a view from the parts of one namespace,
 `Calendar.*`, and everything between them is yours: a date label, a week number, a button, an
 icon, a wrapper for your grid layout. The layout says which rows, days, slots and events there
-are; **collection parts** turn it into your markup by calling a function per entity.
+are; **collection parts** turn it into your markup by calling a function per entity (in Vue,
+their default scoped slot).
 
 ## Parts and collection parts
 
 A part renders one element with its role, its attributes and its registration:
 `Calendar.DayGrid`, `Calendar.Week`, `Calendar.Day`, `Calendar.Segment`, … A collection part calls
-its children function once per entity of the layout, in order:
+its children function (React) or its default scoped slot (Vue) once per entity of the layout, in
+order; the Vue slot's scope names the entity (`v-slot="{ week }"`, `{ day, week }`, `{ segment }`,
+`{ date }`, `{ slot }`, `{ column }`, `{ day }` for `ListDays`, `{ item }` for `ListDay`):
 
 | collection part | calls your function with | inside |
 | --- | --- | --- |
@@ -29,6 +32,8 @@ its children function once per entity of the layout, in order:
 
 `Weeks`, `Days`, `SlotRows`, `Slots` and `ListDays` render no element of their own; the others
 render their container (a row, a list) around what you return.
+
+<Framework name="react">
 
 ```tsx
 <Calendar.DayGrid aria-label="Month" className="month">
@@ -56,12 +61,56 @@ render their container (a row, a list) around what you return.
 </Calendar.DayGrid>
 ```
 
+</Framework>
+
+<Framework name="vue">
+
+```vue
+<Calendar.DayGrid aria-label="Month" class="month">
+    <Calendar.ColumnHeaders v-slot="{ date }" class="weekdays">
+        <Calendar.ColumnHeader :date="date">{{ weekday(date) }}</Calendar.ColumnHeader>
+    </Calendar.ColumnHeaders>
+    <Calendar.Weeks v-slot="{ week }">
+        <Calendar.Week :week="week" class="week">
+            <Calendar.WeekNumber v-slot="{ weekNumber }">{{ weekNumber }}</Calendar.WeekNumber>
+            <Calendar.Days v-slot="{ day }">
+                <Calendar.Day :day="day" class="day">
+                    <span>{{ Number(day.date.slice(8)) }}</span>
+                    <Calendar.DayEvents v-slot="{ segment }">
+                        <EventSegment :segment="segment" />
+                    </Calendar.DayEvents>
+                    <Calendar.More v-slot="{ hiddenCount }">+{{ hiddenCount }} more</Calendar.More>
+                </Calendar.Day>
+            </Calendar.Days>
+        </Calendar.Week>
+    </Calendar.Weeks>
+</Calendar.DayGrid>
+```
+
+</Framework>
+
+<Framework name="react">
+
 `Calendar.Week` and `Calendar.AllDayRow` take either elements (a week number, then
 `Calendar.Days`, then a row's decorations) or a function called per day, the short form when the
 row holds nothing else. A part that shows state takes a function of its state as children
 (`Calendar.More`, `Calendar.Segment`, `Calendar.TimeEvent`).
 
+</Framework>
+
+<Framework name="vue">
+
+`Calendar.Week` and `Calendar.AllDayRow` take either elements in their default slot (a week
+number, then `Calendar.Days`, then a row's decorations) or a `#day="{ day, week }"` slot called
+per day, the short form when the row holds nothing else. Every other part's default slot receives
+its state (`Calendar.More`: `{ hiddenCount, hiddenOccurrenceIds, date }`; `Calendar.Segment`,
+`Calendar.TimeEvent`: the event's state).
+
+</Framework>
+
 ## When your function is called again
+
+<Framework name="react">
 
 A collection part follows React's contract. It calls your function again for an entity whose
 layout object changed, and for **every** entity when the function itself changed. The layout keeps
@@ -107,12 +156,61 @@ function Month({ highlighted }: { highlighted: string | null }) {
 }
 ```
 
-The functions nested inside a row may stay inline: they are new only when their row is called
-again. Most calendars need nothing of this; a grid that re-renders often (a live region that
+</Framework>
+
+<Framework name="vue">
+
+A collection part calls your slot again for an entity whose layout object changed, and for
+**every** entity when the slot itself changed. The layout keeps the objects of what did not change
+(a week row is the same object while nothing in it changed), so moving one event changes the rows
+or columns it left and entered, and nothing else. Vue tracks what a slot reads in each entity's own
+render, so what it shows is never stale.
+
+- A template slot that reads only its scope and reactive state is **stable** (Vue flags it so): it
+  is called again only for the rows whose layout changed, though the template that writes it
+  renders again.
+- A **dynamic slot** (under `v-for` or `v-if`) or a render function's slot is new on every render:
+  each render calls it again for every row, as an inline function in React. In a render function,
+  `$stable: true` on the slots object keeps them.
+
+```vue title="month.vue"
+<script setup lang="ts">
+import { Calendar } from "@fragiola/calendar-vue";
+
+// a stable slot: called again for a row whose layout changed, or that reads `highlighted` when it changes
+defineProps<{ highlighted: string | null }>();
+</script>
+
+<template>
+    <Calendar.DayGrid aria-label="Month">
+        <Calendar.Weeks v-slot="{ week }">
+            <Calendar.Week :week="week" class="week">
+                <template #day="{ day }">
+                    <Calendar.Day :day="day" class="day">
+                        <Calendar.DayEvents v-slot="{ segment }">
+                            <Calendar.Segment
+                                :segment="segment"
+                                :data-highlighted="segment.eventId === highlighted ? '' : undefined"
+                            />
+                        </Calendar.DayEvents>
+                    </Calendar.Day>
+                </template>
+            </Calendar.Week>
+        </Calendar.Weeks>
+    </Calendar.DayGrid>
+</template>
+```
+
+</Framework>
+
+The functions (or slots) nested inside a row may stay inline: they are new only when their row
+is called again. Most calendars need nothing of this; a grid that re-renders often (a live region that
 changes on every key, a form beside the calendar) does. [Performance](/docs/guides/performance)
 measures it.
 
 ## Swap the element
+
+<Framework name="react">
 
 Every part renders a default element (a `div`, a `button` for the navigation buttons and
 `Calendar.More`). `render` replaces it, as an element whose props are merged with the part's, or
@@ -128,11 +226,35 @@ as a function of the props and the part's state. Never `asChild`.
 </Calendar.Next>
 ```
 
+</Framework>
+
+<Framework name="vue">
+
+Every part renders a default element (a `div`, a `button` for the navigation buttons and
+`Calendar.More`). `as` replaces it with another tag or a component, which receives the part's
+props merged; the `#render="{ props, state, children }"` scoped slot replaces it with your own
+element (`v-bind="props"`), when it depends on the part's state. Never `asChild`.
+
+```vue
+<Calendar.ListDay v-slot="{ item }" :day="day" as="ol">
+    <Calendar.ListEvent :item="item" as="li">{{ title(item) }}</Calendar.ListEvent>
+</Calendar.ListDay>
+
+<Calendar.Next>
+    <template #render="{ props, state }">
+        <IconButton v-bind="props" :disabled="state.disabled">Next</IconButton>
+    </template>
+</Calendar.Next>
+```
+
+</Framework>
+
 [The primitive contract](/docs/concepts/primitive-contract) says what every part accepts.
 
 ## Hooks for your own parts
 
-A component you write inside a part reads the calendar through hooks: `useCalendar` (the model
+A component you write inside a part reads the calendar through hooks (composables in Vue, which
+return computed refs): `useCalendar` (the model
 and the engine), `useCalendarView`, `useCalendarTitle`, `useDayHeader`, and the part hooks
 (`useDay`, `useSegment`, `useTimeEvent`, …) that give a part's state and props to spread on an
 element of yours ([Hooks](/docs/api/hooks)).

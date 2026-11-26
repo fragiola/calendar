@@ -16,10 +16,13 @@ import { parseArgs } from "node:util";
 import {
     createDevProxy,
     DEV_PORT,
+    exitCodeOf,
     freePort,
+    parsePort,
     type Upstream,
 } from "./dev-proxy.ts";
 import {
+    baseProblem,
     embedBuilds,
     frameworksOf,
     normalizeBase,
@@ -34,7 +37,16 @@ const { values } = parseArgs({
     },
 });
 const base = normalizeBase(values.base);
-const port = Number(values.port);
+const port = parsePort(values.port);
+const problem =
+    baseProblem(base, project.slug) ??
+    (port === undefined
+        ? `--port ${values.port}: an integer from 1 to 65535`
+        : undefined);
+if (problem !== undefined || port === undefined) {
+    console.error(`site:dev: ${problem}`);
+    process.exit(1);
+}
 
 const children: ChildProcess[] = [];
 const upstreams: Upstream[] = [];
@@ -68,7 +80,8 @@ for (const embed of embedBuilds(frameworksOf(project), base, "")) {
         },
     });
     // one embed gone is the whole dev site broken: stop the others too
-    child.on("exit", (code) => stop(code ?? 0));
+    // (a dev server killed by a signal is a failure: a non-zero exit)
+    child.on("exit", (code, signal) => stop(exitCodeOf(code, signal)));
     children.push(child);
     upstreams.push(upstream);
 }

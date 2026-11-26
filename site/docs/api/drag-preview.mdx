@@ -23,6 +23,8 @@ times it may show, are yours.
 
 ## Usage
 
+<Framework name="react">
+
 ```tsx
 import { Calendar } from "@fragiola/calendar-react";
 import { DragPreview } from "@fragiola/calendar-react/drag-and-drop";
@@ -45,6 +47,33 @@ export function Previewed() {
 }
 ```
 
+</Framework>
+
+<Framework name="vue">
+
+```vue title="previewed.vue"
+<script setup lang="ts">
+import { Calendar } from "@fragiola/calendar-vue";
+import { DragPreview } from "@fragiola/calendar-vue/drag-and-drop";
+</script>
+
+<template>
+
+    <Calendar.Columns v-slot="{ column }">
+        <Calendar.Column :column="column">
+            <Calendar.ColumnEvents v-slot="{ segment }">
+                <Calendar.TimeEvent :segment="segment" />
+            </Calendar.ColumnEvents>
+            <DragPreview v-slot="{ preview }" class="preview">
+                {{ preview.allDay ? "All day" : preview.start }}
+            </DragPreview>
+        </Calendar.Column>
+    </Calendar.Columns>
+</template>
+```
+
+</Framework>
+
 Render one in every column and in the rows (the all-day row, a month's weeks): each shows the
 preview's part in its own place. `useDragPreview` (on the [hooks page](/docs/api/hooks)) gives the
 preview itself.
@@ -60,6 +89,9 @@ preview itself.
 | `style` | positioned as the event in a column, over its days in a row (structural) |
 
 ## Props
+
+In Vue: the same props (in kebab-case in a template), and slots in place of `children`; see
+[Vue primitives](/docs/api/vue).
 
 `DragPreviewProps` takes the [common props](/docs/api/root#common-props) and any `div`
 attribute, and:

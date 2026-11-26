@@ -18,6 +18,8 @@ It renders `data-calendar-part="previous"` on a `button` with `type="button"`.
 
 ## Usage
 
+<Framework name="react">
+
 ```tsx
 import { Calendar } from "@fragiola/calendar-react";
 import { ChevronLeft } from "lucide-react";
@@ -28,6 +30,26 @@ import { ChevronLeft } from "lucide-react";
 </Calendar.Previous>
 ```
 
+</Framework>
+
+<Framework name="vue">
+
+```vue
+<script setup lang="ts">
+import { Calendar } from "@fragiola/calendar-vue";
+import { ChevronLeft } from "@lucide/vue";
+</script>
+
+<template>
+    <!-- inside Calendar.Root -->
+    <Calendar.Previous aria-label="Previous month" class="icon-button">
+        <ChevronLeft aria-hidden="true" />
+    </Calendar.Previous>
+</template>
+```
+
+</Framework>
+
 An icon-only button needs its accessible name: the library sets none, so `aria-label` (or text)
 is yours. A right-to-left calendar flips the icon in your CSS, not the command.
 
@@ -35,6 +57,9 @@ is yours. A right-to-left calendar flips the icon in your CSS, not the command.
 
 `PreviousProps`; it also takes the [common props](/docs/api/root#common-props) and every `button`
 attribute.
+
+In Vue: the same props (in kebab-case in a template), and slots in place of `children`; see
+[Vue primitives](/docs/api/vue).
 
 | prop | type | description |
 | --- | --- | --- |

@@ -6,7 +6,14 @@ import { createServer, type Server } from "node:http";
 import { connect, type Socket } from "node:net";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { createDevProxy, DEV_PORT, freePort, routeOf } from "../dev-proxy.ts";
+import {
+    createDevProxy,
+    DEV_PORT,
+    exitCodeOf,
+    freePort,
+    parsePort,
+    routeOf,
+} from "../dev-proxy.ts";
 
 // `site:dev` serves every framework's embed on one port: a proxy in front of one dev server per
 // framework, routing by `<base>/embed/<framework>/`, hot-reload WebSockets included.
@@ -168,5 +175,33 @@ describe("site:dev", () => {
                 "withSourceCondition(defaultClientConditions)",
             );
         }
+    });
+});
+
+describe("site:dev's arguments and exit", () => {
+    it("takes a port from 1 to 65535 only", () => {
+        expect(parsePort("5192")).toBe(5192);
+        expect(parsePort("1")).toBe(1);
+        expect(parsePort("65535")).toBe(65535);
+        for (const bad of [
+            "",
+            "0",
+            "65536",
+            "51.9",
+            "-1",
+            "abc",
+            "5192x",
+            " 80",
+        ]) {
+            expect(parsePort(bad)).toBeUndefined();
+        }
+    });
+
+    it("exits non-zero when a dev server is killed by a signal", () => {
+        expect(exitCodeOf(0, null)).toBe(0);
+        expect(exitCodeOf(2, null)).toBe(2);
+        expect(exitCodeOf(null, "SIGKILL")).toBe(1);
+        expect(exitCodeOf(null, "SIGTERM")).toBe(1);
+        expect(exitCodeOf(null, null)).toBe(0);
     });
 });

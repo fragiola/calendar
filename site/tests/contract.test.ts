@@ -1,5 +1,8 @@
 // From Primitives (fragiola/primitives, site/tests/contract.test.ts), same author and licence
 // (itself from Tree's).
+import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { beforeAll, describe, expect, it } from "vitest";
 import {
     CATEGORIES,
@@ -8,12 +11,16 @@ import {
 import { THEMES } from "../../examples/shared/src/themes/themes.ts";
 import {
     CONTRACT_VERSION,
+    contractVersion,
+    contractVersionOf,
+    contractVersionProblem,
+    findWwwContract,
     frontmatter,
     LIMITS,
     type Site,
     validateSite,
 } from "../contract.ts";
-import { readExamplesSource, readSite } from "../sources.ts";
+import { baseProblem, readExamplesSource, readSite } from "../sources.ts";
 
 // The export is checked in memory against the site export contract (fragiola/www CONTRACT.md,
 // v1.7) as www checks it, and against what this project decided for its own pages
@@ -36,6 +43,54 @@ const PAGE = (body: string) =>
 describe("the site export", () => {
     it("implements contract v1.7", () => {
         expect(CONTRACT_VERSION).toBe("1.7");
+    });
+
+    it("reads the contract version from www's CONTRACT.md, the pinned one where www is absent", () => {
+        const root = mkdtempSync(join(tmpdir(), "calendar-contract-"));
+        const repo = join(root, "calendar", ".worktrees", "epic");
+        mkdirSync(repo, { recursive: true });
+        // CI: no www checked out beside the repository
+        expect(findWwwContract(repo)).toBeUndefined();
+        expect(contractVersion(findWwwContract(repo))).toEqual({
+            version: CONTRACT_VERSION,
+            source: "pinned",
+        });
+        // a checkout: www beside an ancestor of the worktree
+        mkdirSync(join(root, "www"));
+        const file = join(root, "www", "CONTRACT.md");
+        writeFileSync(file, "# Site export contract, v1.7\n\nText.\n");
+        expect(findWwwContract(repo)).toBe(file);
+        const same = contractVersion(file);
+        expect(same).toEqual({ version: "1.7", source: "www" });
+        expect(contractVersionProblem(same)).toBeUndefined();
+        // www moved on: the export says so instead of exporting against an old contract
+        writeFileSync(file, "# Site export contract, v1.8\n");
+        expect(contractVersionProblem(contractVersion(file))).toMatch(
+            /v1\.8, this export implements v1\.7/,
+        );
+        writeFileSync(file, "# Something else\n");
+        expect(() => contractVersion(file)).toThrow(/no "# Site export/);
+        expect(contractVersionOf("## Site export contract, v1.7")).toBe(
+            undefined,
+        );
+    });
+
+    it("matches www's CONTRACT.md when it is checked out", () => {
+        const version = contractVersion(findWwwContract());
+        if (version.source === "www") {
+            expect(contractVersionProblem(version)).toBeUndefined();
+        } else {
+            expect(version.version).toBe(CONTRACT_VERSION);
+        }
+    });
+
+    it("refuses a base other than the project's", () => {
+        expect(baseProblem("/calendar", "calendar")).toBeUndefined();
+        expect(baseProblem("/docs", "calendar")).toMatch(
+            /under \/calendar only/,
+        );
+        expect(baseProblem("", "calendar")).toMatch(/--base \//);
+        expect(baseProblem("/calendar/x", "calendar")).toBeDefined();
     });
 
     it("passes its own validation", () => {
@@ -80,7 +135,7 @@ describe("project.json", () => {
             contract: 1,
             slug: "calendar",
             title: "Calendar",
-            frameworks: ["react"],
+            frameworks: ["react", "vue"],
             defaultFramework: "react",
             repository: "https://github.com/fragiola/calendar",
         });

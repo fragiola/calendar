@@ -164,7 +164,7 @@ function TimedEvent({ segment }: { segment: TimeSegment }) {
     const { model } = useCalendar<Types>();
     return (
         <Calendar.TimeEvent segment={segment} className={styles.event}>
-            <span className={styles.eventBox}>
+            <span className={styles.eventBox} data-testid="event-box">
                 <span className={styles.eventTitle}>
                     {titleOf(model, segment.occurrenceId, segment.eventId)}
                 </span>

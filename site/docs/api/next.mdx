@@ -18,6 +18,8 @@ It renders `data-calendar-part="next"` on a `button` with `type="button"`.
 
 ## Usage
 
+<Framework name="react">
+
 ```tsx
 import { Calendar } from "@fragiola/calendar-react";
 import { ChevronRight } from "lucide-react";
@@ -28,6 +30,26 @@ import { ChevronRight } from "lucide-react";
 </Calendar.Next>
 ```
 
+</Framework>
+
+<Framework name="vue">
+
+```vue
+<script setup lang="ts">
+import { Calendar } from "@fragiola/calendar-vue";
+import { ChevronRight } from "@lucide/vue";
+</script>
+
+<template>
+    <!-- inside Calendar.Root -->
+    <Calendar.Next aria-label="Next month" class="icon-button">
+        <ChevronRight aria-hidden="true" />
+    </Calendar.Next>
+</template>
+```
+
+</Framework>
+
 An icon-only button needs its accessible name: the library sets none, so `aria-label` (or text)
 is yours. A right-to-left calendar flips the icon in your CSS, not the command.
 
@@ -35,6 +57,9 @@ is yours. A right-to-left calendar flips the icon in your CSS, not the command.
 
 `NextProps`; it also takes the [common props](/docs/api/root#common-props) and every `button`
 attribute.
+
+In Vue: the same props (in kebab-case in a template), and slots in place of `children`; see
+[Vue primitives](/docs/api/vue).
 
 | prop | type | description |
 | --- | --- | --- |

@@ -11,6 +11,8 @@ layout effect and destroys it on unmount; `useCalendar().engine` gives it to you
 ([Model and engine](/docs/concepts/model-and-engine)). The words of an announcement, the popover
 of a "+N more" link and the editor a selection opens are yours.
 
+<Framework name="react">
+
 ```tsx
 import { useCalendar } from "@fragiola/calendar-react";
 
@@ -27,13 +29,35 @@ function GoToReview() {
 }
 ```
 
+</Framework>
+
+<Framework name="vue">
+
+```vue title="go-to-review.vue"
+<script setup lang="ts">
+import { useCalendar } from "@fragiola/calendar-vue";
+
+const { engine } = useCalendar();
+</script>
+
+<template>
+
+    <button type="button" @click="engine.run('focus', { occurrenceId: 'review' })">
+        Focus the review
+    </button>
+</template>
+```
+
+</Framework>
+
 `engine.run("focus", …)` navigates to the event when the view does not show it, then gives it
 the grid's tab stop and the DOM focus.
 
 ## `createCalendarEngine`
 
 `createCalendarEngine(model, options?)` returns a `CalendarEngine`; the adapter attaches its root.
-A React app never calls it: the root's engine props take the same `CalendarEngineOptions`.
+An app on an adapter never calls it: the root's engine props take the same `CalendarEngineOptions`
+(`longPressDelay` in React, `long-press-delay` in Vue).
 
 | option | type | default | description |
 | --- | --- | --- | --- |
@@ -120,7 +144,8 @@ Typed by `EngineIsMap` (`EngineIsKey`):
 
 `engine.subscribe` hears a `CalendarEngineEvent` (`CalendarEngineEventType` names its `type`,
 `CalendarEngineEventOf<K>` one of them). In React, each is a root callback: `on` plus its
-`ENGINE_EVENT_CALLBACKS` name ([Calendar.Root](/docs/api/root)).
+`ENGINE_EVENT_CALLBACKS` name ([Calendar.Root](/docs/api/root)); in Vue, a listener on the root,
+that name in kebab-case (`@event-click`, `@event-drop`; [Vue primitives](/docs/api/vue)).
 
 | type | callback | carries |
 | --- | --- | --- |
@@ -138,7 +163,7 @@ An `Announcement` is data, never text: its `kind` is `"grab"`, `"drag-over"`, `"
 ([Keyboard](/docs/guides/keyboard)).
 
 ```ts
-import type { Announcement } from "@fragiola/calendar-react";
+import type { Announcement } from "@fragiola/calendar";
 
 function announcementText(announcement: Announcement): string {
     switch (announcement.kind) {
@@ -190,7 +215,7 @@ client render), `partAttributes(model, part, payload)` gives the same attributes
 focused, the tab stop where the model puts it ([State attributes](/docs/concepts/state-attributes)).
 
 ```ts
-import { createCalendarModel, partAttributes } from "@fragiola/calendar-react";
+import { createCalendarModel, partAttributes } from "@fragiola/calendar";
 
 const model = createCalendarModel({
     version: 1,

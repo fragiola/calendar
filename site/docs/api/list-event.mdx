@@ -16,6 +16,8 @@ yours: the title is model data you read, the times are `Intl` parts you format.
 
 ## Usage
 
+<Framework name="react">
+
 ```tsx
 import { Calendar, type ListItem, useCalendar } from "@fragiola/calendar-react";
 
@@ -36,6 +38,44 @@ export function Item(props: { item: ListItem }) {
 }
 ```
 
+</Framework>
+
+<Framework name="vue">
+
+```vue title="item.vue"
+<script setup lang="ts">
+import { Calendar, type ListItem, useCalendar } from "@fragiola/calendar-vue";
+import { computed } from "vue";
+
+const props = defineProps<{ item: ListItem }>();
+const { model } = useCalendar();
+const occurrence = computed(() =>
+    model.get("occurrence-by", { id: props.item.occurrenceId }),
+);
+// a renamed occurrence of a recurring event has its own title
+const title = computed(
+    () =>
+        occurrence.value?.title ??
+        model.get("event-by", { id: props.item.eventId })?.title,
+);
+</script>
+
+<template>
+
+    <Calendar.ListEvent :item="item">
+        <template #render="{ props: event, state, children }">
+            <div v-bind="event" :class="`event event-${state.calendarId ?? 'none'}`">
+                <component :is="children" />
+            </div>
+        </template>
+        <span class="event-time">{{ item.allDay ? "All day" : occurrence?.start }}</span>
+        <span class="event-title">{{ title }}</span>
+    </Calendar.ListEvent>
+</template>
+```
+
+</Framework>
+
 The state (`ListEventState`, on the [hooks page](/docs/api/hooks), with the item and the
 `EventState` flags) styles it; `useListEvent` gives the same props for an element of your own.
 
@@ -49,6 +89,9 @@ The state (`ListEventState`, on the [hooks page](/docs/api/hooks), with the item
 | `role`, `tabindex` | `listitem`, `0` |
 
 ## Props
+
+In Vue: the same props (in kebab-case in a template), and slots in place of `children`; see
+[Vue primitives](/docs/api/vue).
 
 `ListEventProps` takes the [common props](/docs/api/root#common-props) and any `div` attribute,
 and:

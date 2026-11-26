@@ -5,6 +5,7 @@ import {
     openExample,
     pointIn,
     scrollTo,
+    settled,
     slot,
 } from "../helpers";
 
@@ -40,7 +41,7 @@ test("a long press on the sprint planning, then a move, drops it on Tuesday", as
     const to = await pointIn(slot(stage, "2026-11-24", "10:00"), 0.5, 0.2);
     const touch = await finger(page);
     await touch.start(from);
-    await page.waitForTimeout(700);
+    // the long press (500 ms): the event shows it is dragged once it has passed
     await expect(planning).toHaveAttribute("data-dragging", "");
     for (let step = 1; step <= 6; step++) {
         await touch.move({
@@ -64,7 +65,8 @@ test("a quick swipe moves nothing", async ({ page }) => {
     await touch.move({ x: (from.x + to.x) / 2, y: from.y });
     await touch.move(to);
     await touch.end(to);
-    await page.waitForTimeout(200);
+    await settled(page);
+    await expect(stage.locator("[data-dragging]")).toHaveCount(0);
     await expect(
         eventById(column(stage, "2026-11-23"), "planning"),
     ).toBeVisible();

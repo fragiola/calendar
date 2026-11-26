@@ -16,6 +16,8 @@ call usually returns the day's heading and its `Calendar.ListDay`.
 
 ## Usage
 
+<Framework name="react">
+
 ```tsx
 import { Calendar, type ListDay } from "@fragiola/calendar-react";
 
@@ -35,9 +37,41 @@ export function Days() {
 }
 ```
 
-`agendaDay` reads only its argument, so it is declared once and stays stable.
+</Framework>
+
+<Framework name="vue">
+
+```vue title="days.vue"
+<script setup lang="ts">
+import { Calendar } from "@fragiola/calendar-vue";
+</script>
+
+<template>
+
+    <Calendar.ListDays v-slot="{ day }">
+        <section :class="day.today ? 'day day-today' : 'day'">
+            <h3 :id="`agenda-${day.date}`">{{ day.date }}</h3>
+            <Calendar.ListDay
+                v-slot="{ item }"
+                :day="day"
+                :aria-labelledby="`agenda-${day.date}`"
+            >
+                <Calendar.ListEvent :item="item">{{ item.eventId }}</Calendar.ListEvent>
+            </Calendar.ListDay>
+        </section>
+    </Calendar.ListDays>
+</template>
+```
+
+</Framework>
+
+In React, `agendaDay` reads only its argument, so it is declared once and stays stable; in Vue, a
+slot that reads only its scope is stable the same way.
 
 ## Props
+
+In Vue: the same props (in kebab-case in a template), and slots in place of `children`; see
+[Vue primitives](/docs/api/vue).
 
 `ListDaysProps`:
 

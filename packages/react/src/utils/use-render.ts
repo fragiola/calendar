@@ -106,6 +106,19 @@ export function dataAttributes(
 
 type AnyProps = Record<string, unknown>;
 
+/** What stands for any callback ref in the merged ref's identity (see `useRenderElement`). */
+const CALLBACK_REF = {};
+
+/**
+ * A consumer ref's part in the merged ref's identity: a ref object by itself (swapping one for
+ * another re-attaches, so the new one receives the element), any callback alike (an inline one is
+ * new each render and must not re-attach), nothing for no ref.
+ */
+function refIdentity(ref: React.Ref<HTMLElement> | undefined): object | null {
+    if (ref == null) return null;
+    return typeof ref === "function" ? CALLBACK_REF : ref;
+}
+
 interface RenderOptions<State> {
     state: State;
     /** the primitive's own props: ARIA, data-*, handlers, children */
@@ -143,22 +156,26 @@ export function useRenderElement<State>(
     const elementRef = renderElement?.props.ref as
         | React.Ref<HTMLElement>
         | undefined;
-    // consumer refs are read when the element attaches, not memoized on their identity: an inline
-    // callback ref (a new function each render) must not make React detach and re-attach the
-    // primitive's own ref (and its registrations) on every render
+    // consumer callback refs are read when the element attaches, not memoized on their identity:
+    // an inline callback ref (a new function each render) must not make React detach and
+    // re-attach the primitive's own ref (and its registrations) on every render. A ref object is
+    // part of the identity: a new one re-attaches (the old one is cleared, the new one set), and
+    // so does a ref that appears or goes away
     const consumerRefs = React.useRef<(React.Ref<HTMLElement> | undefined)[]>(
         [],
     );
     consumerRefs.current = [externalRef, elementRef];
-    // (a consumer ref that appears later re-attaches once, so it is called)
-    const hasConsumerRef = externalRef != null || elementRef != null;
+    const externalIdentity = refIdentity(externalRef);
+    const elementIdentity = refIdentity(elementRef);
     const ref = React.useMemo<React.RefCallback<HTMLElement>>(
         () => (element: HTMLElement | null) =>
             mergeRefs(
                 internalRef,
-                ...(hasConsumerRef ? consumerRefs.current : []),
+                ...(externalIdentity || elementIdentity
+                    ? consumerRefs.current
+                    : []),
             )(element),
-        [internalRef, hasConsumerRef],
+        [internalRef, externalIdentity, elementIdentity],
     );
 
     const resolvedClassName =

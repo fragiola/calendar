@@ -18,6 +18,8 @@ ref callback that scrolls to the morning, a saved position).
 
 ## Usage
 
+<Framework name="react">
+
 ```tsx
 import { Calendar } from "@fragiola/calendar-react";
 import type { ReactNode } from "react";
@@ -40,7 +42,38 @@ export function Body(props: { children: ReactNode }) {
 }
 ```
 
-`ref` is a plain prop, merged with the part's own. See
+</Framework>
+
+<Framework name="vue">
+
+```vue title="body.vue"
+<script setup lang="ts">
+import { Calendar } from "@fragiola/calendar-vue";
+import { type ComponentPublicInstance, onMounted, useTemplateRef } from "vue";
+
+// a template ref on a part is its component: `$el` is its element
+const scroller = useTemplateRef<ComponentPublicInstance>("scroller");
+onMounted(() => scrollToMorning(scroller.value?.$el ?? null));
+
+/** Opens the time grid at 08:00 (the scroll position is the app's). */
+function scrollToMorning(element: HTMLElement | null) {
+    const eight = element?.querySelector<HTMLElement>('[data-time="08:00"]');
+    if (element && eight) element.scrollTop = eight.offsetTop - 8;
+}
+</script>
+
+<template>
+
+    <Calendar.Scroller ref="scroller" :style="{ height: '480px', overflow: 'auto' }">
+        <slot />
+    </Calendar.Scroller>
+</template>
+```
+
+</Framework>
+
+In React, `ref` is a plain prop, merged with the part's own; in Vue, a template ref on a part is its
+component, and its `$el` the element. See
 [Sizing and scrolling](/docs/getting-started/sizing).
 
 ## Attributes
@@ -50,6 +83,9 @@ export function Body(props: { children: ReactNode }) {
 | `data-calendar-part` | `data-calendar-part="scroller"` |
 
 ## Props
+
+In Vue: the same props (in kebab-case in a template), and slots in place of `children`; see
+[Vue primitives](/docs/api/vue).
 
 `ScrollerProps` takes the [common props](/docs/api/root#common-props) and any `div` attribute,
 and:

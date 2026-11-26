@@ -6,6 +6,7 @@ import {
     openFixture,
     pointIn,
     scrollTo,
+    settled,
     slot,
 } from "./helpers";
 
@@ -55,7 +56,7 @@ test("month: moving an event re-renders the two week rows it touches", async ({
             `[data-calendar-part="segment"][data-occurrence-id="${id}"]`,
         ),
     ).toHaveCount(0);
-    await page.waitForTimeout(200);
+    await settled(page);
     expect(changed(before, await renders(page))).toEqual([
         "week 2026-11-22",
         "week 2026-11-29",
@@ -86,7 +87,7 @@ test("week: moving an event re-renders the two columns it touches", async ({
             `[data-calendar-part="column"][data-date="${target}"] [data-calendar-part="time-event"][data-occurrence-id="e28"]`,
         ),
     ).toHaveCount(1);
-    await page.waitForTimeout(200);
+    await settled(page);
     expect(
         changed(before, await renders(page)).filter((key) =>
             key.startsWith("column"),

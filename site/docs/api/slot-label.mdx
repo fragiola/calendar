@@ -16,6 +16,8 @@ It renders what you give it; the library writes no time as text. The time's word
 
 ## Usage
 
+<Framework name="react">
+
 ```tsx
 import { Calendar, useSlotLabel } from "@fragiola/calendar-react";
 
@@ -34,6 +36,41 @@ export function Label() {
 }
 ```
 
+</Framework>
+
+<Framework name="vue">
+
+```vue title="hour-text.vue"
+<script setup lang="ts">
+import { useSlotLabel } from "@fragiola/calendar-vue";
+
+const props = defineProps<{ time: string }>();
+// Intl parts in the calendar's locale: "9 AM", "09"
+const parts = useSlotLabel(() => props.time, { hour: "numeric" });
+</script>
+
+<template>
+
+    <span>{{ parts.map((part) => part.value).join("") }}</span>
+</template>
+```
+
+```vue title="label.vue"
+<script setup lang="ts">
+import { Calendar } from "@fragiola/calendar-vue";
+import HourText from "./hour-text.vue";
+</script>
+
+<template>
+
+    <Calendar.SlotLabel v-slot="{ time }" class="slot-label">
+        <HourText v-if="time.endsWith(':00')" :time="time" />
+    </Calendar.SlotLabel>
+</template>
+```
+
+</Framework>
+
 It shows the hour on the full hours and nothing on the other slots. See
 [`useSlotLabel`](/docs/api/hooks).
 
@@ -46,6 +83,9 @@ It shows the hour on the full hours and nothing on the other slots. See
 | `role` | `rowheader` |
 
 ## Props
+
+In Vue: the same props (in kebab-case in a template), and slots in place of `children`; see
+[Vue primitives](/docs/api/vue).
 
 `SlotLabelProps` takes the [common props](/docs/api/root#common-props) and any `div` attribute,
 and:

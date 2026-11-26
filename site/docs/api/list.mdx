@@ -18,6 +18,8 @@ empty message, like every word of the view, is yours.
 
 ## Usage
 
+<Framework name="react">
+
 ```tsx
 import { Calendar } from "@fragiola/calendar-react";
 
@@ -52,6 +54,37 @@ export function Agenda() {
 }
 ```
 
+</Framework>
+
+<Framework name="vue">
+
+```vue title="agenda.vue"
+<script setup lang="ts">
+import { Calendar } from "@fragiola/calendar-vue";
+</script>
+
+<template>
+
+    <Calendar.List v-slot="{ empty }" class="list">
+        <p v-if="empty" class="empty">Nothing planned this month.</p>
+        <Calendar.ListDays v-else v-slot="{ day }">
+            <section :key="day.date">
+                <h3 :id="`list-${day.date}`">{{ day.date }}</h3>
+                <Calendar.ListDay
+                    v-slot="{ item }"
+                    :day="day"
+                    :aria-labelledby="`list-${day.date}`"
+                >
+                    <Calendar.ListEvent :item="item">{{ item.eventId }}</Calendar.ListEvent>
+                </Calendar.ListDay>
+            </section>
+        </Calendar.ListDays>
+    </Calendar.List>
+</template>
+```
+
+</Framework>
+
 Each day's list is named by the heading before it. See [List view](/docs/guides/list-view).
 
 <Example id="list" />
@@ -63,6 +96,9 @@ Each day's list is named by the heading before it. See [List view](/docs/guides/
 | `data-calendar-part` | `data-calendar-part="list"` |
 
 ## Props
+
+In Vue: the same props (in kebab-case in a template), and slots in place of `children`; see
+[Vue primitives](/docs/api/vue).
 
 `ListProps` takes the [common props](/docs/api/root#common-props) and any `div` attribute, and:
 

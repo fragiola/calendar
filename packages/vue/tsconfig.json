@@ -1,0 +1,11 @@
+{
+    "extends": "../../tsconfig.base.json",
+    "compilerOptions": {
+        "jsx": "preserve",
+        "types": [],
+        "customConditions": ["@fragiola/source"],
+        "allowImportingTsExtensions": true,
+        "stripInternal": true
+    },
+    "include": ["src", "tests", "tests/**/*.vue", "*.config.ts"]
+}

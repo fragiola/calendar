@@ -137,6 +137,16 @@ export function normalizeBase(value: string): string {
 }
 
 /**
+ * A problem when a (normalized) base is not the project's: fragiola.com serves the calendar under
+ * `/<slug>` only, so an export or a dev server built for another base would break every link.
+ */
+export function baseProblem(base: string, slug: string): string | undefined {
+    return base === `/${slug}`
+        ? undefined
+        : `--base ${base || "/"}: the site serves this project under /${slug} only`;
+}
+
+/**
  * Each framework's manifest, by framework: one per framework of project.json, built from that
  * framework's app (`appOf`, `examples/<framework>` by default).
  */

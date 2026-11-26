@@ -19,6 +19,8 @@ usually returns a `Calendar.Slot`.
 
 ## Usage
 
+<Framework name="react">
+
 ```tsx
 import { Calendar, type TimeSlot } from "@fragiola/calendar-react";
 
@@ -39,7 +41,37 @@ export function SlotRow(props: { slot: TimeSlot }) {
 }
 ```
 
+</Framework>
+
+<Framework name="vue">
+
+```vue title="slot-row.vue"
+<script setup lang="ts">
+import { Calendar, type TimeSlot } from "@fragiola/calendar-vue";
+
+defineProps<{ slot: TimeSlot }>();
+</script>
+
+<template>
+
+    <Calendar.SlotRow :slot="slot">
+        <Calendar.SlotLabel>{{ slot.time }}</Calendar.SlotLabel>
+        <Calendar.Slots v-slot="{ column }">
+            <Calendar.Slot
+                :date="column.date"
+                :class="column.weekend ? 'slot slot-weekend' : 'slot'"
+            />
+        </Calendar.Slots>
+    </Calendar.SlotRow>
+</template>
+```
+
+</Framework>
+
 ## Props
+
+In Vue: the same props (in kebab-case in a template), and slots in place of `children`; see
+[Vue primitives](/docs/api/vue).
 
 `SlotsProps`:
 

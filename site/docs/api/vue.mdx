@@ -1,0 +1,227 @@
+---
+title: Vue primitives
+description: The same primitives and hooks for Vue 3.5, from @fragiola/calendar-vue, and how each React prop maps onto Vue props, slots, events and attributes.
+---
+
+`@fragiola/calendar-vue` has every primitive of the React package, as a Vue 3.5 component, and
+every hook as a composable, over the same core (re-exported whole, so a Vue app installs and
+imports one package). The behaviour, the ARIA, the roles, the `data-*` attributes and
+`data-calendar-part` of every element are the same: the React pages of this reference describe
+each part, and this page says how its React API is written in Vue.
+
+```ts
+import {
+    Calendar,
+    createCalendarModel,
+    typedCalendar,
+    useCalendar,
+    useCalendarView,
+    type CalendarEventJson,
+} from "@fragiola/calendar-vue";
+// each feature from its own entry, with its parts and composables
+import { DragPreview, dragAndDrop, useDragPreview } from "@fragiola/calendar-vue/drag-and-drop";
+import { Selection, selection, useSelection } from "@fragiola/calendar-vue/selection";
+```
+
+## Typing by your registry
+
+A React part takes the registry and the features as type arguments
+(`<Calendar.Root<Types, typeof features>>`); a Vue template cannot pass them.
+`typedCalendar<Types, typeof features>()` returns the same components, typed by both: the root
+takes a `CalendarModel<Types, typeof features>`, `v-model:events` holds your events, and a
+feature's event (`@select` with `selection()`, `@event-drop` with `dragAndDrop()` or `resize()`,
+`@external-drop` with `externalDrop()`) compiles only when the feature is installed: without it,
+the listener is a `never` prop (`RootMissingEvents<F>`) and `vue-tsc` refuses it
+([Features](/docs/concepts/features)).
+
+```ts title="calendar.ts"
+import { typedCalendar } from "@fragiola/calendar-vue";
+import { selection } from "@fragiola/calendar-vue/selection";
+
+export type Types = { events: { meeting: { room: string } }; calendar: undefined };
+export const features = [selection()] as const;
+export const Calendar = typedCalendar<Types, typeof features>();
+```
+
+| export | description |
+| --- | --- |
+| `typedCalendar<T, F>()` | the `Calendar` components typed by the registry `T` and the features `F`, as a `TypedCalendar<T, F>` (the same objects as `Calendar`); its `Calendar.Root` takes `RootProps<T, F>` (`RootBaseProps<T, F>` and `RootMissingEvents<F>`) and emits `RootEmits<T, F>` |
+| `Calendar` | the components, untyped: its `Calendar.Root` takes any model and every event |
+
+## How React's props map
+
+| React | Vue |
+| --- | --- |
+| `render={<section />}` | `as="section"` (a tag or a component) |
+| `render={(props, state) => …}` | the `render` scoped slot, `#render="{ props, state, children }"`: bind `v-bind="props"` on your element and render `<component :is="children" />` inside it |
+| `className`, `style` | the `class` and `style` attributes, merged under the structural style (structural keys win: a segment's place, a timed event's position) |
+| `className={(state) => …}`, `style={(state) => …}` | no function form: a `data-*` selector (`[data-today]`, `[data-selected]`), or the `render` slot's `state` |
+| `onClick`, `onKeyDown`, … | listeners (`@click`, `@keydown`), run after the primitive's own |
+| `ref` | a template ref on a part is its component instance; the element is its `$el` |
+| children functions (`Calendar.Weeks`, `Calendar.Days`, `Calendar.DayEvents`, …) | the default scoped slot: `v-slot="{ week }"`, `v-slot="{ day, week }"`, `v-slot="{ segment }"` |
+| a function per day (`Calendar.Week`, `Calendar.AllDayRow`) or per column (`Calendar.SlotRow`) | the named slot `#day="{ day, week }"` or `#column="{ column }"`; elements go in the default slot |
+| the state given to children (`Calendar.More`, `Calendar.WeekNumber`, the buttons, …) | the default slot's scope: `v-slot="{ hiddenCount }"`, `v-slot="{ weekNumber }"`, `v-slot="{ disabled }"` |
+| `events` + `onEventsChange` | `v-model:events` (or `:events` with `@update:events`); `@events-change` beside it |
+| `view` + `onViewChange` | `v-model:view` (the type), `@view-change` with `{ type, days }` |
+| `date` + `onDateChange` | `v-model:date` (the anchor date, `YYYY-MM-DD`), `@date-change` |
+| `onEventClick`, `onSelect`, `onEventDrop`, … (`ENGINE_EVENT_CALLBACKS`) | listeners in kebab-case: `@event-click`, `@date-click`, `@more-click`, `@select`, `@event-drop`, `@external-drop`, `@today-change`, `@announce` |
+| `calendarRef={calendar}` | `:calendar-ref="calendar"`; the handle is `calendar.value`, in the template too (React: `calendar.current`) |
+| `defaultEvents`, `defaultView`, `longPressDelay`, … | the same props in kebab-case (`default-events`, `default-view`, `long-press-delay`) |
+| `<Calendar.Root<Types, typeof features>>` and the other type arguments | `typedCalendar<Types, typeof features>().Root` |
+| `useCalendar<Types, typeof features>()` and the other hooks | the composables of the same names, returning computed refs (below) |
+
+The controlled values are sent, not enforced, as in React: a new value runs its command with
+`meta: { source: "controlled" }`, and `update:*` reports every other change.
+
+## Components
+
+Every part is `Calendar.<Part>`, with the props of its React page except `render`, `className`,
+`style`, `ref` and `children` (see the table above). Each part that renders an element accepts
+`as` and the `render` slot; `Calendar.Weeks`, `Calendar.Days`, `Calendar.SlotRows`,
+`Calendar.Slots` and `Calendar.ListDays` render none, only their slot per entity.
+
+| part | Vue props | slots | events |
+| --- | --- | --- | --- |
+| `Calendar.Root` | `model`, `events`, `defaultEvents`, `defaultCalendars`, `settings`, `view`, `defaultView`, `days`, `date`, `defaultDate`, `features`, `now`, `createId`, `calendarRef`, and the engine options `host`, `longPressDelay`, `dragThreshold`, `autoScroll` | default | `update:events`, `events-change`, `update:view`, `view-change`, `update:date`, `date-change`, and the engine events `event-click`, `date-click`, `more-click`, `select`, `event-drop`, `external-drop`, `today-change`, `announce` |
+| `Calendar.Previous` | none | default `{ disabled }` | none |
+| `Calendar.Next` | none | default `{ disabled }` | none |
+| `Calendar.Today` | none | default `{ disabled }` | none |
+| `Calendar.ViewButton` | `view`, `days` | default `{ disabled, pressed }` | none |
+| `Calendar.DayGrid` | none | default | none |
+| `Calendar.ColumnHeaders` | none | default `{ date }`, per column | none |
+| `Calendar.ColumnHeader` | `date` | default `{ date, today, weekend, past }` | none |
+| `Calendar.Weeks` | none | default `{ week }`, per week | none |
+| `Calendar.Week` | `week` | `day` `{ day, week }`, per day; default `{ week }` | none |
+| `Calendar.WeekNumber` | none | default `{ weekNumber }` | none |
+| `Calendar.Days` | none | default `{ day, week }`, per day | none |
+| `Calendar.Day` | `day` | default `{ day, focused, selected, disabled, businessHours, segments }` (`DaySlotScope`) | none |
+| `Calendar.DayEvents` | none | default `{ segment }`, per segment | none |
+| `Calendar.Segment` | `segment` | default `SegmentState` | none |
+| `Calendar.More` | none | default `{ hiddenCount, hiddenOccurrenceIds, date }` | none |
+| `Calendar.TimeGrid` | none | default | none |
+| `Calendar.AllDayRow` | none | `day` `{ day, week }`, per day; default `{ week }` | none |
+| `Calendar.Scroller` | none | default | none |
+| `Calendar.SlotRows` | none | default `{ slot }`, per slot | none |
+| `Calendar.SlotRow` | `slot` | `column` `{ column }`, per column; default `{ slot }` | none |
+| `Calendar.SlotLabel` | none | default `{ time }` | none |
+| `Calendar.Slots` | none | default `{ column }`, per column | none |
+| `Calendar.Slot` | `date` | default `SlotState` | none |
+| `Calendar.Columns` | none | default `{ column }`, per column | none |
+| `Calendar.Column` | `column` | default `{ column, selected }` | none |
+| `Calendar.ColumnEvents` | none | default `{ segment }`, per segment | none |
+| `Calendar.TimeEvent` | `segment` | default `TimeEventState` | none |
+| `Calendar.List` | none | default `{ empty }` | none |
+| `Calendar.ListDays` | none | default `{ day }`, per day | none |
+| `Calendar.ListDay` | `day` | default `{ item }`, per occurrence | none |
+| `Calendar.ListEvent` | `item` | default `ListEventState` | none |
+
+The feature parts come from their entries, and take the `render` slot like the others:
+
+| part | entry | Vue props | slots |
+| --- | --- | --- | --- |
+| `Selection` | `@fragiola/calendar-vue/selection` | none | default `{ segment, pending }` |
+| `DragPreview` | `@fragiola/calendar-vue/drag-and-drop`, `/resize` | none | default `{ preview, segment }` |
+| `ResizeHandle` | `@fragiola/calendar-vue/resize` | `edge` | default `{ edge }` |
+| `NowIndicator` | `@fragiola/calendar-vue/now-indicator` | none | default `{ position }` |
+| `BusinessHours` | `@fragiola/calendar-vue/constraints` | none | default `{ range }` |
+
+`@fragiola/calendar-vue/recurrence`, `@fragiola/calendar-vue/external-drop` and
+`@fragiola/calendar-vue/event-sources` re-export the core's
+entry and add no part: an external drop previews through `DragPreview` and reaches the root's
+`@external-drop`.
+
+Another `model` remounts the calendar (a new engine), as a new model creates a new engine in
+React. Keep the model out of Vue's reactivity: create it once (`const model =
+createCalendarModel(json)` in `setup`), never in `ref()` or `reactive()`. The model's state is
+frozen data, which Vue never proxies, so a `ref` of the events `update:events` reports holds the
+model's own list.
+
+A slot that reads only its scope and reactive state is stable: a row renders again only when its
+layout object changed, as a stable function in React. A slot under `v-for` or `v-if`, or one a
+render function writes, is new on every render, and every row renders again with it (`$stable:
+true` on a render function's slots keeps them).
+
+## Composables
+
+The hooks of [the React reference](/docs/api/hooks), as composables, with the same names. Call
+them in `setup`, inside a `Calendar.Root` (the calendar refs also outside it). A value composable
+returns a computed ref, which changes only when its value changes (records and arrays compared
+entry by entry); a part composable returns `{ state, props }` of computed refs: bind
+`v-bind="props"` on your element (it holds the template `ref` that registers it and the
+structural `style`). Their arguments take a value, a ref or a getter (`() => props.day`).
+
+| composable | returns |
+| --- | --- |
+| `useCalendar<T, F>()` | `{ model, engine }`, a `UseCalendarResult<T, F>` (plain values, not reactive: read what you show through the composables below) |
+| `useCalendarRef<T, F>()` | a `CalendarRef<T, F>`, whose reactive `value` is the root's `CalendarHandle` (`model`, `engine`) while it is mounted, `null` otherwise. It is not a Vue ref, so a template does not unwrap it: `:calendar-ref="calendar"` passes it, and the template reads `calendar.value` |
+| `createCalendarRef<T, F>()` | the same calendar ref, anywhere (a module, a test) |
+| `useCalendarView()` | a computed ref of the `CalendarView`: `type`, `anchorDate`, `days`, `visibleRange`, `currentRange` |
+| `useCalendarTitle(format?)` | a computed ref of the title's `Intl` range parts |
+| `useDayHeader(date, format?)` | a computed ref of a column header's `Intl` parts |
+| `useSlotLabel(time, format?)` | a computed ref of a slot time's `Intl` parts |
+| `useDayGrid()` | a computed ref of the `DayGrid` shown, `null` in a list view |
+| `useTimeGrid()` | a computed ref of the `TimeGrid` shown, `null` outside the time grid views |
+| `useListLayout()` | a computed ref of the `ListLayout` (the visible days with their occurrences) |
+| `useDay(day)` | `{ state, props }` (`PartComposableResult<DayState>`) of a day |
+| `useSlot({ date, time })` | `{ state, props }` of a slot, its state a `SlotState` |
+| `useSegment(segment)` | `{ state, props }` of a day-grid segment, its state a `SegmentState` |
+| `useTimeEvent(segment)` | `{ state, props }` of a timed segment, its state a `TimeEventState` |
+| `useListEvent(item)` | `{ state, props }` of a list view's occurrence, its state a `ListEventState` |
+| `useSelection()` (from `@fragiola/calendar-vue/selection`) | a computed ref of the `CalendarSelection`: `range` and `preview` |
+| `useDragPreview()` (from `@fragiola/calendar-vue/drag-and-drop` or `/resize`) | a computed ref of the drag's `DragPreview`, `null` for none |
+| `useNowPosition()` (from `@fragiola/calendar-vue/now-indicator`) | a computed ref of the `NowPosition`, `null` when not in view and before the engine |
+| `useBusinessHours(date?)` (from `@fragiola/calendar-vue/constraints`) | a computed ref of the visible days' `BusinessHoursRange` list, only `date`'s when given |
+
+A server render (Nuxt, `renderToString`) outputs the calendar's markup from the model's state,
+with no timer and no listener: the engine, the controlled props and the composables'
+subscriptions start once the root mounts in the browser, and hydration finds the same elements.
+
+## Types
+
+Each part exports its props and its slots, named as in React, and its state where it has one:
+`RootProps`, `RootBaseProps`, `RootEngineProps`, `RootSlots`, `RootState`, `RootEmits`,
+`RootEngineEmits`, `RootMissingEvents`, `RootView`, `PreviousProps`, `PreviousSlots`,
+`PreviousState`, `NextProps`, `NextSlots`, `NextState`, `TodayProps`, `TodaySlots`, `TodayState`,
+`ViewButtonProps`, `ViewButtonSlots`, `ViewButtonState`, `DayGridProps`, `DayGridSlots`,
+`DayGridState`, `ColumnHeadersProps`, `ColumnHeadersSlots`, `ColumnHeadersState`,
+`ColumnHeaderProps`, `ColumnHeaderSlots`, `ColumnHeaderState`, `WeeksProps`, `WeeksSlots`,
+`WeekProps`, `WeekSlots`, `WeekState`, `WeekNumberProps`, `WeekNumberSlots`, `WeekNumberState`,
+`DaysProps`, `DaysSlots`, `DayProps`, `DaySlots`, `DaySlotScope`, `DayEventsProps`,
+`DayEventsSlots`, `DayEventsState`, `SegmentProps`, `SegmentSlots`, `MoreProps`, `MoreSlots`,
+`MoreState`, `TimeGridProps`, `TimeGridSlots`, `TimeGridState`, `AllDayRowProps`,
+`AllDayRowSlots`, `AllDayRowState`, `ScrollerProps`, `ScrollerSlots`, `ScrollerState`,
+`SlotRowsProps`, `SlotRowsSlots`, `SlotRowProps`, `SlotRowSlots`, `SlotRowState`,
+`SlotLabelProps`, `SlotLabelSlots`, `SlotLabelState`, `SlotsProps`, `SlotsSlots`, `SlotProps`,
+`SlotSlots`, `ColumnsProps`, `ColumnsSlots`, `ColumnsState`, `ColumnProps`, `ColumnSlots`,
+`ColumnState`, `ColumnEventsProps`, `ColumnEventsSlots`, `ColumnEventsState`, `TimeEventProps`,
+`TimeEventSlots`, `ListProps`, `ListSlots`, `ListState`, `ListDaysProps`, `ListDaysSlots`,
+`ListDayProps`, `ListDaySlots`, `ListDayState`, `ListEventProps`, `ListEventSlots`; the feature
+parts' `SelectionProps`, `SelectionSlots`, `SelectionState`, `DragPreviewProps`,
+`DragPreviewSlots`, `DragPreviewState`, `ResizeHandleProps`, `ResizeHandleSlots`,
+`ResizeHandleState`, `NowIndicatorProps`, `NowIndicatorSlots`, `NowIndicatorState`,
+`BusinessHoursProps`, `BusinessHoursSlots`, `BusinessHoursState`; and the composables' `DayState`,
+`SlotState`, `SegmentState`, `TimeEventState`, `ListEventState`, `EventState`,
+`CommandButtonState`, `CalendarView`, `UseCalendarResult`, `CalendarSelection`,
+`CalendarHandle`, `CalendarRef`.
+
+| type | description |
+| --- | --- |
+| `CalendarComponent<Props, Slots, Emits>` | a part's component type: its props, plus any fallthrough attribute, its scoped slots and its events |
+| `TypedCalendar<T, F>` | what `typedCalendar<T, F>()` returns: every part, the root typed by `T` and `F` |
+| `PartComposableResult<S>` | what a part composable returns: `state` and `props`, computed refs |
+| `PartElementProps` | its `props`: the ARIA, `data-*`, listeners, the template `ref` and the structural `style` |
+| `PrimitiveProps` | what every part that renders an element accepts: `as` |
+| `AsProp` | a tag name or a component |
+| `RenderSlot<State>` | the `render` slot every such part accepts |
+| `RenderSlotProps<State>` | what it receives: `props`, `state`, `children` |
+| `SlotFunction<Scope>` | a scoped slot: its scope in, the nodes it renders out |
+| `ElementRef` | a function template ref, as a part composable's `props.ref` |
+
+## Examples
+
+Every example of the gallery exists in Vue, with the same behaviour: pick Vue in the framework
+switch to see its code. The [month](/examples/month) and [week](/examples/week) examples assemble
+the grids from the slots, [select to create](/examples/select-to-create) and
+[the team planner](/examples/team-planner) use `typedCalendar` with the features' events, and
+[undo and redo](/examples/undo-redo) and [save and restore](/examples/save-and-restore) keep the
+model's state in the app.

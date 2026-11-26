@@ -21,6 +21,8 @@ sits on the event, its size and its cursor are yours.
 
 ## Usage
 
+<Framework name="react">
+
 ```tsx
 import { Calendar, type TimeSegment } from "@fragiola/calendar-react";
 import { ResizeHandle } from "@fragiola/calendar-react/resize";
@@ -35,6 +37,30 @@ export function ResizableEvent(props: { segment: TimeSegment }) {
     );
 }
 ```
+
+</Framework>
+
+<Framework name="vue">
+
+```vue title="resizable-event.vue"
+<script setup lang="ts">
+import { Calendar, type TimeSegment } from "@fragiola/calendar-vue";
+import { ResizeHandle } from "@fragiola/calendar-vue/resize";
+
+defineProps<{ segment: TimeSegment }>();
+</script>
+
+<template>
+
+    <Calendar.TimeEvent :segment="segment" class="event">
+        <ResizeHandle edge="start" class="handle handle-top" />
+        <span class="event-title">{{ segment.eventId }}</span>
+        <ResizeHandle edge="end" class="handle handle-bottom" />
+    </Calendar.TimeEvent>
+</template>
+```
+
+</Framework>
 
 ```css
 .handle {
@@ -63,6 +89,9 @@ See [Resizing events](/docs/guides/resizing).
 | `aria-hidden` | `true` |
 
 ## Props
+
+In Vue: the same props (in kebab-case in a template), and slots in place of `children`; see
+[Vue primitives](/docs/api/vue).
 
 `ResizeHandleProps` takes the [common props](/docs/api/root#common-props) and any `div`
 attribute, and:

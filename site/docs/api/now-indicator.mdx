@@ -20,6 +20,8 @@ are yours.
 
 ## Usage
 
+<Framework name="react">
+
 ```tsx
 import { Calendar } from "@fragiola/calendar-react";
 import { NowIndicator } from "@fragiola/calendar-react/now-indicator";
@@ -38,6 +40,30 @@ export function NowColumns() {
     );
 }
 ```
+
+</Framework>
+
+<Framework name="vue">
+
+```vue title="now-columns.vue"
+<script setup lang="ts">
+import { Calendar } from "@fragiola/calendar-vue";
+import { NowIndicator } from "@fragiola/calendar-vue/now-indicator";
+</script>
+
+<template>
+
+    <Calendar.Columns v-slot="{ column }">
+        <Calendar.Column :column="column">
+            <NowIndicator v-slot="{ position }" class="now">
+                <span class="now-time">{{ position.time }}</span>
+            </NowIndicator>
+        </Calendar.Column>
+    </Calendar.Columns>
+</template>
+```
+
+</Framework>
 
 ```css
 .now {
@@ -59,6 +85,9 @@ export function NowColumns() {
 | `style` | `position: absolute`, `top` (structural) |
 
 ## Props
+
+In Vue: the same props (in kebab-case in a template), and slots in place of `children`; see
+[Vue primitives](/docs/api/vue).
 
 `NowIndicatorProps` takes the [common props](/docs/api/root#common-props) and any `div`
 attribute, and:

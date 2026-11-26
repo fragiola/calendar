@@ -13,6 +13,8 @@ words an announcement becomes, are yours.
 
 ## Installing the feature
 
+<Framework name="react">
+
 ```tsx
 import { Calendar, createCalendarModel } from "@fragiola/calendar-react";
 import { DragPreview, dragAndDrop } from "@fragiola/calendar-react/drag-and-drop";
@@ -70,6 +72,67 @@ export function DraggableWeek() {
 }
 ```
 
+</Framework>
+
+<Framework name="vue">
+
+```vue title="draggable-week.vue"
+<script setup lang="ts">
+import {
+    type AnyTypes,
+    createCalendarModel,
+    typedCalendar,
+} from "@fragiola/calendar-vue";
+import { DragPreview, dragAndDrop } from "@fragiola/calendar-vue/drag-and-drop";
+
+const features = [dragAndDrop()] as const;
+
+// typed by the features: the root takes `@event-drop`
+const Calendar = typedCalendar<AnyTypes, typeof features>();
+const model = createCalendarModel(
+    {
+        version: 1,
+        events: [],
+        calendars: [],
+        view: { type: "week", anchorDate: "2026-11-26" },
+    },
+    { features },
+);
+</script>
+
+<template>
+    <Calendar.Root :model="model">
+        <Calendar.TimeGrid aria-label="Week">
+            <Calendar.AllDayRow>
+                <Calendar.Days v-slot="{ day }">
+                    <Calendar.Day :day="day">
+                        <Calendar.DayEvents v-slot="{ segment }">
+                            <Calendar.Segment :segment="segment" />
+                        </Calendar.DayEvents>
+                    </Calendar.Day>
+                </Calendar.Days>
+                <DragPreview class="preview" />
+            </Calendar.AllDayRow>
+            <Calendar.Scroller>
+                <div class="body">
+                    <!-- the slot rows -->
+                    <Calendar.Columns v-slot="{ column }" class="columns">
+                        <Calendar.Column :column="column">
+                            <Calendar.ColumnEvents v-slot="{ segment }">
+                                <Calendar.TimeEvent :segment="segment" />
+                            </Calendar.ColumnEvents>
+                            <DragPreview class="preview" />
+                        </Calendar.Column>
+                    </Calendar.Columns>
+                </div>
+            </Calendar.Scroller>
+        </Calendar.TimeGrid>
+    </Calendar.Root>
+</template>
+```
+
+</Framework>
+
 Every event is draggable once the feature is installed (`touch-action: none` is set on it, so a
 touch can drag). `DragPreview` goes wherever the event could land: each `Calendar.Column`, and
 each `Calendar.Week` or the `Calendar.AllDayRow`. It renders only while there is a target, laid
@@ -77,8 +140,10 @@ out as the event would be there.
 
 ## Showing where it lands
 
-`DragPreview` takes elements or a function of its state: `preview` (the occurrence's new times,
+`DragPreview` takes elements or a function of its state (in Vue, its default slot's scope): `preview` (the occurrence's new times,
 `start`, `end`, `allDay`, and the gesture's `kind` and `keyboard`) and `segment` (its part here).
+
+<Framework name="react">
 
 ```tsx
 <DragPreview className="preview">
@@ -92,6 +157,24 @@ out as the event would be there.
     )}
 </DragPreview>
 ```
+
+</Framework>
+
+<Framework name="vue">
+
+```vue
+<script setup lang="ts">
+const time = new Intl.DateTimeFormat("en-US", { hour: "numeric", minute: "2-digit" });
+</script>
+
+<template>
+    <DragPreview v-slot="{ preview }" class="preview">
+        <span>{{ time.format(Date.parse(preview.start)) }}</span>
+    </DragPreview>
+</template>
+```
+
+</Framework>
 
 While it is dragged, the event itself carries `data-dragging` (dim it), and a keyboard grab
 carries `data-grabbed`:
@@ -112,7 +195,7 @@ carries `data-grabbed`:
 ## The gestures
 
 - **Mouse and pen:** a drag starts after the pointer moves 5 pixels (`dragThreshold`, an option
-  of the root); a press that never moves is a click (`onEventClick`).
+  of the root); a press that never moves is a click (`onEventClick`, `@event-click`).
 - **Touch:** a long press (`longPressDelay`, 500 ms) starts the drag, unless the event already has
   the focus; a touch that moves first scrolls the page.
 - **Keyboard:** Space on a focused event grabs it; the arrows move it by a day (Up and Down by a
@@ -120,12 +203,15 @@ carries `data-grabbed`:
 
 Escape, a lost pointer capture or a `pointercancel` end a pointer drag with nothing changed.
 Near the scroller's edges the time grid scrolls by itself (`autoScroll`, an option of the root).
-Each step of a keyboard move is announced as data (`onAnnounce`): see
+Each step of a keyboard move is announced as data (`onAnnounce`, `@announce`): see
 [Keyboard](/docs/guides/keyboard) for the live region.
 
 ## Hearing the drop
 
-A drop runs one command, and the root reports it as `onEventDrop` with the event's new times:
+A drop runs one command, and the root reports it as `onEventDrop` (`@event-drop` in Vue) with the event's new
+times:
+
+<Framework name="react">
 
 ```tsx
 import { Calendar, type CalendarEngineEventOf } from "@fragiola/calendar-react";
@@ -141,7 +227,30 @@ import { Calendar, type CalendarEngineEventOf } from "@fragiola/calendar-react";
 </Calendar.Root>;
 ```
 
-To save it, listen to the model instead (`model.subscribe`, or `onEventsChange`): it hears the
+</Framework>
+
+<Framework name="vue">
+
+```vue
+<script setup lang="ts">
+import type { CalendarEngineEventOf } from "@fragiola/calendar-vue";
+
+function dropped(event: CalendarEngineEventOf<"drop">) {
+    // kind: "move" (or "resize" with resize()), keyboard: whether Enter dropped it
+    console.log(event.kind, event.eventId, event.start, event.end, event.allDay);
+}
+</script>
+
+<template>
+    <Calendar.Root :model="model" @event-drop="dropped">
+        <!-- the grid -->
+    </Calendar.Root>
+</template>
+```
+
+</Framework>
+
+To save it, listen to the model instead (`model.subscribe`, or `onEventsChange`, `@events-change` in Vue): it hears the
 drop and every other change the same way.
 
 ## Between the all-day row and the time grid
@@ -166,8 +275,8 @@ refused one shows no preview, and a drop there runs nothing.
 - **Middleware:** an app rule is a middleware around every command, a drag's dry runs included.
 
 ```ts
-import { createCalendarModel, veto } from "@fragiola/calendar-react";
-import { dragAndDrop } from "@fragiola/calendar-react/drag-and-drop";
+import { createCalendarModel, veto } from "@fragiola/calendar";
+import { dragAndDrop } from "@fragiola/calendar/drag-and-drop";
 
 const features = [dragAndDrop()] as const;
 

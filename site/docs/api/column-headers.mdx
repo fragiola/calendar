@@ -15,11 +15,14 @@ row (standing for its weekday). What a header says is yours, from `useDayHeader`
   function itself is a new one (React's contract): an inline function is always current; declare
   it outside the component, or with `useCallback`, to re-render only what changed (see
   [performance](/docs/guides/performance)).
-- In a time grid, a corner cell for the time axis is yours: put it before the headers.
+- In a time grid, the time axis is column 1 (`aria-colindex` on each header): leave its room
+  with your layout (a padding or the grid template), no corner cell is needed.
 
 It renders `data-calendar-part="column-headers"`.
 
 ## Usage
+
+<Framework name="react">
 
 ```tsx
 import { Calendar, useDayHeader } from "@fragiola/calendar-react";
@@ -39,10 +42,42 @@ const header = (date: string) => <DayHeader date={date} />;
 <Calendar.ColumnHeaders className="headers">{header}</Calendar.ColumnHeaders>;
 ```
 
+</Framework>
+
+<Framework name="vue">
+
+```vue title="day-header.vue"
+<script setup lang="ts">
+import { Calendar, useDayHeader } from "@fragiola/calendar-vue";
+
+// the weekday and the day in a time grid, the weekday in a month, in the calendar's locale
+const props = defineProps<{ date: string }>();
+const parts = useDayHeader(() => props.date);
+</script>
+
+<template>
+
+    <Calendar.ColumnHeader :date="date" class="header">
+        {{ parts.map((part) => part.value).join("") }}
+    </Calendar.ColumnHeader>
+</template>
+```
+
+```vue
+<Calendar.ColumnHeaders v-slot="{ date }" class="headers">
+    <DayHeader :date="date" />
+</Calendar.ColumnHeaders>
+```
+
+</Framework>
+
 ## Props
 
 `ColumnHeadersProps`; it also takes the [common props](/docs/api/root#common-props) and every `div`
 attribute.
+
+In Vue: the same props (in kebab-case in a template), and slots in place of `children`; see
+[Vue primitives](/docs/api/vue).
 
 | prop | type | description |
 | --- | --- | --- |

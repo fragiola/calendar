@@ -19,6 +19,8 @@ nothing of its own. What a slot row looks like, and its height, is what your fun
 
 ## Usage
 
+<Framework name="react">
+
 ```tsx
 import { Calendar, type TimeSlot } from "@fragiola/calendar-react";
 
@@ -41,9 +43,39 @@ export function Slots() {
 }
 ```
 
+</Framework>
+
+<Framework name="vue">
+
+```vue title="slots.vue"
+<script setup lang="ts">
+import { Calendar } from "@fragiola/calendar-vue";
+</script>
+
+<template>
+
+    <!-- the slot reads only its scope: Vue keeps it stable, a row renders again only when it changed -->
+    <Calendar.SlotRows v-slot="{ slot }">
+        <Calendar.SlotRow :slot="slot" class="slot-row">
+            <Calendar.SlotLabel class="slot-label">
+                {{ slot.time.endsWith(":00") ? slot.time : "" }}
+            </Calendar.SlotLabel>
+            <Calendar.Slots v-slot="{ column }">
+                <Calendar.Slot :date="column.date" class="slot" />
+            </Calendar.Slots>
+        </Calendar.SlotRow>
+    </Calendar.SlotRows>
+</template>
+```
+
+</Framework>
+
 It renders an hour label on the full hours and one cell per day in every row.
 
 ## Props
+
+In Vue: the same props (in kebab-case in a template), and slots in place of `children`; see
+[Vue primitives](/docs/api/vue).
 
 `SlotRowsProps`:
 

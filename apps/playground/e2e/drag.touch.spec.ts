@@ -1,5 +1,5 @@
 import { expect, type Page, test } from "@playwright/test";
-import { day, event, log, openFixture, pointIn } from "./helpers";
+import { day, event, log, openFixture, pointIn, settled } from "./helpers";
 
 // Touch, on a phone's emulation (the `mobile` project): a press on an event that is not focused
 // starts a drag only after a long press (`longPressDelay`, 500 ms), so a swipe scrolls the page
@@ -32,7 +32,7 @@ test("a long press on an event, then a move, drops it on another day", async ({
     const to = await pointIn(day(page, "2026-11-27"), 0.3, 0.6);
     const touch = await finger(page);
     await touch.start(from);
-    await page.waitForTimeout(700);
+    // the long press (500 ms): the event shows it is dragged once it has passed
     await expect(event(page, "standup")).toHaveAttribute("data-dragging", "");
     for (let step = 1; step <= 6; step++) {
         await touch.move({
@@ -55,7 +55,8 @@ test("a quick swipe is no drag", async ({ page }) => {
     await touch.move({ x: (from.x + to.x) / 2, y: from.y });
     await touch.move(to);
     await touch.end(to);
-    await page.waitForTimeout(200);
+    await settled(page);
     await expect(log(page).filter({ hasText: "drop" })).toHaveCount(0);
+    await expect(page.locator("[data-dragging]")).toHaveCount(0);
     await expect(event(day(page, "2026-11-26"), "standup")).toBeVisible();
 });

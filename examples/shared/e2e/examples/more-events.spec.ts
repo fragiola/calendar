@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { day, focused, openExample } from "../helpers";
+import { day, focused, openExample, settled } from "../helpers";
 
 // more-events: two events a day; "+N more" opens Fragiola UI's popover with the day's events, from
 // a press and from the keyboard (the link is the last item of the day's events).
@@ -30,6 +30,13 @@ test("a press on +N more opens the day's events in a popover; Escape closes it",
     );
     await expect(popover.getByRole("listitem")).toHaveCount(7);
     await expect(popover).toContainText("Team lunch");
+    // a press on +N more while its popover is open is the engine's more-click again: it stays open
+    // (the trigger's own toggle is the app's, never the calendar's)
+    await more(day(stage, "2026-11-26")).click();
+    await settled(page);
+    await expect(page.getByRole("dialog")).toHaveCount(1);
+    await expect(popover).toBeVisible();
+    await expect(popover).not.toHaveAttribute("data-closed");
     await page.keyboard.press("Escape");
     await expect(popover).toBeHidden();
 });

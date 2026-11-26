@@ -5,7 +5,7 @@ description: Test calendar logic in plain Node with an injected clock, component
 
 The model loads in plain Node: no DOM, no timers, no global clock it does not let you replace. So
 most of a calendar's behaviour (your commands, your middleware, what a view lays out) is a unit
-test. Components test with Testing Library through roles, accessible names and
+test. Components test with Testing Library (React's or Vue's) through roles, accessible names and
 `data-calendar-part`; gestures and the keyboard in a real browser. Which runner you use is yours.
 
 ## The model, in Node
@@ -81,6 +81,8 @@ reach the calendar through roles and names, as a reader would. The grid is a `gr
 `data-calendar-part` and `data-date` find a part when no role says enough (`modelOf` is the
 helper of the section above):
 
+<Framework name="react">
+
 ```tsx
 import { Calendar } from "@fragiola/calendar-react";
 import { act, render, screen } from "@testing-library/react";
@@ -124,8 +126,64 @@ it("shows the standup on Thursday", () => {
 });
 ```
 
+</Framework>
+
+<Framework name="vue">
+
+```ts title="team-week.test.ts"
+import {
+    Calendar,
+    type TimeGridColumn,
+    type TimeSegment,
+} from "@fragiola/calendar-vue";
+import { render, screen } from "@testing-library/vue";
+import { expect, it } from "vitest";
+import { h, nextTick } from "vue";
+
+it("shows the standup on Thursday", async () => {
+    const model = modelOf();
+    render(() =>
+        h(Calendar.Root, { model }, () =>
+            h(Calendar.TimeGrid, { "aria-label": "Week" }, () =>
+                h(Calendar.Columns, null, {
+                    default: ({ column }: { column: TimeGridColumn }) =>
+                        h(Calendar.Column, { column }, () =>
+                            h(Calendar.ColumnEvents, null, {
+                                default: ({ segment }: { segment: TimeSegment }) =>
+                                    h(Calendar.TimeEvent, {
+                                        segment,
+                                        "aria-label": segment.eventId,
+                                    }),
+                            }),
+                        ),
+                }),
+            ),
+        ),
+    );
+    const event = screen.getByRole("listitem", { name: "standup" });
+    expect(event.closest('[data-calendar-part="column"]')).toHaveProperty(
+        "dataset.date",
+        "2026-11-26",
+    );
+    model.run("event.move", { eventId: "standup", delta: { days: 1 } });
+    await nextTick(); // Vue renders the change on its next tick
+    expect(
+        screen
+            .getByRole("listitem", { name: "standup" })
+            .closest('[data-calendar-part="column"]'),
+    ).toHaveProperty("dataset.date", "2026-11-27");
+});
+```
+
+Render an SFC of your own (`render(TeamWeek, { props: { model } })`) the same way: the test's
+Vite config needs `@vitejs/plugin-vue` to compile it. `fireEvent` returns a promise that resolves
+once Vue has updated the DOM; `@vue/test-utils`' `mount` works the same way, if you prefer it.
+
+</Framework>
+
 jsdom has no layout, so positions and pointer gestures belong in a browser test. A server render
-works in Node too (`renderToString`): the first render reads the model's layout, before any engine.
+works in Node too (`renderToString` from `react-dom/server` or `vue/server-renderer`): the first
+render reads the model's layout, before any engine.
 
 ## The browser, with Playwright
 

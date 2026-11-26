@@ -12,8 +12,8 @@ export interface ColumnHeadersState {
 export interface ColumnHeadersProps
     extends DivPrimitiveProps<ColumnHeadersState> {
     /**
-     * called per column (`<Calendar.ColumnHeader date={date} />`); put a corner cell for a time
-     * axis before it yourself
+     * called per column (`<Calendar.ColumnHeader date={date} />`); a time grid's axis is its
+     * column 1 (`aria-colindex`), so no corner cell is needed
      */
     children: (date: string) => React.ReactNode;
 }

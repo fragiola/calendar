@@ -6,9 +6,11 @@ import {
     EXAMPLES,
     eventById,
     grid,
+    hostedFrame,
     openHosted,
     pointIn,
     scrollTo,
+    settled,
     slot,
 } from "./helpers";
 
@@ -34,7 +36,9 @@ test("the embed says ready once, with no resize for a fill layout", async ({
         .poll(() => messages(page))
         .toContainEqual({ type: "fragiola:example:ready", id: "month" });
     await expect(page.getByTestId("frame")).toHaveCSS("opacity", "1");
-    await page.waitForTimeout(300);
+    // a resize would be posted after the frame's layout: let it paint, then the page
+    await settled(hostedFrame(page));
+    await settled(page);
     expect(await messages(page)).toEqual([
         { type: "fragiola:example:ready", id: "month" },
     ]);
@@ -71,7 +75,7 @@ test("the theme is applied before the first paint, and follows the site's messag
 
     // an unknown theme is ignored
     await send("nope");
-    await page.waitForTimeout(100);
+    await settled(hostedFrame(page));
     await expect(body).toHaveAttribute("data-example-theme", "dark");
 });
 
