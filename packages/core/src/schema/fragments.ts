@@ -74,6 +74,10 @@ export const EVENT_FIELDS = {
     timeZone: TIME_ZONE,
     calendarId: ID,
     recurrence: RECURRENCE,
+    sourceId: {
+        ...ID,
+        description: "the event source it came from (requires eventSources())",
+    },
     data: DATA,
     ...EVENT_FLAGS,
 } as const;
@@ -88,6 +92,55 @@ export const CALENDAR_FIELDS = {
 export const VALID_RANGE = {
     type: "object",
     properties: { start: PLAIN_DATE, end: PLAIN_DATE },
+    additionalProperties: false,
+} as const;
+
+/** A range of a constraint: dates (a day's start in the display zone) or RFC 3339 date-times. */
+export const CONSTRAINT_RANGE = {
+    type: "object",
+    properties: {
+        start: {
+            type: "string",
+            description: "YYYY-MM-DD or an RFC 3339 date-time",
+        },
+        end: {
+            type: "string",
+            description: "YYYY-MM-DD or an RFC 3339 date-time (exclusive)",
+        },
+    },
+    additionalProperties: false,
+} as const;
+
+/** Where events (or a selection) may be: within business hours, or within one of the ranges. */
+export const CONSTRAINT = {
+    anyOf: [
+        { const: "business-hours" },
+        { type: "array", items: CONSTRAINT_RANGE },
+    ],
+    description:
+        '"business-hours", or ranges one of which must hold it (requires constraints())',
+} as const;
+
+/** The business hours of some days of the week, in the display zone. */
+export const BUSINESS_HOURS = {
+    type: "object",
+    properties: {
+        daysOfWeek: { type: "array", items: WEEKDAY, uniqueItems: true },
+        startTime: PLAIN_TIME,
+        endTime: PLAIN_TIME,
+    },
+    required: ["daysOfWeek", "startTime", "endTime"],
+    additionalProperties: false,
+} as const;
+
+/** An event source the app fetches events from. */
+export const EVENT_SOURCE = {
+    type: "object",
+    properties: {
+        id: ID,
+        calendarId: { ...ID, description: "the calendar its events go to" },
+    },
+    required: ["id"],
     additionalProperties: false,
 } as const;
 
@@ -129,6 +182,28 @@ export const SETTINGS_FIELDS = {
     startEditable: { type: "boolean" },
     durationEditable: { type: "boolean" },
     deletable: { type: "boolean" },
+    businessHours: {
+        type: "array",
+        items: BUSINESS_HOURS,
+        description:
+            "the business hours, per days of the week, in the display zone (requires constraints())",
+    },
+    eventConstraint: CONSTRAINT,
+    selectConstraint: CONSTRAINT,
+    overlap: {
+        anyOf: [
+            { type: "boolean" },
+            { type: "object", additionalProperties: { type: "boolean" } },
+        ],
+        description:
+            "whether events may overlap: for all, or per calendar id (requires constraints())",
+    },
+    eventSources: {
+        type: "array",
+        items: EVENT_SOURCE,
+        description:
+            "the event sources the app fetches (requires eventSources())",
+    },
 } as const;
 
 export const VIEW_TYPE = {

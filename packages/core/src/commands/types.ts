@@ -3,9 +3,11 @@
 // same author and licence.
 import type {
     CalendarEventInit,
+    CalendarEventJson,
     CalendarInfoJson,
     CalendarSettingsJson,
     EventFlags,
+    RecurrenceJson,
     ViewType,
 } from "../document/calendar-document";
 import type {
@@ -113,7 +115,8 @@ export type CalendarUpdatePayload<T extends CalendarTypes = AnyTypes> = {
 
 /**
  * A patch of the settings: each field replaces the setting; `null` removes an optional one
- * (`firstDayOfWeek`, `snapDuration`, `validRange`, the flag defaults) so its default applies.
+ * (`firstDayOfWeek`, `snapDuration`, `validRange`, the flag defaults, the features' settings) so
+ * its default applies.
  */
 export type SettingsPatch = {
     [K in keyof CalendarSettingsJson]?: K extends
@@ -123,6 +126,11 @@ export type SettingsPatch = {
         | "startEditable"
         | "durationEditable"
         | "deletable"
+        | "businessHours"
+        | "eventConstraint"
+        | "selectConstraint"
+        | "overlap"
+        | "eventSources"
         ? CalendarSettingsJson[K] | null
         : CalendarSettingsJson[K];
 };
@@ -201,6 +209,40 @@ export interface CommandMap<T extends CalendarTypes = AnyTypes> {
         payload: { commands: BatchEntry<T>[] };
         result: { results: unknown[] };
     };
+    /** `recurrence()`'s */
+    "event.set-recurrence": {
+        payload: { eventId: string; recurrence: RecurrenceJson | null };
+        result: EventIdResult;
+    };
+    /** `eventSources()`'s */
+    "event-sources.receive": {
+        payload: {
+            sourceId: string;
+            range: DaysPayload;
+            events: CalendarEventJson<T>[];
+        };
+        result: {
+            sourceId: string;
+            eventIds: string[];
+            removedEventIds: string[];
+        };
+    };
+    /** `eventSources()`'s */
+    "event-sources.invalidate": {
+        payload: { sourceId?: string; range?: DaysPayload };
+        result: { sourceIds: string[] };
+    };
+    /** `eventSources()`'s */
+    "event-sources.set-loading": {
+        payload: { sourceId: string; range: DaysPayload; loading: boolean };
+        result: { sourceId: string };
+    };
+}
+
+/** A range of days in a payload: `YYYY-MM-DD`, `end` exclusive. */
+export interface DaysPayload {
+    start: string;
+    end: string;
 }
 
 /** The view a `view.*` command leaves, as JSON. */

@@ -3,6 +3,7 @@
 
 // layout (D11) and part attributes (D17)
 export type { EventAttributesPayload } from "./attributes/event-attributes";
+export type { SlotAttributesPayload } from "./attributes/slot-attributes";
 export type { EventPermissions } from "./commands/edit-rules";
 export {
     type BatchEntry,
@@ -20,6 +21,7 @@ export {
     type CommandName,
     type CommandResult,
     type DateInput,
+    type DaysPayload,
     type EditScope,
     type EventAddPayload,
     type EventMovePayload,
@@ -41,12 +43,16 @@ export {
 } from "./commands/types";
 // the document (D3)
 export type {
+    BusinessHours,
     CalendarDocument,
     CalendarEventInit,
     CalendarEventJson,
     CalendarInfoJson,
     CalendarSettingsJson,
+    ConstraintRange,
+    EventConstraint,
     EventFlags,
+    EventSource,
     RecurrenceJson,
     ValidRangeJson,
     ViewJson,
@@ -94,9 +100,12 @@ export type {
     EditRequest,
     EditWrite,
     EventChange,
+    FeatureCommand,
     FeatureDocument,
+    FeatureReads,
     FeatureState,
     PartAttributes,
+    SelectionRange,
 } from "./features/types";
 export type {
     DayCell,
@@ -137,6 +146,11 @@ export {
 export type { JsonSchema, JsonValue } from "./schema/json-schema";
 export type { CalendarState, ViewState } from "./state/calendar-state";
 export type { Draft, DraftState } from "./state/draft";
+export type {
+    BusinessHoursRange,
+    EventSourceStatus,
+    RangeToFetch,
+} from "./state/feature-queries";
 export type {
     DateRangeJson,
     ModelGetKey,

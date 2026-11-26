@@ -39,6 +39,32 @@ export interface RecurrenceJson {
     overrides?: Record<string, Record<string, unknown>>;
 }
 
+/** The business hours of some days of the week (requires `constraints()`), in the display zone. */
+export interface BusinessHours {
+    daysOfWeek: Weekday[];
+    /** `HH:mm` */
+    startTime: PlainTimeString;
+    /** `HH:mm`, after `startTime` (up to `24:00`) */
+    endTime: PlainTimeString;
+}
+
+/** A range of a constraint: dates (a day's start in the display zone) or date-times; either end open. */
+export interface ConstraintRange {
+    start?: PlainDateString | DateTimeString;
+    /** exclusive */
+    end?: PlainDateString | DateTimeString;
+}
+
+/** Where an event or a selection may be (requires `constraints()`): business hours, or within a range. */
+export type EventConstraint = "business-hours" | ConstraintRange[];
+
+/** An event source (requires `eventSources()`): the app fetches its events, the model tracks its ranges. */
+export interface EventSource {
+    id: string;
+    /** the calendar its events go to when they name none */
+    calendarId?: string;
+}
+
 /**
  * The fields an event is written with: the document's, and `event.add`'s. `start` and `end` are
  * `YYYY-MM-DD` dates when `allDay`, RFC 3339 date-times with their offset otherwise; `end` is
@@ -60,6 +86,8 @@ export type CalendarEventInit<K extends string = string, D = unknown> = {
     calendarId?: string;
     /** the occurrences of a recurring event (requires `recurrence()`) */
     recurrence?: RecurrenceJson;
+    /** the event source it came from (requires `eventSources()`) */
+    sourceId?: string;
 } & EventFlags &
     DataField<D>;
 
@@ -131,6 +159,16 @@ export interface CalendarSettingsJson {
     durationEditable?: boolean;
     /** the default of every event's `deletable` (default `editable`) */
     deletable?: boolean;
+    /** the business hours (requires `constraints()`) */
+    businessHours?: BusinessHours[];
+    /** where events may be added, moved and resized to (requires `constraints()`) */
+    eventConstraint?: EventConstraint;
+    /** where a range may be selected (requires `constraints()`; read by `selection()`) */
+    selectConstraint?: EventConstraint;
+    /** whether events may overlap: all of them, or per calendar id (requires `constraints()`; default true) */
+    overlap?: boolean | Record<string, boolean>;
+    /** the event sources (requires `eventSources()`) */
+    eventSources?: EventSource[];
 }
 
 /** A view type (D7). */

@@ -124,7 +124,7 @@ export const eventAdd = defineCommand({
             const owner = features.missing("eventFields", key);
             if (owner !== undefined) {
                 return fail(
-                    "not_found",
+                    "invalid_payload",
                     `"${key}" ${requiresFeature(owner)}`,
                     `/${key}`,
                 );

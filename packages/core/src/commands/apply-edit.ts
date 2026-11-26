@@ -92,7 +92,21 @@ export function applyEdit<R>(
     if (changed !== null && "ok" in changed) return changed as Failure;
     let next: CalendarEvent | null = null;
     if (changed !== null) {
-        next = toEvent({ ...event, ...changed }, event.id);
+        // an occurrence a feature took is checked as an event of its own: the series' fields (its
+        // rule) are the feature's to check when it writes
+        next = toEvent(
+            target === undefined
+                ? { ...event, ...changed }
+                : {
+                      ...event,
+                      recurrence: undefined,
+                      ...(occurrence.title === undefined
+                          ? {}
+                          : { title: occurrence.title }),
+                      ...changed,
+                  },
+            event.id,
+        );
         const issues = eventIssues(
             next as unknown as Readonly<Record<string, unknown>> &
                 CalendarEvent,
@@ -106,11 +120,18 @@ export function applyEdit<R>(
         command,
         before: event,
         after: next,
+        occurrence,
     });
     if (refusal) return refusal;
     const written = features.writeEdit(draft, { ...request, occurrence, next });
     if (written !== undefined) {
-        return written.ok ? ok(value(next)) : written;
+        if (!written.ok) return written;
+        const extra = written.value;
+        return ok(
+            typeof extra === "object" && extra !== null
+                ? ({ ...value(next), ...extra } as R)
+                : value(next),
+        );
     }
     if (next === null)
         draft.removeEvents((candidate) => candidate.id === event.id);

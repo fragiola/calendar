@@ -23,6 +23,7 @@ export interface CalendarEvent<K extends string = string, D = unknown>
     readonly timeZone?: string;
     readonly calendarId?: string;
     readonly recurrence?: Readonly<RecurrenceJson>;
+    readonly sourceId?: string;
     readonly data?: D;
 }
 

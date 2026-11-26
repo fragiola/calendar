@@ -4,7 +4,11 @@
 // the core composes them once, when the model is created (`registry.ts`). Features talk to each
 // other only through keys. The engine's hook points (keys, presses, gestures) join with the engine
 // (Issue #5).
-import type { CommandDefinition, Failure } from "../commands/define";
+import type {
+    CommandDefinition,
+    Failure,
+    ReduceContext,
+} from "../commands/define";
 import type { CommandResult, EditScope } from "../commands/types";
 import type { CalendarEvent } from "../document/calendar-event";
 import type { AnyTypes, CalendarTypes } from "../document/calendar-types";
@@ -23,6 +27,14 @@ export type FeatureState = DraftState;
 export type FeatureDocument = Readonly<Record<string, unknown>> & {
     readonly events: readonly Readonly<Record<string, unknown>>[];
     readonly settings?: Readonly<Record<string, unknown>>;
+};
+
+/** A feature's command: a definition of any command of `CommandMap`, its payload its own. */
+export type FeatureCommand = Omit<CommandDefinition, "reduce"> & {
+    readonly reduce: (
+        payload: never,
+        context: ReduceContext,
+    ) => CommandResult<unknown>;
 };
 
 /** A part's attributes (D17): `data-*` and ARIA, `undefined` for an absent one. */
@@ -52,13 +64,41 @@ export interface EditWrite extends EditRequest {
     readonly next: CalendarEvent | null;
 }
 
-/** A change of an event the core is about to write: what the constraints of a feature may refuse. */
+/**
+ * A change of an event the core is about to write: what the constraints of a feature may refuse.
+ * For an edit of one occurrence of a recurring event, `after` is that occurrence's new fields as
+ * an event (its id the event's, no `recurrence`).
+ */
 export interface EventChange {
     readonly command: string;
     /** the event before (`undefined`: added) */
     readonly before: CalendarEvent | undefined;
     /** the event after (`null`: removed) */
     readonly after: CalendarEvent | null;
+    /** the occurrence an edit started from (its times before), for an edit of an existing event */
+    readonly occurrence?: Occurrence;
+}
+
+/** A range of dates or times a selection covers (`selection()`, D2), end exclusive. */
+export interface SelectionRange {
+    /** a date when `allDay`, an RFC 3339 date-time otherwise */
+    readonly start: string;
+    readonly end: string;
+    readonly allDay: boolean;
+}
+
+/**
+ * What the core lends a feature's rules: reads that need the other features' contributions (every
+ * event's occurrences, a recurring one's expanded by `recurrence()`), without importing them.
+ */
+export interface FeatureReads {
+    /** every event's occurrences that may touch the window (calendars hidden or not), in event order */
+    occurrences(within: OccurrenceWindow): readonly Occurrence[];
+    /** one event's occurrences that may touch the window (one not in the state: an event added) */
+    eventOccurrences(
+        event: CalendarEvent,
+        within: OccurrenceWindow,
+    ): readonly Occurrence[];
 }
 
 /**
@@ -74,6 +114,14 @@ export interface CalendarFeature<
     readonly requires?: readonly FeatureName[];
     /** its settings and their defaults */
     readonly settings?: Readonly<Record<string, unknown>>;
+    /**
+     * the rules of its settings past the JSON Schema, on the settings in effect (the document's,
+     * and `settings.set`'s once applied); `path` is the settings' pointer
+     */
+    settingsIssues?(
+        settings: Readonly<Record<string, unknown>>,
+        path: string,
+    ): ValidationIssue[];
     /** the rules of its document fields past the JSON Schema (top-level fields) */
     issues?(
         json: FeatureDocument,
@@ -95,7 +143,7 @@ export interface CalendarFeature<
     /** its top-level document fields, from a state */
     toJson?(state: FeatureState): Record<string, unknown>;
     /** its commands, on the same bus as the core's (same middleware, results and codes) */
-    readonly commands?: readonly CommandDefinition[];
+    readonly commands?: readonly FeatureCommand[];
     /** its `model.get` keys */
     readonly get?: {
         readonly [key: string]: (
@@ -120,6 +168,15 @@ export interface CalendarFeature<
         window: OccurrenceWindow,
     ): readonly Occurrence[] | undefined;
     /**
+     * an occurrence by its id when the feature owns it (`get("occurrence-by")`): the occurrence,
+     * `null` when the id is the feature's but names none (an excluded date, a recurring event's own
+     * id), or `undefined` to leave the id to the core
+     */
+    occurrenceById?(
+        state: FeatureState,
+        occurrenceId: string,
+    ): Occurrence | null | undefined;
+    /**
      * the occurrence an edit starts from (a recurring event's, by `occurrenceId`), a failure (no
      * such occurrence, a scope missing), or `undefined` to leave it to the core (the event itself)
      */
@@ -127,19 +184,38 @@ export interface CalendarFeature<
         state: FeatureState,
         edit: EditRequest,
     ): Occurrence | Failure | undefined;
-    /** writes an edit the core computed, its own way, or `undefined` to let the core write `next` */
+    /**
+     * writes an edit the core computed, its own way, or `undefined` to let the core write `next`;
+     * an object value is merged into the command's result (the id of an event it added)
+     */
     writeEdit?(
         draft: Draft,
         edit: EditWrite,
     ): CommandResult<unknown> | undefined;
     /** a change of an event that its rules refuse (constraints), or `undefined` */
-    checkEvent?(state: FeatureState, change: EventChange): Failure | undefined;
+    checkEvent?(
+        state: FeatureState,
+        change: EventChange,
+        reads: FeatureReads,
+    ): Failure | undefined;
+    /** a selected range that its rules refuse (`selectConstraint`), or `undefined` */
+    checkSelection?(
+        state: FeatureState,
+        selection: SelectionRange,
+        reads: FeatureReads,
+    ): Failure | undefined;
     /** after every command, before it commits: its state kept to the core's (events removed, …) */
     stateChanged?(draft: Draft, before: FeatureState): void;
     /** the attributes a day (`YYYY-MM-DD`) gets, from the state alone */
     dayAttributes?(
         state: FeatureState,
         date: string,
+    ): PartAttributes | undefined;
+    /** the attributes a time-grid slot (a date, an `HH:mm` time) gets, from the state alone */
+    slotAttributes?(
+        state: FeatureState,
+        date: string,
+        time: string,
     ): PartAttributes | undefined;
     /** the attributes an occurrence's element gets, from the state alone */
     eventAttributes?(

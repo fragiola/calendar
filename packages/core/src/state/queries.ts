@@ -10,6 +10,10 @@ import {
     occurrenceOf,
 } from "../attributes/event-attributes";
 import { rootAttributes } from "../attributes/root-attributes";
+import {
+    type SlotAttributesPayload,
+    slotAttributes,
+} from "../attributes/slot-attributes";
 import { COMMANDS } from "../commands/catalogue";
 import type { CommandDefinition } from "../commands/define";
 import { type EventPermissions, permissionsOf } from "../commands/edit-rules";
@@ -22,12 +26,16 @@ import type {
 import type { CalendarSettings } from "../document/calendar-settings";
 import type { AnyTypes, CalendarTypes } from "../document/calendar-types";
 import { toCalendarJson } from "../document/to-calendar-json";
+import type { OwnedBy } from "../features/keys";
 import type { ComposedFeatures } from "../features/registry";
 import type {
     CalendarFeatureInfo,
     FeatureState,
     PartAttributes,
 } from "../features/types";
+import { dayHeaderParts } from "../format/day-header-parts";
+import { slotLabelParts } from "../format/slot-label-parts";
+import { titleParts } from "../format/title-parts";
 import { type DayGrid, type DayGridWeek, dayGrid } from "../layout/day-grid";
 import { type LayoutInput, layoutInput } from "../layout/layout-input";
 import { type ListDay, type ListLayout, listLayout } from "../layout/list";
@@ -38,6 +46,7 @@ import {
     type TimeGridColumn,
     timeGrid,
 } from "../layout/time-grid";
+import type { FormatOptions } from "../locale/date-time-format";
 import { fromEpochDay, toEpochDay } from "../time/epoch-day";
 import { formatPlainDate } from "../time/format-plain-date";
 import { parsePlainDate } from "../time/parse-plain-date";
@@ -46,6 +55,11 @@ import { isValidDay } from "../view/valid-days";
 import type { DayRange } from "../view/view-days";
 import type { CalendarState, ViewState } from "./calendar-state";
 import { indexOf } from "./draft";
+import type {
+    BusinessHoursRange,
+    EventSourceStatus,
+    RangeToFetch,
+} from "./feature-queries";
 
 /**
  * The payload argument of a query: optional when the payload has no required field
@@ -97,10 +111,21 @@ export interface ModelGetMap<T extends CalendarTypes = AnyTypes> {
     "current-range": { payload: NoPayload; result: DateRangeJson };
     /** the occurrences the view shows, in event order (D6) */
     occurrences: { payload: NoPayload; result: readonly Occurrence[] };
-    /** an occurrence by its id: one the view shows, else a non-recurring event's own */
+    /**
+     * an occurrence by its id: one the view shows, else one a feature finds (a recurring event's,
+     * any date), else a non-recurring event's own
+     */
     "occurrence-by": {
         payload: { id: string };
         result: Occurrence | undefined;
+    };
+    /**
+     * the occurrences that touch a range of days (the display zone's), recurring ones expanded, in
+     * event order (requires `recurrence()`)
+     */
+    "occurrences-in": {
+        payload: { range: DateRangeJson };
+        result: readonly Occurrence[];
     };
     /**
      * the day grid (D11): a month view's weeks, or a time-grid view's all-day row; `null` for a
@@ -120,6 +145,53 @@ export interface ModelGetMap<T extends CalendarTypes = AnyTypes> {
     "event-attributes-by": {
         payload: EventAttributesPayload;
         result: PartAttributes | undefined;
+    };
+    /** a time-grid slot's part attributes (D17): `data-date`, `data-time` and the features' */
+    "slot-attributes-by": {
+        payload: SlotAttributesPayload;
+        result: PartAttributes | undefined;
+    };
+    /**
+     * the view's title as `Intl.DateTimeFormat#formatRangeToParts` parts in the settings' locale
+     * (D4): a month view's month, another view's days; `format` replaces the default options
+     */
+    "title-parts": {
+        payload: { format?: FormatOptions };
+        result: readonly Intl.DateTimeRangeFormatPart[];
+    };
+    /**
+     * a day's header as `Intl.DateTimeFormat` parts (D4): the weekday in a month view, the weekday
+     * and the day in a time grid; `undefined` for no date
+     */
+    "day-header-by": {
+        payload: { date: string; format?: FormatOptions };
+        result: readonly Intl.DateTimeFormatPart[] | undefined;
+    };
+    /** a slot label (an `HH:mm` time) as `Intl.DateTimeFormat` parts (D4); `undefined` for no time */
+    "slot-label-by": {
+        payload: { time: string; format?: FormatOptions };
+        result: readonly Intl.DateTimeFormatPart[] | undefined;
+    };
+    /**
+     * the business hours of each day of a range (default the visible one) in the display zone, with
+     * their place in a time-grid column (requires `constraints()`)
+     */
+    "business-hours-in": {
+        payload: { range?: DateRangeJson };
+        result: readonly BusinessHoursRange[];
+    };
+    /**
+     * per source, the ranges of a range of days (default the visible one) neither received nor
+     * being fetched, merged (requires `eventSources()`)
+     */
+    "ranges-to-fetch": {
+        payload: { range?: DateRangeJson };
+        result: readonly RangeToFetch[];
+    };
+    /** a source and its fetched and loading ranges (requires `eventSources()`) */
+    "event-source-by": {
+        payload: { id: string };
+        result: EventSourceStatus | undefined;
     };
     /** the root's part attributes (D17) */
     "root-attributes": { payload: NoPayload; result: PartAttributes };
@@ -167,6 +239,10 @@ export interface ModelIsMap {
     "date-disabled": { date: string };
     /** the list layout has no day */
     "list-empty": NoPayload;
+    /** the event has a recurrence rule (requires `recurrence()`) */
+    "event-recurring": { eventId: string };
+    /** the source has a range being fetched; without `sourceId`, any source (requires `eventSources()`) */
+    "event-source-loading": { sourceId?: string };
 }
 
 /** A key of `model.is`. */
@@ -274,9 +350,33 @@ export function createQueries(
             : undefined;
     };
 
+    // formatted parts, frozen and reused while the locale is the same (adapters ask per render)
+    let formats = new Map<string, unknown>();
+    let formatsLocale = "";
+    const formatted = <V>(
+        state: CalendarState,
+        key: readonly unknown[],
+        make: () => V,
+    ): V => {
+        if (state.settings.locale !== formatsLocale || formats.size > 2000) {
+            formats = new Map();
+            formatsLocale = state.settings.locale;
+        }
+        const id = JSON.stringify(key);
+        if (formats.has(id)) return formats.get(id) as V;
+        const made = make();
+        const value = (
+            Array.isArray(made)
+                ? Object.freeze(made.map((part) => Object.freeze(part)))
+                : made
+        ) as V;
+        formats.set(id, value);
+        return value;
+    };
+
     type Payload = Readonly<Record<string, unknown>>;
     const getters: Record<
-        ModelGetKey,
+        Exclude<ModelGetKey, OwnedBy<"get">>,
         (state: CalendarState, payload: Payload) => unknown
     > = {
         "event-by": (state, { id }) => eventOf(state, id),
@@ -297,7 +397,7 @@ export function createQueries(
             inputOf(state).placed.map((placed) => placed.occurrence),
         "occurrence-by": (state, { id }) =>
             typeof id === "string"
-                ? occurrenceOf(inputOf(state), id)
+                ? occurrenceOf(inputOf(state), features, id)
                 : undefined,
         "day-grid": (state, { maxLanes }) => {
             const layout = inputOf(state);
@@ -325,6 +425,38 @@ export function createQueries(
                 features,
                 payload as unknown as EventAttributesPayload,
             ),
+        "slot-attributes-by": (state, payload) =>
+            slotAttributes(state, features, payload),
+        "title-parts": (state, { format }) => {
+            const { days } = inputOf(state);
+            const { type, duration } = state.view;
+            return formatted(
+                state,
+                ["title", type, duration, days.current, days.visible, format],
+                () =>
+                    titleParts(
+                        state,
+                        days,
+                        format as FormatOptions | undefined,
+                    ),
+            );
+        },
+        "day-header-by": (state, { date, format }) =>
+            formatted(state, ["day", state.view.type, date, format], () =>
+                dayHeaderParts(
+                    state,
+                    date,
+                    format as FormatOptions | undefined,
+                ),
+            ),
+        "slot-label-by": (state, { time, format }) =>
+            formatted(state, ["slot", time, format], () =>
+                slotLabelParts(
+                    state,
+                    time,
+                    format as FormatOptions | undefined,
+                ),
+            ),
         "root-attributes": (state) => rootAttributes(state, features),
         "calendar-json": (state, { includeView }) =>
             toCalendarJson(state, features, includeView === true),
@@ -332,7 +464,7 @@ export function createQueries(
         features: () => features.info,
     };
     const questions: Record<
-        ModelIsKey,
+        Exclude<ModelIsKey, OwnedBy<"is">>,
         (state: CalendarState, payload: Payload) => boolean
     > = {
         "event-editable": (state, { eventId }) =>
@@ -367,7 +499,7 @@ export function createQueries(
     return {
         get(state, key, payload) {
             const read = Object.hasOwn(getters, key)
-                ? getters[key as ModelGetKey]
+                ? getters[key as keyof typeof getters]
                 : undefined;
             if (read) return read(state, (payload ?? {}) as Payload);
             return features.getters.get(key)?.(
@@ -377,7 +509,7 @@ export function createQueries(
         },
         is(state, key, payload) {
             const ask = Object.hasOwn(questions, key)
-                ? questions[key as ModelIsKey]
+                ? questions[key as keyof typeof questions]
                 : undefined;
             if (ask) return ask(state, (payload ?? {}) as Payload);
             return (

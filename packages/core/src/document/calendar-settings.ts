@@ -3,7 +3,12 @@
 // `snapDuration`, `validRange` and the flag defaults other than `editable` stay absent when not
 // given: their default is another value (the locale's first day, the slot, no limit, `editable`).
 import type { Weekday } from "../time/day-of-week";
-import type { ValidRangeJson } from "./calendar-document";
+import type {
+    BusinessHours,
+    EventConstraint,
+    EventSource,
+    ValidRangeJson,
+} from "./calendar-document";
 
 /** The calendar's settings, resolved (`model.state.settings`, `get("settings")`). */
 export interface CalendarSettings {
@@ -29,6 +34,13 @@ export interface CalendarSettings {
     readonly startEditable?: boolean;
     readonly durationEditable?: boolean;
     readonly deletable?: boolean;
+    /** `constraints()`'s (absent without it) */
+    readonly businessHours?: readonly Readonly<BusinessHours>[];
+    readonly eventConstraint?: Readonly<EventConstraint>;
+    readonly selectConstraint?: Readonly<EventConstraint>;
+    readonly overlap?: boolean | Readonly<Record<string, boolean>>;
+    /** `eventSources()`'s (absent without it) */
+    readonly eventSources?: readonly Readonly<EventSource>[];
 }
 
 /** The settings of a document that gives none. */
@@ -59,4 +71,9 @@ export const OPTIONAL_SETTINGS = [
     "startEditable",
     "durationEditable",
     "deletable",
+    "businessHours",
+    "eventConstraint",
+    "selectConstraint",
+    "overlap",
+    "eventSources",
 ] as const;

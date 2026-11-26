@@ -449,14 +449,17 @@ class Model<T extends CalendarTypes, F extends CalendarFeatures>
         return result;
     }
 
-    /** The failure of a payload field that belongs to a feature not installed (`occurrenceId`). */
+    /**
+     * The failure of a payload field that belongs to a feature not installed (`occurrenceId`): not
+     * a field of the payload's schema in this model, so `invalid_payload`, naming the feature.
+     */
     private featureField(payload: unknown): CommandResult<never> | undefined {
         if (!isObject(payload)) return undefined;
         for (const key of Object.keys(payload)) {
             const owner = this.features.missing("payloadFields", key);
             if (owner !== undefined) {
                 return fail(
-                    "not_found",
+                    "invalid_payload",
                     `"${key}" ${requiresFeature(owner)}`,
                     `/${key}`,
                 );

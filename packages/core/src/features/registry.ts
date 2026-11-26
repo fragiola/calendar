@@ -8,7 +8,12 @@ import type { CommandDefinition, Failure } from "../commands/define";
 import type { CommandResult } from "../commands/types";
 import type { CalendarEvent } from "../document/calendar-event";
 import type { ValidationIssue } from "../document/validation-issue";
-import type { Occurrence, OccurrenceWindow } from "../layout/occurrence";
+import {
+    eventOccurrences,
+    type Occurrence,
+    type OccurrenceWindow,
+    occurrencesOf,
+} from "../layout/occurrence";
 import type { CalendarState } from "../state/calendar-state";
 import type { Draft } from "../state/draft";
 import { type FeatureKeyKind, type FeatureName, ownerOf } from "./keys";
@@ -19,8 +24,10 @@ import type {
     EditWrite,
     EventChange,
     FeatureDocument,
+    FeatureReads,
     FeatureState,
     PartAttributes,
+    SelectionRange,
 } from "./types";
 
 /** A model's features, composed. */
@@ -49,6 +56,10 @@ export interface ComposedFeatures {
         event: Readonly<Record<string, unknown>>,
         path: string,
     ): ValidationIssue[];
+    settingsIssues(
+        settings: Readonly<Record<string, unknown>>,
+        path: string,
+    ): ValidationIssue[];
     load(json: FeatureDocument, state: CalendarState): Record<string, unknown>;
     toJson(state: FeatureState): Record<string, unknown>;
     /** the occurrences contribution point: `undefined` without a feature filling it */
@@ -59,6 +70,13 @@ export interface ComposedFeatures {
               within: OccurrenceWindow,
           ) => readonly Occurrence[] | undefined)
         | undefined;
+    /** an occurrence a feature owns by its id (`null`: the feature's id, no occurrence) */
+    occurrenceById(
+        state: FeatureState,
+        occurrenceId: string,
+    ): Occurrence | null | undefined;
+    /** the reads lent to the features' rules, for a state */
+    reads(state: FeatureState): FeatureReads;
     /** the occurrence an edit starts from: `undefined` (the event's own) without a feature */
     editTarget(
         state: FeatureState,
@@ -71,6 +89,11 @@ export interface ComposedFeatures {
     ): CommandResult<unknown> | undefined;
     /** the first refusal of an event change by a feature's rules */
     checkEvent(state: FeatureState, change: EventChange): Failure | undefined;
+    /** the first refusal of a selected range by a feature's rules */
+    checkSelection(
+        state: FeatureState,
+        selection: SelectionRange,
+    ): Failure | undefined;
     stateChanged(draft: Draft, before: FeatureState): void;
     dayAttributes(
         state: FeatureState,
@@ -79,6 +102,11 @@ export interface ComposedFeatures {
     eventAttributes(
         state: FeatureState,
         occurrence: Occurrence,
+    ): PartAttributes | undefined;
+    slotAttributes(
+        state: FeatureState,
+        date: string,
+        time: string,
     ): PartAttributes | undefined;
     rootAttributes(state: FeatureState): PartAttributes | undefined;
 }
@@ -154,7 +182,8 @@ export function composeFeatures(
             feature,
             "command",
             (feature.commands ?? []).map(
-                (command) => [command.name, command] as const,
+                (command) =>
+                    [command.name, command as CommandDefinition] as const,
             ),
             commands,
         );
@@ -182,6 +211,10 @@ export function composeFeatures(
         list.filter((feature) => feature[key] !== undefined);
     const issuers = each("issues");
     const eventIssuers = each("eventIssues");
+    const settingsIssuers = each("settingsIssues");
+    const finders = each("occurrenceById");
+    const selectionCheckers = each("checkSelection");
+    const slots = each("slotAttributes");
     const loaders = each("load");
     const writers = each("toJson");
     const contributors = each("occurrences");
@@ -192,6 +225,29 @@ export function composeFeatures(
     const days = each("dayAttributes");
     const events = each("eventAttributes");
     const roots = each("rootAttributes");
+    const contribute = (
+        state: FeatureState,
+        event: CalendarEvent,
+        within: OccurrenceWindow,
+    ): readonly Occurrence[] | undefined => {
+        for (const feature of contributors) {
+            const occurrences = feature.occurrences?.(state, event, within);
+            if (occurrences !== undefined) return occurrences;
+        }
+        return undefined;
+    };
+    const reads = (state: FeatureState): FeatureReads => ({
+        occurrences: (within) =>
+            occurrencesOf(
+                state.events,
+                within,
+                contributors.length === 0
+                    ? undefined
+                    : (event, at) => contribute(state, event, at),
+            ),
+        eventOccurrences: (event, within) =>
+            contribute(state, event, within) ?? eventOccurrences(event),
+    });
 
     return Object.freeze({
         list: Object.freeze([...list]),
@@ -229,20 +285,19 @@ export function composeFeatures(
                 {},
                 ...writers.map((feature) => feature.toJson?.(state)),
             ),
-        occurrences:
-            contributors.length === 0
-                ? undefined
-                : (state, event, within) => {
-                      for (const feature of contributors) {
-                          const occurrences = feature.occurrences?.(
-                              state,
-                              event,
-                              within,
-                          );
-                          if (occurrences !== undefined) return occurrences;
-                      }
-                      return undefined;
-                  },
+        settingsIssues: (settings, path) =>
+            settingsIssuers.flatMap(
+                (feature) => feature.settingsIssues?.(settings, path) ?? [],
+            ),
+        occurrences: contributors.length === 0 ? undefined : contribute,
+        occurrenceById: (state, occurrenceId) => {
+            for (const feature of finders) {
+                const found = feature.occurrenceById?.(state, occurrenceId);
+                if (found !== undefined) return found;
+            }
+            return undefined;
+        },
+        reads,
         editTarget: (state, edit) => {
             for (const feature of targets) {
                 const target = feature.editTarget?.(state, edit);
@@ -258,8 +313,23 @@ export function composeFeatures(
             return undefined;
         },
         checkEvent: (state, change) => {
+            if (checkers.length === 0) return undefined;
+            const lent = reads(state);
             for (const feature of checkers) {
-                const refusal = feature.checkEvent?.(state, change);
+                const refusal = feature.checkEvent?.(state, change, lent);
+                if (refusal !== undefined) return refusal;
+            }
+            return undefined;
+        },
+        checkSelection: (state, selection) => {
+            if (selectionCheckers.length === 0) return undefined;
+            const lent = reads(state);
+            for (const feature of selectionCheckers) {
+                const refusal = feature.checkSelection?.(
+                    state,
+                    selection,
+                    lent,
+                );
                 if (refusal !== undefined) return refusal;
             }
             return undefined;
@@ -283,6 +353,14 @@ export function composeFeatures(
                 : mergeAttributes(
                       events.map((feature) =>
                           feature.eventAttributes?.(state, occurrence),
+                      ),
+                  ),
+        slotAttributes: (state, date, time) =>
+            slots.length === 0
+                ? undefined
+                : mergeAttributes(
+                      slots.map((feature) =>
+                          feature.slotAttributes?.(state, date, time),
                       ),
                   ),
         rootAttributes: (state) =>

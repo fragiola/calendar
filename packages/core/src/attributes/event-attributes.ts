@@ -34,13 +34,22 @@ function shownById(input: LayoutInput): Map<string, Occurrence> {
     return map;
 }
 
-/** An occurrence by its id: one the view shows, else a non-recurring event's own. */
+/**
+ * An occurrence by its id: one the view shows, else one a feature finds (`recurrence()`'s, any
+ * date), else a non-recurring event's own.
+ */
 export function occurrenceOf(
     input: LayoutInput,
+    features: ComposedFeatures,
     occurrenceId: string,
 ): Occurrence | undefined {
     const shown = shownById(input).get(occurrenceId);
     if (shown) return shown;
+    const found = features.occurrenceById(
+        input.state as FeatureState,
+        occurrenceId,
+    );
+    if (found !== undefined) return found ?? undefined;
     const at = indexOf(input.state.events).get(occurrenceId);
     const event = at === undefined ? undefined : input.state.events[at];
     return event ? eventOccurrences(event)[0] : undefined;
@@ -52,7 +61,7 @@ export function eventAttributes(
     features: ComposedFeatures,
     payload: EventAttributesPayload,
 ): PartAttributes | undefined {
-    const occurrence = occurrenceOf(input, payload.occurrenceId);
+    const occurrence = occurrenceOf(input, features, payload.occurrenceId);
     if (!occurrence) return undefined;
     const at = indexOf(input.state.events).get(occurrence.eventId);
     const event = at === undefined ? undefined : input.state.events[at];

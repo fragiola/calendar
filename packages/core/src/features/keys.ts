@@ -49,9 +49,10 @@ export const FEATURE_KEYS = Object.freeze({
         rootProps: [],
     },
     recurrence: {
-        commands: [],
-        get: [],
-        is: [],
+        // a rule set, changed or removed
+        commands: ["event.set-recurrence"],
+        get: ["occurrences-in"],
+        is: ["event-recurring"],
         engineRun: [],
         engineGet: [],
         engineIs: [],
@@ -78,7 +79,7 @@ export const FEATURE_KEYS = Object.freeze({
     },
     constraints: {
         commands: [],
-        get: [],
+        get: ["business-hours-in"],
         is: [],
         engineRun: [],
         engineGet: [],
@@ -86,7 +87,12 @@ export const FEATURE_KEYS = Object.freeze({
         fields: [],
         eventFields: [],
         payloadFields: [],
-        settings: [],
+        settings: [
+            "businessHours",
+            "eventConstraint",
+            "selectConstraint",
+            "overlap",
+        ],
         rootProps: [],
     },
     "external-drop": {
@@ -103,16 +109,21 @@ export const FEATURE_KEYS = Object.freeze({
         rootProps: [],
     },
     "event-sources": {
-        commands: [],
-        get: [],
-        is: [],
+        commands: [
+            "event-sources.receive",
+            "event-sources.invalidate",
+            "event-sources.set-loading",
+        ],
+        get: ["ranges-to-fetch", "event-source-by"],
+        is: ["event-source-loading"],
         engineRun: [],
         engineGet: [],
         engineIs: [],
         fields: [],
-        eventFields: [],
+        // the source an event came from
+        eventFields: ["sourceId"],
         payloadFields: [],
-        settings: [],
+        settings: ["eventSources"],
         rootProps: [],
     },
 } as const);

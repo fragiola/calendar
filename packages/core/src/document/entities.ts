@@ -18,6 +18,7 @@ const EVENT_KEYS = [
     "durationEditable",
     "deletable",
     "recurrence",
+    "sourceId",
     "data",
 ] as const;
 

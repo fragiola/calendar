@@ -76,7 +76,7 @@ describe("event.add", () => {
             error: { code: "invalid_payload", path: "/timeZone" },
         });
         expect(add({ recurrence: { rule: "FREQ=DAILY" } })).toMatchObject({
-            error: { code: "not_found", path: "/recurrence" },
+            error: { code: "invalid_payload", path: "/recurrence" },
         });
         expect(add({ title: 3 })).toMatchObject({
             error: { code: "invalid_payload", path: "/title" },
@@ -530,7 +530,7 @@ describe("the edit rules (D9)", () => {
 });
 
 describe("occurrences without recurrence()", () => {
-    it("refuses occurrenceId and scope as fields of the recurrence feature", () => {
+    it("refuses occurrenceId and scope as invalid fields naming the recurrence feature", () => {
         const model = modelOf([allDay("a", "2026-11-24", "2026-11-25")]);
         for (const field of [
             { occurrenceId: "a" },
@@ -541,7 +541,7 @@ describe("occurrences without recurrence()", () => {
             ).toEqual({
                 ok: false,
                 error: {
-                    code: "not_found",
+                    code: "invalid_payload",
                     message: `"${Object.keys(field)[0]}" requires the recurrence feature (\`@fragiola/calendar/recurrence\`)`,
                     path: `/${Object.keys(field)[0]}`,
                 },

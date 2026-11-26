@@ -151,7 +151,13 @@ export function loadDocument(json: unknown, context: LoadContext): LoadResult {
     const doc = json as CalendarDocument;
     const issues: ValidationIssue[] = [];
     if (doc.settings) {
-        issues.push(...settingsIssues(doc.settings, `${path}/settings`));
+        issues.push(
+            ...settingsIssues(doc.settings, `${path}/settings`),
+            ...features.settingsIssues(
+                doc.settings as Readonly<Record<string, unknown>>,
+                `${path}/settings`,
+            ),
+        );
     }
     const calendarIds = new Set<string>();
     (doc.calendars ?? []).forEach((calendar, at) => {

@@ -14,6 +14,8 @@ export interface Occurrence {
     /** exclusive, as the event's */
     readonly end: string;
     readonly allDay: boolean;
+    /** its own title, when an occurrence of a recurring event was renamed alone (`recurrence()`) */
+    readonly title?: string;
 }
 
 /** The days the occurrences are asked for, and the display zone they are shown in. */
