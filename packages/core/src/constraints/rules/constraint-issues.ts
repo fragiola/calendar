@@ -32,7 +32,7 @@ function rangeIssues(
         });
     }
     constraint.forEach((range, i) => {
-        // a date's day start is the same order in any zone that matters here: UTC reads it
+        // two dates, or two date-times, keep their order in any zone: UTC reads them
         const start =
             range.start === undefined
                 ? undefined
@@ -51,7 +51,18 @@ function rangeIssues(
                 });
             }
         }
-        if (start !== undefined && end !== undefined && end <= start) {
+        // a date against a date-time orders only in the display zone, which may change later:
+        // only edges of the same form are checked here
+        const sameForm =
+            range.start !== undefined &&
+            range.end !== undefined &&
+            (range.start.length === 10) === (range.end.length === 10);
+        if (
+            sameForm &&
+            start !== undefined &&
+            end !== undefined &&
+            end <= start
+        ) {
             issues.push({
                 path: `${path}/${i}/end`,
                 message: "must be after start (the end is exclusive)",

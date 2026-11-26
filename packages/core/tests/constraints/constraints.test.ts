@@ -386,6 +386,20 @@ describe("selectConstraint", () => {
 });
 
 describe("the settings", () => {
+    it("accepts a range from a date-time to a date, ordered in the display zone", () => {
+        const issues = validateCalendar(
+            documentOf([], {
+                timeZone: "America/New_York",
+                // 23:00 New York to the next midnight there: one hour, though UTC reads 04:00Z–00:00Z
+                eventConstraint: [
+                    { start: "2026-01-01T23:00:00-05:00", end: "2026-01-02" },
+                ],
+            }),
+            { features: [constraints()] },
+        );
+        expect(issues).toEqual([]);
+    });
+
     it("refuses nonsense", () => {
         const issues = (settings: CalendarSettingsJson) =>
             validateCalendar(documentOf([], settings), {
