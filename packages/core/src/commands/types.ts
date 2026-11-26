@@ -214,6 +214,13 @@ export interface CommandMap<T extends CalendarTypes = AnyTypes> {
         payload: { eventId: string; recurrence: RecurrenceJson | null };
         result: EventIdResult;
     };
+    /** `selection()`'s */
+    "selection.set": {
+        payload: { start: string; end: string; allDay: boolean };
+        result: { start: string; end: string; allDay: boolean };
+    };
+    /** `selection()`'s */
+    "selection.clear": { payload: NoPayload; result: { cleared: boolean } };
     /** `eventSources()`'s */
     "event-sources.receive": {
         payload: {

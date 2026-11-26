@@ -32,6 +32,7 @@ import type {
     CalendarFeatureInfo,
     FeatureState,
     PartAttributes,
+    SelectionRange,
 } from "../features/types";
 import { dayHeaderParts } from "../format/day-header-parts";
 import { slotLabelParts } from "../format/slot-label-parts";
@@ -193,6 +194,8 @@ export interface ModelGetMap<T extends CalendarTypes = AnyTypes> {
         payload: { id: string };
         result: EventSourceStatus | undefined;
     };
+    /** the selected range (requires `selection()`); `null` when none */
+    "selected-range": { payload: NoPayload; result: SelectionRange | null };
     /** the root's part attributes (D17) */
     "root-attributes": { payload: NoPayload; result: PartAttributes };
     /** the document, version 1 (a writable copy); the view only with `includeView` (D7) */
