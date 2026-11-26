@@ -209,7 +209,7 @@ describe("validRange", () => {
     });
 
     it("refuses a go-to or a view.set whose shown days all leave it (a hidden anchor)", () => {
-        const settings = {
+        const settings: CalendarSettingsJson = {
             hiddenDays: [5],
             validRange: { start: "2026-11-23", end: "2026-11-28" },
         };
