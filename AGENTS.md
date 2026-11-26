@@ -563,7 +563,7 @@ drag and ranges; RFC 5545 for recurrence; FullCalendar's documented default for 
   performance pages say it.
 
 - **Issue #9, the site export.** `site/` follows Primitives' (itself Tree's and Dockable's):
-  `contract.ts` (`CONTRACT_VERSION` `"1.7"`), `export.ts`, `dev.ts` (defaults `--base /calendar`,
+  `contract.ts` (`CONTRACT_VERSION` `"1.7"`, checked against `www`'s since Epic #13), `export.ts`, `dev.ts` (defaults `--base /calendar`,
   `--port 5192`, `DEV_PORT`), `dev-proxy.ts`, `sources.ts`; `site/examples.json` names the levels
   (`basics`, `interaction`, `data`, `apps`: the shared categories, checked equal) and the five themes
   in switcher order, whose titles, swatches and CSS come from `examples/shared`. `project.json`:
@@ -581,6 +581,34 @@ drag and ranges; RFC 5545 for recurrence; FullCalendar's documented default for 
   field, an error code, a document field or a setting is undocumented, or a `data-*` attribute or a
   part name is missing from `concepts/state-attributes`; `contract.test.ts` also refuses wording that
   lists gaps on a public page. What is missing lives in `~/organizations/fragiola/todo/calendar.md`.
+
+- **Epic #13, carry-over from Epic #10 (grid ARIA).** `partAttributes` / `engine.adapter.attributes`
+  add: `aria-current="date"` on today's `day` and, in a time grid, today's `column-header`;
+  `aria-selected` (`"true"` / `"false"`, from `data-selected`) on every `day` and `slot` while
+  `selection()` is installed, the grid `aria-multiselectable="true"` (headers and columns are not
+  selectable cells); `aria-disabled="true"` on the days outside `validRange` and on their slots. A
+  month's `column-header` keeps `data-date` (a date of its weekday, the first row's) and
+  `data-weekend` only. **The corner is a column number, not a cell**: a time grid's `time-grid` has
+  `aria-colcount` (days + 1) and every cell `aria-colindex` (`slot-label` 1, the days' `slot`,
+  `column-header`, `day` and `column` from 2), so the header row, the all-day row and the columns'
+  layer keep the slot rows' column count; an empty corner `columnheader` would need a name the
+  library may not give (D19), and axe's `empty-table-header` refuses one unnamed. A month numbers
+  nothing (its week-number column is the app's choice). `tests/engine/part-attributes.test.ts`.
+- **Epic #13, carry-over (React refs).** `use-render.ts` keys its merged ref on the consumer refs'
+  identity where it matters: a ref object by itself (a swap re-attaches: the old one is cleared, the
+  new one set), every callback ref alike (an inline one stays free).
+- **Epic #13, carry-over (E2E hygiene).** No `waitForTimeout`: a long press is awaited through the
+  `data-dragging` it causes, and a negative check runs after `settled(page | frame)` (two animation
+  frames: everything queued before has been handled and committed; the helpers of both suites).
+  Tab stops are `[data-calendar-part][tabindex="0"]`, the log's lines `listitem`s, the week
+  example's event box its `data-testid="event-box"` (every framework's week example sets it).
+- **Epic #13, carry-over (site).** `site:export` and `site:dev` refuse a `--base` other than
+  `/calendar` (`baseProblem`); the contract version is `www`'s (`findWwwContract`: `www/CONTRACT.md`
+  beside the nearest ancestor of `site/`, so a worktree finds it too; `contractVersion` reads its
+  title) and the export fails when it is not `CONTRACT_VERSION` (the version the checks implement);
+  where no `www` is checked out (CI) the pinned `CONTRACT_VERSION` is used. `site:dev` refuses a
+  `--port` that is not an integer from 1 to 65535 (`parsePort`) and exits 1 when a dev server is
+  ended by a signal (`exitCodeOf`).
 
 ## Commands
 
