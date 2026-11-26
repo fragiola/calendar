@@ -38,8 +38,12 @@ class Values {
     readonly list = injectListLayout();
     readonly selected = injectSelection();
     text(): string {
+        // ICU versions differ on the space before "AM" (U+202F or U+0020): compare plain spaces.
         const join = (parts: readonly { value: string }[]) =>
-            parts.map((part) => part.value).join("");
+            parts
+                .map((part) => part.value)
+                .join("")
+                .replace(/\s/g, " ");
         return [
             this.calendar.model().state.view.type,
             join(this.title()),
