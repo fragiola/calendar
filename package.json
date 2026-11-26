@@ -1,0 +1,42 @@
+{
+    "name": "calendar",
+    "version": "0.0.0",
+    "private": true,
+    "license": "MIT",
+    "type": "module",
+    "author": {
+        "name": "Mauro de Souza",
+        "email": "maurodesouza.me@gmail.com",
+        "url": "https://github.com/maurodesouza"
+    },
+    "packageManager": "pnpm@12.21.0",
+    "engines": {
+        "node": ">=24"
+    },
+    "scripts": {
+        "check": "biome check && pnpm check:layout && pnpm check:commands",
+        "check:layout": "node scripts/check-layout.ts",
+        "check:commands": "pnpm --filter @fragiola/calendar build && node packages/core/scripts/generate-command-docs.ts --check",
+        "check:fix": "biome check --write",
+        "typecheck": "pnpm -r --if-present typecheck",
+        "test": "vitest run",
+        "build": "pnpm -r --if-present build && node scripts/check-dts.ts && node scripts/check-features.ts",
+        "size": "node scripts/size-report.ts",
+        "check:package": "pnpm --filter \"./packages/*\" build && node scripts/check-package.ts",
+        "changeset": "changeset",
+        "release:version": "changeset version",
+        "e2e": "pnpm --workspace-concurrency=1 --filter \"./apps/*\" --filter \"./examples/*\" --if-present e2e",
+        "dev": "pnpm --filter playground dev",
+        "site:export": "node site/export.ts",
+        "site:dev": "node site/dev.ts"
+    },
+    "devDependencies": {
+        "@arethetypeswrong/cli": "0.18.5",
+        "@biomejs/biome": "2.6.7",
+        "@changesets/changelog-github": "1.0.1",
+        "@changesets/cli": "3.0.3",
+        "publint": "0.3.25",
+        "vite": "8.3.8",
+        "vitest": "5.1.0"
+    }
+}

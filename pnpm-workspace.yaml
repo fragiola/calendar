@@ -1,0 +1,12 @@
+packages:
+  # the private dev apps (the playground), from the React Epic
+  - "apps/*"
+  # the core (@fragiola/calendar) and one adapter per framework
+  - "packages/*"
+  # the site export (fragiola.com): one embed app per framework, and what they share
+  - "examples/*"
+  - "site"
+
+# Dependencies allowed to run install scripts (pnpm refuses an ignored build script in CI).
+allowBuilds:
+  esbuild: true
