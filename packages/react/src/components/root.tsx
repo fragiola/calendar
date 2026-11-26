@@ -255,10 +255,12 @@ export function Root<
         children,
         ...rest
     } = props;
-    const [ownModel] = React.useState(() =>
-        modelProp ? null : createOwnModel(props),
-    );
-    const typed = (modelProp ?? ownModel) as CalendarModel<T, F>;
+    // created the first time the root has no model prop, even after mount (a dropped `model`)
+    const ownModel = React.useRef<CalendarModel<T, F> | null>(null);
+    if (!modelProp && ownModel.current === null) {
+        ownModel.current = createOwnModel(props);
+    }
+    const typed = (modelProp ?? ownModel.current) as CalendarModel<T, F>;
     // the parts below work on the erased registry; the typed surface is their props
     const model = eraseModel(typed);
 
@@ -378,7 +380,7 @@ export function Root<
     // the controlled props: each value the root has not sent yet is brought to the model by the
     // command a user would run (a model the root created starts at them)
     const sent = React.useRef({
-        model: ownModel as unknown,
+        model: ownModel.current as unknown,
         events: events as unknown,
         settings: JSON.stringify(settings ?? null),
         view: `${view}/${days}`,

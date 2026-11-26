@@ -280,6 +280,26 @@ describe("features and the root", () => {
         warn.mockRestore();
     });
 
+    it("creates its own model when a model prop is dropped after mount", () => {
+        const model = modelOf();
+        const ref = createCalendarRef();
+        const { rerender } = render(
+            <Calendar.Root model={model} calendarRef={ref} />,
+        );
+        expect(ref.current?.model).toBe(model);
+        rerender(
+            <Calendar.Root
+                model={undefined}
+                calendarRef={ref}
+                settings={SETTINGS}
+                now={() => NOW}
+                defaultView="week"
+            />,
+        );
+        expect(ref.current?.model).not.toBe(model);
+        expect(ref.current?.model.state.view.type).toBe("week");
+    });
+
     it("gives a calendar ref the model and an engine that answers before the root mounts", () => {
         const ref = createCalendarRef();
         expect(ref.current).toBeNull();
