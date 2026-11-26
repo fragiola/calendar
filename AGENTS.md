@@ -18,12 +18,12 @@ the core**.
 | package | name | contains | depends on |
 |---|---|---|---|
 | `packages/core` | `@fragiola/calendar` | the calendar document (v1) and its JSON Schemas, the date and time-zone engine (`Intl` only), the model and its command bus (commands with JSON Schemas, `get`/`is` queries, middleware, events), the views, ranges and layout, the feature registry and every opt-in feature on its own subpath (D2), and the engine (keyboard, gestures, measurement). Today: the date and time-zone engine (`time/`, `time-zone/`, `locale/`, Issue #2) and the model (`schema/`, `document/`, `state/`, `commands/`, `view/`, `layout/`, `attributes/`, `features/`, `model/`, `format/`, Issue #3; formatting keys, Issue #4) and the model features `recurrence/`, `constraints/`, `event-sources/` (Issue #4), the engine (`engine/`) and the interactive features `selection/`, `drag-and-drop/`, `resize/`, `external-drop/`, `now-indicator/` with their shared `drop-target/` (Issue #5), each feature on its subpath | DOM only, zero runtime deps |
-| `packages/react` | `@fragiola/calendar-react` | the `Calendar.*` primitives and hooks over the core, and the core re-exported (React Epic) | the core (`workspace:*`, published as the exact version); peer `react`, `react-dom` (^19) |
+| `packages/react` | `@fragiola/calendar-react` | the `Calendar.*` primitives and hooks over the core, every feature's entry mirrored with its parts, and the core re-exported (Issue #7) | the core (`workspace:*`, published as the exact version); peer `react`, `react-dom` (^19) |
 | `packages/vue` | `@fragiola/calendar-vue` | the same primitives in Vue (Vue Epic) | the core; peer `vue` (^3.5) |
 | `packages/angular` | `@fragiola/calendar-angular` | the same primitives as Angular directives (Angular Epic) | the core; peer `@angular/core` |
 | `site` | `site`, private | the repository's script tests today; the site export (fragiola.com/calendar) and `site/docs` from the React Epic | |
 
-Only `packages/core` and `site` exist yet. `apps/playground`, `examples/*` and the adapters arrive
+`packages/core`, `packages/react` and `site` exist. `apps/playground`, `examples/*` and the adapters arrive
 with their Epics; the root scripts that need them (`dev`, `e2e`, `site:export`, `site:dev`) are in
 place and do nothing useful until then.
 
@@ -349,10 +349,7 @@ drag and ranges; RFC 5545 for recurrence; FullCalendar's documented default for 
   `subscribe` / `getSnapshot` (view changes). The engine writes `tabIndex` on the roving elements
   it focuses (Tree's) and `touch-action: none` on events while a drag feature is installed.
 - **Issue #5, roles.** Day grid: `grid` > `row` (week) > `gridcell` (day) > `list` (`day-events`) >
-  `listitem` (events); time grid: `grid` > `row` per column > `gridcell` per slot, timed events
-  get no role (the column is the DOM's container). The time grid's column-major DOM is a known
-  compromise with APG's row-major grid; the React Epic settles it with real assistive technology
-  (`aria-owns` rows, or rowgroups), so the adapters can still follow the record.
+  `listitem` (events). (The time grid's first, column-major roles were replaced by Issue #7.)
 - **Issue #5, focus.** One tab stop: the focus position if shown, else today, else the current
   range's first day (time grids: the first slot of today's or the first column). Keys follow D12
   as the date picker's: Home/End are the week's first and last days whatever the direction;
@@ -390,6 +387,77 @@ drag and ranges; RFC 5545 for recurrence; FullCalendar's documented default for 
   ticks on the interval's boundaries (minimum 1 s). `drop-target/` holds the drag session shared
   by drag and drop, resize and external drop (`host.shared("drag-session")`), with no entry.
 
+
+- **Issue #7, roles (the time grid's ARIA, D12 settled).** The time grid is row-major, as APG's
+  grid: `grid` > a `row` of `columnheader`s (`column-headers`), the all-day `row` (`all-day-row`:
+  the day grid's one row, its days `gridcell`s with their `list` of segments, the time grid's
+  first row: Up from the first slot reaches it), then one `row` per slot (`slot-row`, `data-time`:
+  a `rowheader` label, `slot-label`, and a `gridcell` per day, `slot`). Each day's timed events are
+  a `list` (`column-events`) of `listitem`s (`time-event`) in a positioned layer per day
+  (`column`, no role; `columns` holds them, no role), laid over the slot rows: the slots are the
+  grid's cells and the roving focus; Enter on a slot moves focus into the events starting in it,
+  Up/Down between them, Escape back (D12, unchanged). Week numbers are `rowheader`s. An
+  occurrence's element is named where it shows: `segment` (a day grid), `time-event`,
+  `list-event`; all are `listitem`s. Decorations (`selection`, `drag-preview`, `now-indicator`,
+  `business-hours`, `resize-handle`) are `aria-hidden`. Known compromise: the column layers' lists
+  sit in the `grid` beside its rows (not in a cell), which ARIA's required-children rule does not
+  allow (an axe check reports it); keeping each list in a cell would make an event's box depend
+  on the slot height in CSS. Checked against screen readers in #8's e2e and manual pass; the
+  alternative, if they misread it, is `aria-owns` from each slot cell to the events starting in
+  it.
+- **Issue #7, core keys for the adapter.** `partAttributes(model, part, payload)`: a part's
+  attributes before an engine (the server render, the first client render), the tab stop where
+  the model puts it (`engine/positions.ts` holds the focus positions both read). New parts:
+  `all-day-row`, `column-headers`, `slot-row`, `columns`, `column-events`, and the navigation
+  buttons `previous`, `next`, `today` (`data-disabled` when `model.can` says no), `view-button`
+  (`{ type, days? }`: `aria-pressed`, `data-pressed`, `data-disabled`). `event.set-all { events }`
+  replaces every event (a controlled list): ids required, an object the model holds kept as it is,
+  the others validated like the document's (and their `sourceId` named by `eventSources`), no
+  edit flags or constraints; a source's fetched ranges stay. `selection()`'s
+  `engine.get("selection-segments")` lays the shown range out as an event (kept per range and
+  state). `FEATURE_KEYS[name].engineEvents` (`select`: selection; `drop`: drag and drop, resize;
+  `external-drop`), `EngineEventTypeOf<F, All>`, `emittersOf(type)` and `ENGINE_EVENT_CALLBACKS`
+  (each engine event's callback name, alike in every adapter). The engine leaves a key on a
+  registered button (`more`, the navigation buttons) or on an app's control inside a part (a
+  button, a field, a link) to it; Enter on a "+N more" link, and a click with no pointer or key
+  behind it (`detail` 0: assistive technology), is its `more-click`.
+- **Issue #7, the React adapter.** The engine is created in a layout effect (Tree's and Flow's), so
+  no render subscribes or sets a timer; before it, each part reads `partAttributes` and the
+  model's layouts (`get("day-grid")`), after it `engine.adapter.attributes` and
+  `engine.get("day-grid")`. One store per root bumps a version on every model commit and engine
+  view change; each part reads its value through `useSyncExternalStore`, the last object kept
+  while equal (`sameValue`: records and arrays compared entry by entry), so a part re-renders
+  only when what it shows changed. The root re-renders on every change (its children are the
+  app's elements, which do not re-render with it) and calls `engine.adapter.committed()` after
+  each commit. Parts register through ref callbacks (a cleanup unregisters); decorations shown in
+  several places at once (`selection`, `drag-preview`, `business-hours`) are not registered.
+- **Issue #7, controlled props.** `events` (`event.set-all`), `settings` (`settings.set` with the
+  changed value as a whole patch), `view` + `days` (`view.set`), `date` (`view.go-to`) are sent
+  when their value changes from the last one sent (a model the root creates starts at them;
+  `events` that are the model's own list send nothing), with `meta: { source: "controlled" }`;
+  `onEventsChange`, `onViewChange` (`{ type, days? }`), `onDateChange` (the anchor date) hear
+  every other change. As Flow's, the props are sent, not enforced: a change the app does not
+  echo stays in the model (the app owns the reply). A refused value warns once and the model's
+  stays. A `model` given with controlled props is brought to them in the first layout effect, so
+  its server render shows the model's state: give a model that already matches. The features,
+  `now`, `createId`, `defaultEvents`, `defaultCalendars`, `defaultView`, `defaultDate` and the
+  engine options (`host`, `longPressDelay`, `dragThreshold`, `autoScroll`) are read once.
+- **Issue #7, feature subpaths.** Every core feature entry is mirrored (D2 refined): the ones with
+  parts (`/selection`, `/drag-and-drop`, `/resize`, `/now-indicator`, `/constraints`) and, as pure
+  re-exports, `/external-drop`, `/recurrence`, `/event-sources`, so a React app installs one
+  package. `DragPreview` (and `useDragPreview`) is in `/drag-and-drop` and `/resize` (a resize
+  previews through it); in those entries the component shadows the core's `DragPreview` type,
+  which the main entry still exports. A feature's callback (`onSelect`, `onEventDrop`,
+  `onExternalDrop`) is a type error without its feature (`RootEventProps<F>`, from
+  `engineEvents`; the root's DOM `onSelect` is omitted) and warns at runtime; a feature's part
+  rendered without its feature warns once and renders nothing (a part cannot see the root's `F`,
+  so it is not a type error: importing its entry is the opt-in). A callback inferred with the
+  model's features takes a type annotation (`CalendarEngineEventOf<"select">`), as Tree's.
+- **Issue #7, package check.** `ADAPTERS` lists React: its tarball pins the core exactly and
+  exports every feature subpath; the smoke app (Vite + React, strict, no `skipLibCheck`) takes its
+  pins from `examples/react` once it exists, the adapter's own until then (react 19.3.1, vite
+  8.3.8: `../primitives`'). The bundle guard already reads every package's main entry.
+
 ## Commands
 
 | command | does |
@@ -400,7 +468,7 @@ drag and ranges; RFC 5545 for recurrence; FullCalendar's documented default for 
 | `pnpm check:commands` | builds the core, then `packages/core/scripts/generate-command-docs.ts --check`: fails when `site/docs/api/commands.mdx` drifts from the command catalogue (`pnpm --filter @fragiola/calendar generate:commands` rewrites it) |
 | `pnpm check:fix` | Biome check with auto-fix |
 | `pnpm typecheck` | `pnpm -r typecheck` (TypeScript 7, no emit) |
-| `pnpm test` | Vitest projects: `core (TZ=UTC)` and `core (TZ=America/Sao_Paulo)` (the core's suite twice, host zone forced, same expectations; node, jsdom per file with a docblock), `site` (the repository's script tests) |
+| `pnpm test` | Vitest projects: `core (TZ=UTC)` and `core (TZ=America/Sao_Paulo)` (the core's suite twice, host zone forced, same expectations; node, jsdom per file with a docblock), `react` (jsdom + Testing Library over a fake layout, `TZ=UTC`; a server render in node), `site` (the repository's script tests) |
 | `pnpm build` | `pnpm -r build` (tsdown), then `scripts/check-dts.ts` (no `any` in the built declarations) and `scripts/check-features.ts` (the bundle guard) |
 | `pnpm size` | the bundle size of every entry point (raw, gzip, min + gzip): a report, after `pnpm build` |
 | `pnpm check:package` | builds the packages, packs them with pnpm, checks the packed `exports` are the repo's without the source condition (only `types`/`import`/`default`, targets in `dist`), runs `publint --strict` and `attw --profile esm-only` on the tarballs, fails on a package neither the core nor in `ADAPTERS`, and runs each adapter's pin check and smoke app (`scripts/check-package.ts`) |
@@ -429,6 +497,8 @@ suite's test step passes about 3 minutes.
 ## Repository layout
 
 ```
+packages/react/     @fragiola/calendar-react  src/components, hooks, utils, one folder per feature entry;
+                                         tests/ by behaviour, tests/types/
 packages/core/      @fragiola/calendar   src/<domain>/ (schema, document, time, time-zone, locale, state, commands, model,
                                          view, layout, attributes, features, engine) and one folder per feature;
                                          tests/ mirroring src/, tests/types/ (type fixtures), tests/guard.test.ts;
@@ -518,7 +588,64 @@ Every change keeps the packages small, simple and fast. Before writing code:
   grows noticeably, and why.
 - **Tests share their setup**, never a copy.
 
-## The primitive contract
+## The primitive contract (`@fragiola/calendar-react`)
 
-Filled by the adapter Epics (React, then Vue and Angular): the parts, their `data-calendar-part`
-names, the part hooks and the Vue and Angular idioms (`../guidelines/components/primitives.md`).
+`../guidelines/components/primitives.md`, enforced by `packages/react/tests/contract.test.tsx`:
+one namespace (`Calendar.*`), `render` (an element or `(props, state) => element`, never
+`asChild`), `ref` a plain prop merged with the part's, handlers composed internal first,
+`className` / `style` a value or a function of the state, structural inline style only
+(`position`, the time grid's `top` / `height` / `inset-inline-start` / `width` percentages from
+the layout's fractions, `pointer-events` on the column layer and its events), state as `data-*`
+(present or absent) and ARIA only, every attribute from the core (`engine.adapter.attributes` /
+`partAttributes`), no text, no `aria-label`, no class names. A collection part calls a children
+function per entity and renders no element of its own (`Weeks`, `Days`, `SlotRows`, `Slots`,
+`ListDays`) or its own container (`ColumnHeaders`, `DayEvents`, `ColumnEvents`, `ListDay`,
+`Columns`).
+
+| part (`Calendar.*`) | `data-calendar-part` | role | children |
+|---|---|---|---|
+| `Root` | `root` (`data-view`) | | nodes |
+| `Previous`, `Next`, `Today` | `previous`, `next`, `today` (`data-disabled`) | button | label |
+| `ViewButton` (`view`, `days?`) | `view-button` | button, `aria-pressed` | label |
+| `DayGrid` | `day-grid` | grid | nodes |
+| `ColumnHeaders` / `ColumnHeader` (`date`) | `column-headers` / `column-header` | row / columnheader | `(date)` / nodes or `(state)` |
+| `Weeks` | — | — | `(week)` |
+| `Week` (`week`) | `week` | row | `(day)` or nodes |
+| `WeekNumber` | `week-number` | rowheader | nodes or `(state)` |
+| `Days` | — | — | `(day, week)` |
+| `Day` (`day`) | `day` (`data-date`, `data-today`, …) | gridcell (roving) | nodes or `(day, segments)` |
+| `DayEvents` | `day-events` | list | `(segment)` |
+| `Segment` (`segment`) | `segment` | listitem (roving) | nodes or `(state)` |
+| `More` | `more` | button (`tabindex=-1`) | nodes or `(state)`; rendered while `hiddenCount > 0` |
+| `TimeGrid` | `time-grid` | grid | nodes |
+| `AllDayRow` | `all-day-row` | row | `(day)` or nodes |
+| `Scroller` | `scroller` | | nodes |
+| `SlotRows` | — | — | `(slot)` |
+| `SlotRow` (`slot`) | `slot-row` (`data-time`) | row | `(column)` or nodes |
+| `SlotLabel` | `slot-label` | rowheader | nodes or `(state)` |
+| `Slots` | — | — | `(column)` |
+| `Slot` (`date`) | `slot` (`data-date`, `data-time`, …) | gridcell (roving) | nodes or `(state)` |
+| `Columns` | `columns` | | `(column)` |
+| `Column` (`column`) | `column` (`data-date`, …) | | nodes |
+| `ColumnEvents` | `column-events` | list | `(segment)` |
+| `TimeEvent` (`segment`) | `time-event` | listitem (roving) | nodes or `(state)` |
+| `List` / `ListDays` | `list` / — | / — | nodes or `(state)` / `(day)` |
+| `ListDay` (`day`) | `list-day` | list | `(item)` |
+| `ListEvent` (`item`) | `list-event` | listitem (tab stop) | nodes or `(state)` |
+| `Selection` (`/selection`) | `selection` | `aria-hidden` | in a `Column` or a row |
+| `DragPreview` (`/drag-and-drop`, `/resize`) | `drag-preview` | `aria-hidden` | in a `Column` or a row |
+| `ResizeHandle` (`edge`, `/resize`) | `resize-handle` (`data-edge`) | `aria-hidden` | in a `Segment` or `TimeEvent` |
+| `NowIndicator` (`/now-indicator`) | `now-indicator` | `aria-hidden` | in today's `Column` |
+| `BusinessHours` (`/constraints`) | `business-hours` | `aria-hidden` | in a `Column` |
+
+Hooks (`primitives.md#hooks-have-one-shape`): `useCalendar<T, F>()` → `{ model, engine }`
+(the engine a facade, there before the root mounts); part hooks → `{ state, props }`: `useDay`,
+`useSlot`, `useSegment`, `useTimeEvent`, `useListEvent`; value hooks: `useCalendarView`,
+`useCalendarTitle(format?)`, `useDayHeader(date, format?)`, `useSlotLabel(time, format?)` (`Intl`
+parts: the title is data, never a primitive), `useDayGrid`, `useTimeGrid`, `useListLayout`;
+features: `useSelection`, `useDragPreview`, `useNowPosition`, `useBusinessHours(date?)`. Outside
+the root: `createCalendarRef<T, F>()` / `useCalendarRef<T, F>()` (`calendarRef` on the root).
+Root event callbacks: `onEventClick`, `onDateClick`, `onMoreClick`, `onTodayChange`,
+`onAnnounce`, and with their feature `onSelect`, `onEventDrop`, `onExternalDrop`.
+
+The Vue and Angular idioms come with their Epics.
