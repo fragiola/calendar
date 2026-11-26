@@ -641,6 +641,17 @@ drag and ranges; RFC 5545 for recurrence; FullCalendar's documented default for 
   and lists the composables and types (`docs-reference.test.ts`, "the Vue reference"). Measured
   locally (4 workers): examples vue's 235 tests in 1.1 min.
 
+- **Epic #16, carry-over (week numbers, core).** A month counts its week-number column only when
+  the app says its rows render one: `PartAttributeOptions { weekNumberColumn }`, the fourth argument
+  of `partAttributes` and the third of `engine.adapter.attributes`, which every adapter's root
+  passes from its `weekNumberColumn` prop or input (`week-number-column` in Vue) to every part's
+  attributes read. A part registration could not say it (a server render has no engine, so its
+  attributes would differ from the client's); a setting would put rendering in the document. With
+  it, in a month the grid's `aria-colcount` is the shown days plus one, `week-number` is
+  `aria-colindex` 1, each `day` and `column-header` its column from 2; a time grid ignores it. A
+  `WeekNumber` rendered without it warns once. The playground's `?weeks=1` renders them (axe in
+  `a11y.spec.ts`), and the shared `locale-and-week-numbers` spec checks the numbering.
+
 ## Commands
 
 | command | does |

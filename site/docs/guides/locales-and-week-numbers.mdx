@@ -101,7 +101,8 @@ In `ja-JP`, the same components show `2026年11月` and `木`; in `de-DE`, `Nove
 `weekNumbers` picks the rule: `"locale"` (the default: the locale's first day and minimal days)
 or `"iso"` (ISO 8601: weeks start on Monday, week 1 holds the year's first Thursday). A row's week
 number is its middle day's. `Calendar.WeekNumber` is a row header that gives the number in its
-state:
+state; tell the root its rows render one (`<Calendar.Root weekNumberColumn>`, `week-number-column` in
+Vue), so the grid counts that column:
 
 <Framework name="react">
 

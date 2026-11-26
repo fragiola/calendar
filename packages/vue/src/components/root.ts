@@ -145,6 +145,12 @@ export interface RootBaseProps<
     createId?: CreateId | undefined;
     /** access to the model and the engine from outside the root (`useCalendarRef`, `createCalendarRef`) */
     calendarRef?: CalendarRef<T, F> | undefined;
+    /**
+     * a month's rows render a `Calendar.WeekNumber` before their days: the grid counts that column
+     * (`aria-colcount`, `aria-colindex` on the week numbers, days and headers), so the header row
+     * and the rows agree. Set it wherever the rows render one (a server render included)
+     */
+    weekNumberColumn?: boolean | undefined;
 }
 
 /**
@@ -225,6 +231,7 @@ const ROOT_PROPS = [
     "now",
     "createId",
     "calendarRef",
+    "weekNumberColumn",
     "host",
     "longPressDelay",
     "dragThreshold",
@@ -582,6 +589,13 @@ const RootCalendar = definePrimitive<
             version,
             installed,
             warn,
+            partOptions: {
+                // a bare attribute (`week-number-column`) is the empty string: the props are untyped
+                get weekNumberColumn() {
+                    const value: unknown = props.weekNumberColumn;
+                    return value === true || value === "";
+                },
+            },
         };
         provide(CalendarKey, context);
 

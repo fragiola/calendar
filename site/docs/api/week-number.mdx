@@ -11,6 +11,10 @@ description: The row header of a month's week. It gives you the row's week numbe
 - The number follows the `weekNumbers` setting: `"iso"` (ISO 8601 weeks) or `"locale"` (the
   locale's first day and minimal days); a row's number is its middle day's.
 - It is not in the roving focus.
+- Give the root `weekNumberColumn` (`week-number-column` in Vue) wherever the rows render one: the
+  grid then counts its column (`aria-colcount`), the week number is column 1 (`aria-colindex`) and
+  the days and their headers from 2, so the header row and the rows agree. Without it, a
+  `Calendar.WeekNumber` warns once.
 - It lives inside a `Calendar.Week`; keep its room with `--calendar-row-inset` on the row so the
   selection and the drag preview start after it.
 

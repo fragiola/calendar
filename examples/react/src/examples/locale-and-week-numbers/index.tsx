@@ -47,7 +47,7 @@ export default function LocaleAndWeekNumbers() {
         }),
     );
     return (
-        <Calendar.Root model={model} className={styles.root}>
+        <Calendar.Root model={model} className={styles.root} weekNumberColumn>
             <Toolbar />
             <Settings />
             <Calendar.DayGrid aria-label="Month" className={styles.grid}>

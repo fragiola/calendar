@@ -204,14 +204,14 @@ injects its own timers.
 | `attachRoot` | attaches the root element: the engine listens to its pointers, keys, focus and native drags |
 | `detachRoot` | detaches it, cancelling a gesture under way |
 | `register` | `register(part, payload, element)` registers (or, with `null`, unregisters) a part's element: measured, hit-tested, focused |
-| `attributes` | `attributes(part, payload)`: a part's `PartAttributes`: `data-calendar-part`, the model's, the engine's and the features' |
+| `attributes` | `attributes(part, payload, options?)`: a part's `PartAttributes`: `data-calendar-part`, the model's, the engine's and the features'; `options` (`PartAttributeOptions`) say how the app renders the parts: `weekNumberColumn`, a month's rows render a week number |
 | `committed` | the adapter committed a render: the engine measures and gives focus to an element it waited for |
 | `subscribe` | calls a listener with a `ViewChange` (`focus`, `gesture`, `layout`) when the view changes; returns its remover |
 | `getSnapshot` | a number that changes whenever the view changes |
 
 `PartName` names a registered part and `PartPayloadMap` its payload (`{ date }` for a day,
 `{ occurrenceId, date }` for an event). Before an engine exists (a server render, the first
-client render), `partAttributes(model, part, payload)` gives the same attributes with nothing
+client render), `partAttributes(model, part, payload, options?)` gives the same attributes with nothing
 focused, the tab stop where the model puts it ([State attributes](/docs/concepts/state-attributes)).
 
 ```ts

@@ -202,6 +202,7 @@ controlled ones, and listeners for the callbacks (`@events-change`, `@event-clic
 | `now` | `() => number` | `Date.now` | the clock of the created model, epoch milliseconds (read once) |
 | `createId` | `CreateId` | | the id generator of the created model (read once) |
 | `calendarRef` | `CalendarRef<T, F>` | | access to the model and the engine from outside the root ([hooks](/docs/api/hooks)) |
+| `weekNumberColumn` | `boolean` | `false` | a month's rows render a `Calendar.WeekNumber` before their days: the grid counts that column (`aria-colcount`, `aria-colindex`) |
 | `children` | `ReactNode` | | the toolbar, the grid, anything of yours |
 
 ## Engine props

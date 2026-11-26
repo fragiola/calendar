@@ -82,7 +82,7 @@ Every part is `Calendar.<Part>`, with the props of its React page except `render
 
 | part | Vue props | slots | events |
 | --- | --- | --- | --- |
-| `Calendar.Root` | `model`, `events`, `defaultEvents`, `defaultCalendars`, `settings`, `view`, `defaultView`, `days`, `date`, `defaultDate`, `features`, `now`, `createId`, `calendarRef`, and the engine options `host`, `longPressDelay`, `dragThreshold`, `autoScroll` | default | `update:events`, `events-change`, `update:view`, `view-change`, `update:date`, `date-change`, and the engine events `event-click`, `date-click`, `more-click`, `select`, `event-drop`, `external-drop`, `today-change`, `announce` |
+| `Calendar.Root` | `model`, `events`, `defaultEvents`, `defaultCalendars`, `settings`, `view`, `defaultView`, `days`, `date`, `defaultDate`, `features`, `now`, `createId`, `calendarRef`, `weekNumberColumn` (`week-number-column`), and the engine options `host`, `longPressDelay`, `dragThreshold`, `autoScroll` | default | `update:events`, `events-change`, `update:view`, `view-change`, `update:date`, `date-change`, and the engine events `event-click`, `date-click`, `more-click`, `select`, `event-drop`, `external-drop`, `today-change`, `announce` |
 | `Calendar.Previous` | none | default `{ disabled }` | none |
 | `Calendar.Next` | none | default `{ disabled }` | none |
 | `Calendar.Today` | none | default `{ disabled }` | none |

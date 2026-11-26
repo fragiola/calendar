@@ -220,7 +220,8 @@ The month's title, the weekday names and the day numbers are data you format: th
 `view.today`, and carry `data-disabled` when the model cannot run them (outside `validRange`).
 
 `Calendar.Week` takes a function of each day, as above (in Vue, its `#day` slot), or elements (its
-default slot): put a `Calendar.WeekNumber` (a row header) before `Calendar.Days` when the row has more than its days.
+default slot): put a `Calendar.WeekNumber` (a row header) before `Calendar.Days` when the row has more than its days,
+and give the root `weekNumberColumn` (`week-number-column` in Vue) so the grid counts its column.
 
 <Framework name="react">
 

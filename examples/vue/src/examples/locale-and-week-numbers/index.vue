@@ -27,7 +27,7 @@ const model = createCalendarModel<Types>({
 </script>
 
 <template>
-    <Calendar.Root :model="model" :class="styles.root">
+    <Calendar.Root :model="model" :class="styles.root" week-number-column>
         <Toolbar />
         <Settings />
         <Calendar.DayGrid aria-label="Month" :class="styles.grid">

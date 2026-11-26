@@ -36,7 +36,8 @@ function app(type: ViewType) {
               ? ListView
               : TimeGridView;
     return createSSRApp({
-        render: () => h(Calendar.Root, { model }, () => h(view)),
+        render: () =>
+            h(Calendar.Root, { model, weekNumberColumn: true }, () => h(view)),
     });
 }
 
@@ -109,6 +110,7 @@ describe("a server render", () => {
                                 },
                             }),
                             date: "2027-01-15",
+                            weekNumberColumn: true,
                         },
                         () => h(MonthGrid),
                     ),

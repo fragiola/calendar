@@ -22,6 +22,17 @@ test("English (US): Sunday first, the locale's week numbers", async ({
         .getByRole("row")
         .filter({ has: page.locator('[data-date="2026-11-26"]') });
     await expect(row.getByRole("rowheader")).toHaveText("48");
+    // the week numbers are the grid's first column: the header row and the rows agree
+    await expect(month).toHaveAttribute("aria-colcount", "8");
+    await expect(row.getByRole("rowheader")).toHaveAttribute(
+        "aria-colindex",
+        "1",
+    );
+    await expect(firstHeader(month)).toHaveAttribute("aria-colindex", "2");
+    await expect(row.getByRole("gridcell").last()).toHaveAttribute(
+        "aria-colindex",
+        "8",
+    );
 });
 
 test("Deutsch: Monday first, German names, ISO week numbers", async ({

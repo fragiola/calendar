@@ -329,3 +329,61 @@ describe("the time grid's accessibility structure", () => {
         ).toBe("slot");
     });
 });
+
+describe("a month's week numbers (week-number-column)", () => {
+    it("numbers the columns, so the header row and the rows of eight agree", async () => {
+        const model = modelOf(EVENTS, {
+            view: { type: "month", anchorDate: "2026-11-26" },
+        });
+        // a bare attribute, as a template writes it
+        const wrapper = mount(() =>
+            h(Calendar.Root, { model, "week-number-column": "" }, () =>
+                h(MonthGrid),
+            ),
+        );
+        await flush();
+        const grid = wrapper.get('[role="grid"]').element;
+        expect(grid.getAttribute("aria-colcount")).toBe("8");
+        const headers = [...grid.querySelectorAll('[role="columnheader"]')];
+        expect(headers.map((one) => one.getAttribute("aria-colindex"))).toEqual(
+            ["2", "3", "4", "5", "6", "7", "8"],
+        );
+        const row = grid.querySelectorAll('[data-calendar-part="week"]')[1];
+        const cells = [
+            ...(row?.querySelectorAll(
+                '[role="rowheader"], [role="gridcell"]',
+            ) ?? []),
+        ];
+        expect(cells.map((one) => one.getAttribute("aria-colindex"))).toEqual([
+            "1",
+            "2",
+            "3",
+            "4",
+            "5",
+            "6",
+            "7",
+            "8",
+        ]);
+    });
+
+    it("warns once when a week number is rendered without it, and numbers nothing", async () => {
+        const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+        const model = modelOf(EVENTS, {
+            view: { type: "month", anchorDate: "2026-11-26" },
+        });
+        const wrapper = mount(() =>
+            h(Calendar.Root, { model }, () => h(MonthGrid)),
+        );
+        await flush();
+        expect(
+            wrapper.get('[role="grid"]').element.hasAttribute("aria-colcount"),
+        ).toBe(false);
+        const messages = warn.mock.calls.map(([message]) => String(message));
+        expect(
+            messages.filter((message) =>
+                message.includes("week-number-column"),
+            ),
+        ).toHaveLength(1);
+        warn.mockRestore();
+    });
+});

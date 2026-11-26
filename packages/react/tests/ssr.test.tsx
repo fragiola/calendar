@@ -30,7 +30,7 @@ function App(props: { type: ViewType }) {
         features: [selection(), nowIndicator()],
     });
     return (
-        <Calendar.Root model={model}>
+        <Calendar.Root model={model} weekNumberColumn>
             {props.type === "month" ? (
                 <MonthGrid />
             ) : props.type === "list" ? (
