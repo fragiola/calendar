@@ -208,6 +208,35 @@ describe("validRange", () => {
         expect(model.can("view.previous", {})).toBe(false);
     });
 
+    it("refuses a go-to or a view.set whose shown days all leave it (a hidden anchor)", () => {
+        const settings = {
+            hiddenDays: [5],
+            validRange: { start: "2026-11-23", end: "2026-11-28" },
+        };
+        const model = viewModel(
+            { type: "day", anchorDate: "2026-11-24" },
+            settings,
+        );
+        // Friday 27 is hidden: the day view would show Saturday 28, outside the range
+        expect(model.run("view.go-to", { date: "2026-11-27" })).toMatchObject({
+            ok: false,
+            error: { code: "refused" },
+        });
+        expect(model.get("view").anchorDate).toBe("2026-11-24");
+        const set = viewModel(
+            { type: "month", anchorDate: "2026-11-27" },
+            settings,
+        );
+        expect(set.run("view.set", { type: "day" })).toMatchObject({
+            ok: false,
+            error: { code: "refused" },
+        });
+        expect(set.get("view").type).toBe("month");
+        expect(set.run("view.set", { type: "week" })).toMatchObject({
+            ok: true,
+        });
+    });
+
     it("refuses go-to and today outside it, and marks its days disabled", () => {
         const model = viewModel(
             { type: "month" },
@@ -246,6 +275,25 @@ describe("view commands", () => {
             ok: true,
             value: { view: { type: "month", anchorDate: "2026-11-26" } },
         });
+    });
+
+    it("refuses today when the injected clock gives no instant, without throwing", () => {
+        let clock = Date.UTC(2026, 10, 26, 12);
+        const model = modelOf(
+            [],
+            {},
+            { view: { type: "month", anchorDate: "2020-01-01" } },
+            { now: () => clock },
+        );
+        for (const broken of [Number.NaN, Number.POSITIVE_INFINITY, 1e20]) {
+            clock = broken;
+            expect(() => model.run("view.today", {})).not.toThrow();
+            expect(model.run("view.today", {})).toMatchObject({
+                ok: false,
+                error: { code: "refused" },
+            });
+        }
+        expect(model.get("view").anchorDate).toBe("2020-01-01");
     });
 
     it("changes the type keeping the anchor, and refuses a days or duration that does not fit", () => {

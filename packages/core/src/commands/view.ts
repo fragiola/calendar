@@ -18,6 +18,7 @@ import { todayOf } from "../view/today";
 import { isValidDay, touchesValid, validDays } from "../view/valid-days";
 import { steppedAnchor, viewDays } from "../view/view-days";
 import { defineCommand, type Failure, fail, ok } from "./define";
+import { isWritable } from "./event-moves";
 import type { ViewResult } from "./types";
 
 const VIEW_RESULT = {
@@ -77,17 +78,19 @@ function outsideValidRange(
 ): Failure | undefined {
     if (settings.validRange === undefined) return undefined;
     const valid = validDays(settings);
-    const inside =
-        date === undefined
-            ? touchesValid(viewDays(view, settings).current, valid)
-            : isValidDay(date, valid);
-    return inside
+    if (date !== undefined && !isValidDay(date, valid)) {
+        return fail(
+            "refused",
+            `${formatPlainDate(fromEpochDay(date))} is outside validRange`,
+            path,
+        );
+    }
+    // a valid anchor can still show only other days (a day view skips a hidden anchor)
+    return touchesValid(viewDays(view, settings).current, valid)
         ? undefined
         : fail(
               "refused",
-              date === undefined
-                  ? "the view would show only dates outside validRange"
-                  : `${formatPlainDate(fromEpochDay(date))} is outside validRange`,
+              "the view would show only dates outside validRange",
               path,
           );
 }
@@ -134,6 +137,13 @@ export const viewSet = defineCommand({
                 ? {}
                 : { duration: payload.duration }),
         });
+        const refusal = outsideValidRange(
+            view,
+            draft.state.settings,
+            undefined,
+            undefined,
+        );
+        if (refusal) return refusal;
         draft.set({ view });
         return ok(viewResult(view));
     },
@@ -235,9 +245,17 @@ export const viewToday = defineCommand({
     resultSchema: VIEW_RESULT,
     transient: false,
     reduce: (_payload, { draft }) => {
+        // an injected clock that gives no instant is refused, not thrown out of the command
+        const now = draft.now();
+        if (!isWritable(Math.floor(now))) {
+            return fail(
+                "refused",
+                `the model's clock gave ${now}, not an instant`,
+            );
+        }
         const result = goTo(
             draft,
-            todayOf(draft.state.settings, draft.now),
+            todayOf(draft.state.settings, () => now),
             undefined,
         );
         return "ok" in result ? result : ok(result);
