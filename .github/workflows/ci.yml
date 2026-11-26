@@ -1,0 +1,138 @@
+# CI: the Fragiola project jobs. From Tree (fragiola/tree, .github/workflows/ci.yml), itself from
+# Dockable's; the rules of the guidelines (repository.md#ci).
+#
+#   Checks            Biome, the source layout and the generated command reference (`pnpm check`),
+#                     TypeScript, the unit tests and the build (with the .d.ts check and the
+#                     features' bundle guard), then the bundle size report (`pnpm size`, a report
+#                     in the job summary, never a gate).
+#   Package           `pnpm check:package`: builds and packs every package with pnpm, lints the
+#                     tarballs (dist-only exports, publint, attw), and fails on a package that is
+#                     neither the core nor a listed adapter. Each adapter (from the React, Vue and
+#                     Angular Epics) adds its exact core pin check and its smoke app.
+#   Changesets        on a pull request, `pnpm changeset status` fails when the PR changes what a
+#                     package ships (`changedFilePatterns` in .changeset/config.json) without
+#                     adding a changeset. Skipped for the Version Packages PR (changeset-release/*),
+#                     which consumes them.
+#   Changes           the E2E suites the pull request can affect (scripts/e2e-suites.ts, a `git
+#                     diff --no-renames` against the base): none for docs only (site/docs, *.md,
+#                     AGENTS.md); packages/react or examples/react: the playground and examples
+#                     react; packages/vue or examples/vue: examples vue; packages/angular or
+#                     examples/angular: examples angular; anything else (the core,
+#                     examples/shared, the playground, the lockfile, root configs, .github,
+#                     scripts, site) and a manual run: every suite. A renamed file counts under
+#                     both its paths. No suite exists yet: the E2E jobs, which run in Playwright's
+#                     image (no browser install), and the Site export job arrive with the
+#                     React Epic.
+#
+# Tests run only on pull requests (and on a manual run). A push to main runs nothing: main is what
+# its PR tested, and the www trigger comes once the project is registered on fragiola.com.
+
+name: CI
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    name: Checks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Reads the pnpm version from `packageManager` in package.json.
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - run: pnpm check
+
+      - run: pnpm typecheck
+
+      - run: pnpm test
+
+      - run: pnpm build
+
+      - run: pnpm size
+
+  package:
+    name: Package
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      # builds the packages first, then packs and lints the tarballs
+      - run: pnpm check:package
+
+  changesets:
+    name: Changesets
+    if: github.event_name == 'pull_request' && !startsWith(github.head_ref, 'changeset-release/')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # `--since` diffs from the merge base with the base branch: the full history is needed
+          fetch-depth: 0
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      # the root's tools only (@changesets/cli): the check reads the packages' manifests and git
+      - run: pnpm install --frozen-lockfile --filter "{.}"
+
+      - name: A changeset for every package change
+        env:
+          BASE_REF: ${{ github.base_ref }}
+        run: pnpm changeset status --since="origin/$BASE_REF"
+
+  # The E2E suites the pull request can affect (scripts/e2e-suites.ts): the E2E jobs (from the
+  # React Epic) run only what it selects. It also lists the frameworks with an examples app (every
+  # examples/<framework> with a playwright.config.ts): none yet.
+  changes:
+    name: Changes
+    runs-on: ubuntu-latest
+    outputs:
+      playground: ${{ steps.suites.outputs.playground }}
+      examples: ${{ steps.suites.outputs.examples }}
+    steps:
+      # a pull request checks out its merge commit: its first parent is the base it merges into
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - id: suites
+        run: |
+          if [ "${{ github.event_name }}" = pull_request ]; then
+            node scripts/e2e-suites.ts --diff HEAD^1
+          else
+            node scripts/e2e-suites.ts --all
+          fi
