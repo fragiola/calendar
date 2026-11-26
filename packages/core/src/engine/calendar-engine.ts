@@ -714,8 +714,10 @@ class Engine<T extends CalendarTypes, F extends CalendarFeatures> {
             return;
         }
         if (registration && BUTTONS.has(registration.part)) {
-            if (registration.part === "more" && event.key === "Enter") {
-                this.moreClick(String(registration.payload.date));
+            if (
+                registration.part === "more" &&
+                this.moreKey(event, String(registration.payload.date))
+            ) {
                 event.preventDefault();
                 event.stopPropagation();
             }
@@ -795,6 +797,12 @@ class Engine<T extends CalendarTypes, F extends CalendarFeatures> {
                 const next = list[at + (event.key === "ArrowDown" ? 1 : -1)];
                 if (at >= 0 && next !== undefined) {
                     this.focusOn({ ...position, occurrenceId: next });
+                } else if (
+                    at === list.length - 1 &&
+                    event.key === "ArrowDown"
+                ) {
+                    // a day's "+N more" link is the last item of its events
+                    this.focusMore(position.cell);
                 }
                 return true;
             }
@@ -802,7 +810,7 @@ class Engine<T extends CalendarTypes, F extends CalendarFeatures> {
         }
         if ((event.key === "Enter" || event.key === "F2") && !event.shiftKey) {
             const [first] = this.eventsIn(position);
-            if (first === undefined) return false;
+            if (first === undefined) return this.focusMore(position);
             this.focusOn({
                 kind: "event",
                 occurrenceId: first,
@@ -843,6 +851,45 @@ class Engine<T extends CalendarTypes, F extends CalendarFeatures> {
         }
         this.focusOn(target.cell);
         return true;
+    }
+
+    /** Focuses a day's "+N more" link, when the day has one: whether it did. */
+    private focusMore(cell: CellPosition): boolean {
+        if (cell.kind !== "day") return false;
+        const more = this.registry.get(keyOf("more", { date: cell.date }));
+        if (!more) return false;
+        more.element.focus({ preventScroll: false });
+        return true;
+    }
+
+    /**
+     * The keys of a "+N more" link, the last item of its day's events (D12): Enter is its tap
+     * (Space clicks it: `click`), Up goes back to the day's last event, Escape to the day.
+     */
+    private moreKey(event: KeyboardEvent, date: string): boolean {
+        if (event.ctrlKey || event.altKey || event.metaKey) return false;
+        const cell: CellPosition = { kind: "day", date };
+        switch (event.key) {
+            case "Enter":
+                this.moreClick(date);
+                return true;
+            case "Escape":
+                this.focusOn(cell);
+                return true;
+            case "ArrowUp": {
+                const last = this.eventsIn(cell).at(-1);
+                this.focusOn(
+                    last === undefined
+                        ? cell
+                        : { kind: "event", occurrenceId: last, cell },
+                );
+                return true;
+            }
+            case "ArrowDown":
+                return true;
+            default:
+                return false;
+        }
     }
 
     private focusIn(event: FocusEvent): void {

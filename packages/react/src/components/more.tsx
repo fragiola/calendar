@@ -22,8 +22,9 @@ export interface MoreProps extends ButtonPrimitiveProps<MoreState> {
 
 /**
  * A day's "+N more" trigger (a `button`), rendered only while some of the day's occurrences do not
- * fit (`dayMaxEvents`). A press is the engine's `more-click` (`onMoreClick`): the popover is the
- * app's.
+ * fit (`dayMaxEvents`). A press, or Enter, is the engine's `more-click` (`onMoreClick`): the
+ * popover is the app's. On the keyboard it is the last item of the day's events: Down from the last
+ * one reaches it, Up goes back, Escape returns to the day.
  */
 export function More(props: MoreProps) {
     const { day } = useRequired(DayContext, "More", "Calendar.Day");
@@ -46,7 +47,8 @@ function MoreElement(props: MoreProps) {
         ref: part.ref,
         props: {
             type: "button",
-            // outside the grid's roving focus: the keys reach the day's events from the cell
+            // outside the grid's roving focus: it is the last item of the day's events (Down from
+            // the last one, or Enter on a day whose events are all hidden)
             tabIndex: -1,
             ...part.props,
             children:
