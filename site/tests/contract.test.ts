@@ -143,12 +143,12 @@ describe("the landing", () => {
                 /href: "([^"]+)"/g,
             ),
         ].map((match) => match[1]);
-        // then GitHub, as Dockable's (www fixtures/dockable/docs/index.mdx)
-        expect(hrefs).toHaveLength(4);
+        // no GitHub action: the site's header and footer link it (Tree's landing, #80)
+        expect(hrefs).toHaveLength(3);
         expect(hrefs[0]).toBe("/examples");
         expect(hrefs[1]).toBe("/ai");
         expect(hrefs[2]).toMatch(/^\/docs\//);
-        expect(hrefs[3]).toBe("https://github.com/fragiola/calendar");
+        expect(body()).not.toMatch(/<Hero[\s\S]*?github\.com[\s\S]*?\/>/);
         expect(body()).toContain('{ label: "Set up your agent", href: "/ai"');
     });
 

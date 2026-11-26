@@ -573,7 +573,7 @@ drag and ranges; RFC 5545 for recurrence; FullCalendar's documented default for 
   Guides (24: the Epic's list plus "+N more", controlled state and performance), API: primitives
   (one page per `Calendar.*` part, one per feature part, and the hooks: 38), API: core (8, with
   the generated `commands.mdx`), More (the issues link): 87 pages and the landing (Hero actions
-  examples → `/ai` → docs → GitHub, then the `team-planner` showcase). `site/tests/docs-reference.test.ts`
+  examples → `/ai` → docs, no GitHub: the header and footer link it; then the `team-planner` showcase). `site/tests/docs-reference.test.ts`
   fails when an export of the React package, of a feature entry or of the core is on no page, when a
   part's `## Props` table differs from its `<Part>Props` (the root's `RootBaseProps`, its engine
   options and every engine event callback), when an exported interface's field has no row, a hook
