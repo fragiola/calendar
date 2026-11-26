@@ -35,8 +35,10 @@ model.run("view.today", {});
 Each step is the view's own: a month moves by a month (and anchors on its first day), a week by a
 week, a day by a day skipping hidden days, a `days` view by its number of shown days. The
 navigation buttons are the same commands: `Calendar.Previous`, `Calendar.Next`, `Calendar.Today`
-and `Calendar.ViewButton` (`view="week"`, or `view="days" days={3}`), each disabled when the model
-cannot run it.
+and `Calendar.ViewButton` (`view="week"`, or `view="days"` with `days` 3), each disabled when the
+model cannot run it.
+
+<Framework name="react">
 
 ```tsx
 <Calendar.ViewButton view="month">Month</Calendar.ViewButton>
@@ -44,11 +46,25 @@ cannot run it.
 <Calendar.ViewButton view="days" days={3}>3 days</Calendar.ViewButton>
 ```
 
+</Framework>
+
+<Framework name="vue">
+
+```vue
+<Calendar.ViewButton view="month">Month</Calendar.ViewButton>
+<Calendar.ViewButton view="week">Week</Calendar.ViewButton>
+<Calendar.ViewButton view="days" :days="3">3 days</Calendar.ViewButton>
+```
+
+</Framework>
+
 ## The visible range and the current range
 
 `model.get("visible-range")` is every day the view shows; `model.get("current-range")` is the
 range it is about. They differ for a month: November 2026 shows six weeks from Sunday November 1st
 to Saturday December 12th, and is about November. Both are `{ start, end }` with an exclusive end.
+
+<Framework name="react">
 
 ```tsx
 import { useCalendarView } from "@fragiola/calendar-react";
@@ -62,6 +78,24 @@ function RangeNote() {
     );
 }
 ```
+
+</Framework>
+
+<Framework name="vue">
+
+```vue title="range-note.vue"
+<script setup lang="ts">
+import { useCalendarView } from "@fragiola/calendar-vue";
+
+const view = useCalendarView();
+</script>
+
+<template>
+    <p>{{ view.type }}: {{ view.visibleRange.start }} to {{ view.visibleRange.end }} (exclusive)</p>
+</template>
+```
+
+</Framework>
 
 `firstDayOfWeek` (default the locale's) starts the weeks, `hiddenDays` leaves weekdays out of
 every view (a work week: `[0, 6]`), and the edge days that are hidden are left out of the range.
@@ -83,8 +117,12 @@ model.can("view.go-to", { date: "2027-03-01" }); // false
 ## The view as props
 
 A root can take the view as controlled props, mapped onto these commands: `view` and `days`
-(`view.set`), `date` (`view.go-to`), with `onViewChange` and `onDateChange` hearing the other
-changes, or `defaultView` and `defaultDate` to start it ([Controlled state](/docs/guides/controlled-state)).
+(`view.set`), `date` (`view.go-to`), with a change event hearing the other changes, or a default
+view and date to start it ([Controlled state](/docs/guides/controlled-state)).
+
+<Framework name="react">
+
+`onViewChange` and `onDateChange` hear the changes; `defaultView` and `defaultDate` start it.
 
 ```tsx
 const [date, setDate] = useState("2026-11-26");
@@ -93,5 +131,28 @@ const [date, setDate] = useState("2026-11-26");
     {/* … */}
 </Calendar.Root>
 ```
+
+</Framework>
+
+<Framework name="vue">
+
+`v-model:view` and `v-model:date` bind them (`@view-change` and `@date-change` hear the changes
+too); `default-view` and `default-date` start it.
+
+```vue
+<script setup lang="ts">
+import { ref } from "vue";
+
+const date = ref("2026-11-26");
+</script>
+
+<template>
+    <Calendar.Root :default-events="events" default-view="week" v-model:date="date">
+        <!-- … -->
+    </Calendar.Root>
+</template>
+```
+
+</Framework>
 
 The [n days](/examples/n-days) example shows three, four or five days at a time.

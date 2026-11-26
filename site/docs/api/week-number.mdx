@@ -18,6 +18,8 @@ It renders `data-calendar-part="week-number"`.
 
 ## Usage
 
+<Framework name="react">
+
 ```tsx
 <Calendar.Week week={week}>
     <Calendar.WeekNumber className="week-number">
@@ -27,12 +29,32 @@ It renders `data-calendar-part="week-number"`.
 </Calendar.Week>
 ```
 
+</Framework>
+
+<Framework name="vue">
+
+```vue
+<Calendar.Week :week="week">
+    <Calendar.WeekNumber v-slot="{ weekNumber }" class="week-number">
+        <span :aria-label="`Week ${weekNumber}`">{{ weekNumber }}</span>
+    </Calendar.WeekNumber>
+    <Calendar.Days v-slot="{ day }">
+        <Calendar.Day :day="day" />
+    </Calendar.Days>
+</Calendar.Week>
+```
+
+</Framework>
+
 <Example id="locale-and-week-numbers" variant="card" />
 
 ## Props
 
 `WeekNumberProps`; it also takes the [common props](/docs/api/root#common-props) and every `div`
 attribute.
+
+In Vue: the same props (in kebab-case in a template), and slots in place of `children`; see
+[Vue primitives](/docs/api/vue).
 
 | prop | type | description |
 | --- | --- | --- |

@@ -20,6 +20,8 @@ description: A day's positioned layer over the slot rows, the containing block o
 
 ## Usage
 
+<Framework name="react">
+
 ```tsx
 import { Calendar, type TimeGridColumn } from "@fragiola/calendar-react";
 import { BusinessHours } from "@fragiola/calendar-react/constraints";
@@ -45,6 +47,40 @@ export function dayColumn(column: TimeGridColumn) {
 }
 ```
 
+</Framework>
+
+<Framework name="vue">
+
+```vue title="day-column.vue"
+<script setup lang="ts">
+import { Calendar, type TimeGridColumn } from "@fragiola/calendar-vue";
+import { BusinessHours } from "@fragiola/calendar-vue/constraints";
+import { DragPreview } from "@fragiola/calendar-vue/drag-and-drop";
+import { NowIndicator } from "@fragiola/calendar-vue/now-indicator";
+import { Selection } from "@fragiola/calendar-vue/selection";
+
+defineProps<{ column: TimeGridColumn }>();
+</script>
+
+<template>
+
+    <Calendar.Column
+        :column="column"
+        :class="column.today ? 'column column-today' : 'column'"
+    >
+        <BusinessHours class="business-hours" />
+        <Calendar.ColumnEvents v-slot="{ segment }">
+            <Calendar.TimeEvent :segment="segment" />
+        </Calendar.ColumnEvents>
+        <Selection class="selection" />
+        <DragPreview class="preview" />
+        <NowIndicator class="now" />
+    </Calendar.Column>
+</template>
+```
+
+</Framework>
+
 Each feature part needs its feature in the model's `features` (`constraints()`, `selection()`,
 `dragAndDrop()` or `resize()`, `nowIndicator()`); without it, it renders nothing and warns once.
 
@@ -59,6 +95,9 @@ Each feature part needs its feature in the model's `features` (`constraints()`, 
 | `style` | `position: relative` (structural) |
 
 ## Props
+
+In Vue: the same props (in kebab-case in a template), and slots in place of `children`; see
+[Vue primitives](/docs/api/vue).
 
 `ColumnProps` takes the [common props](/docs/api/root#common-props) and any `div` attribute, and:
 

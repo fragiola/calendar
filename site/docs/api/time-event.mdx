@@ -23,6 +23,8 @@ shows (the title, the times, a colour from its calendar) is yours.
 
 ## Usage
 
+<Framework name="react">
+
 ```tsx
 import { Calendar, type TimeSegment, useCalendar } from "@fragiola/calendar-react";
 import { ResizeHandle } from "@fragiola/calendar-react/resize";
@@ -44,6 +46,39 @@ export function TimedEvent(props: { segment: TimeSegment }) {
 }
 ```
 
+</Framework>
+
+<Framework name="vue">
+
+```vue title="timed-event.vue"
+<script setup lang="ts">
+import { Calendar, type TimeSegment, useCalendar } from "@fragiola/calendar-vue";
+import { ResizeHandle } from "@fragiola/calendar-vue/resize";
+
+const props = defineProps<{ segment: TimeSegment }>();
+const { model } = useCalendar();
+const event = model.get("event-by", { id: props.segment.eventId });
+</script>
+
+<template>
+
+    <Calendar.TimeEvent :segment="segment">
+        <template #render="{ props: element, state, children }">
+            <div
+                v-bind="element"
+                :class="state.dragging || state.grabbed ? 'event event-moving' : 'event'"
+            >
+                <component :is="children" />
+            </div>
+        </template>
+        <span class="event-title">{{ event?.title }}</span>
+        <ResizeHandle edge="end" class="event-handle" />
+    </Calendar.TimeEvent>
+</template>
+```
+
+</Framework>
+
 The state (`TimeEventState`, on the [hooks page](/docs/api/hooks), with the segment and the
 `EventState` flags) styles it; `useTimeEvent` gives the same props for an element of your own.
 
@@ -61,6 +96,9 @@ The state (`TimeEventState`, on the [hooks page](/docs/api/hooks), with the segm
 | `style` | `position`, `top`, `height`, `inset-inline-start`, `width` (structural) |
 
 ## Props
+
+In Vue: the same props (in kebab-case in a template), and slots in place of `children`; see
+[Vue primitives](/docs/api/vue).
 
 `TimeEventProps` takes the [common props](/docs/api/root#common-props) and any `div` attribute,
 and:

@@ -18,7 +18,7 @@ clock is injectable, so "today" is the same in a test as in production
 ([Dates and time zones](/docs/concepts/dates-and-time-zones)).
 
 ```ts
-import { createCalendarModel } from "@fragiola/calendar-react";
+import { createCalendarModel } from "@fragiola/calendar";
 
 const model = createCalendarModel(json, {
     now: () => Date.parse("2026-11-26T12:00:00-05:00"),
@@ -29,8 +29,8 @@ model.get("visible-range"); // { start: "2026-11-01", end: "2026-12-13" }: six w
 
 ## The engine
 
-`Calendar.Root` creates the engine (`createCalendarEngine(model, options)`) when it mounts, in a
-layout effect, attaches its element and destroys it on unmount. The parts register their elements
+`Calendar.Root` creates the engine (`createCalendarEngine(model, options)`) when it mounts (in a
+layout effect in React, `onMounted` in Vue), attaches its element and destroys it on unmount. The parts register their elements
 with it; you never do. Before it exists (the server render, the first client render) every part
 reads its attributes and its layout from the model, so the server's HTML is the client's first
 render.
@@ -39,6 +39,8 @@ What only a screen has is the engine's: the focused date or event (`engine.get("
 drag preview (`engine.get("drag-preview")`), the lanes that fit a day
 (`engine.get("max-lanes")`), the reading direction. Its actions move the focus or cancel a
 gesture:
+
+<Framework name="react">
 
 ```tsx
 import { useCalendar } from "@fragiola/calendar-react";
@@ -56,16 +58,40 @@ function GoToToday() {
 }
 ```
 
+</Framework>
+
+<Framework name="vue">
+
+```vue title="go-to-today.vue"
+<script setup lang="ts">
+import { useCalendar } from "@fragiola/calendar-vue";
+
+const { model, engine } = useCalendar();
+</script>
+
+<template>
+    <button type="button" @click="engine.run('focus', { date: model.get('today') })">
+        Focus today
+    </button>
+</template>
+```
+
+</Framework>
+
 `useCalendar` gives both anywhere inside the root. The engine it returns is there from the first
-render: before the root is mounted an action is refused and a read is empty.
+render (from `setup` in Vue): before the root is mounted an action is refused and a read is empty.
 
 ## What the engine tells you
 
-The engine's events are the root's callbacks: `onEventClick` (a tap, or Enter on an event),
-`onDateClick` (a day or a slot), `onMoreClick` (a "+N more" link), `onTodayChange` (midnight),
-`onAnnounce` (data for your live region), and with their features `onSelect`, `onEventDrop` and
-`onExternalDrop`. A drop has already run its command when you hear it; a selection is a range for
-your app to act on.
+The engine's events are the root's: an event click (a tap, or Enter on an event), a date click (a
+day or a slot), a more click (a "+N more" link), a today change (midnight), an announcement (data
+for your live region), and with their features a selection, an event drop and an external drop. A
+drop has already run its command when you hear it; a selection is a range for your app to act on.
+
+<Framework name="react">
+
+They are the root's callbacks: `onEventClick`, `onDateClick`, `onMoreClick`, `onTodayChange`,
+`onAnnounce`, `onSelect`, `onEventDrop` and `onExternalDrop`.
 
 ```tsx
 <Calendar.Root
@@ -77,10 +103,32 @@ your app to act on.
 </Calendar.Root>
 ```
 
+</Framework>
+
+<Framework name="vue">
+
+They are the root's listeners: `@event-click`, `@date-click`, `@more-click`, `@today-change`,
+`@announce`, `@select`, `@event-drop` and `@external-drop` (a feature's listener is a type error
+on a root typed without it, `typedCalendar<Types, typeof features>()`).
+
+```vue
+<Calendar.Root
+    :model="model"
+    @event-click="({ eventId }) => openEditor(eventId)"
+    @date-click="({ date, time }) => console.log('pressed', date, time)"
+>
+    <!-- … -->
+</Calendar.Root>
+```
+
+</Framework>
+
 ## Outside the root
 
 A toolbar or a test outside the root reaches both through a calendar ref, `useCalendarRef` in a
 component or `createCalendarRef` in a module:
+
+<Framework name="react">
 
 ```tsx
 import { Calendar, useCalendarRef } from "@fragiola/calendar-react";
@@ -99,5 +147,29 @@ function Planner() {
     );
 }
 ```
+
+</Framework>
+
+<Framework name="vue">
+
+A calendar ref is not a Vue ref: the template passes it as it is and reads `calendar.value`, which
+is reactive (`null` until the root mounts).
+
+```vue title="planner.vue"
+<script setup lang="ts">
+import { Calendar, useCalendarRef } from "@fragiola/calendar-vue";
+
+const calendar = useCalendarRef();
+</script>
+
+<template>
+    <button type="button" @click="calendar.value?.model.run('view.today', {})">Today</button>
+    <Calendar.Root :calendar-ref="calendar" :default-events="[]">
+        <!-- … -->
+    </Calendar.Root>
+</template>
+```
+
+</Framework>
 
 [Engine](/docs/api/engine) lists every action, key and event.

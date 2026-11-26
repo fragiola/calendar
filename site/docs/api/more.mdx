@@ -22,6 +22,8 @@ It renders `data-calendar-part="more"` and `data-date`.
 
 ## Usage
 
+<Framework name="react">
+
 ```tsx
 import { Calendar } from "@fragiola/calendar-react";
 import { type ReactNode, useState } from "react";
@@ -62,8 +64,52 @@ function BusyMonth() {
 declare function DayPopover(props: { date: string; onClose: () => void }): ReactNode;
 ```
 
+</Framework>
+
+<Framework name="vue">
+
+```vue title="busy-month.vue"
+<script setup lang="ts">
+import { Calendar } from "@fragiola/calendar-vue";
+import { ref } from "vue";
+// your popover: the day's events from model.get("list"), a close button
+import DayPopover from "./day-popover.vue";
+
+const openDay = ref<string | null>(null);
+</script>
+
+<template>
+
+    <Calendar.Root :settings="{ dayMaxEvents: 2 }" @more-click="openDay = $event.date">
+        <Calendar.DayGrid aria-label="Month">
+            <Calendar.Weeks v-slot="{ week }">
+                <Calendar.Week :week="week">
+                    <template #day="{ day }">
+                        <Calendar.Day :day="day">
+                            <Calendar.DayEvents v-slot="{ segment }">
+                                <Calendar.Segment :segment="segment" />
+                            </Calendar.DayEvents>
+                            <Calendar.More v-slot="{ hiddenCount }" class="more">
+                                +{{ hiddenCount }} more
+                            </Calendar.More>
+                            <DayPopover
+                                v-if="openDay === day.date"
+                                :date="day.date"
+                                @close="openDay = null"
+                            />
+                        </Calendar.Day>
+                    </template>
+                </Calendar.Week>
+            </Calendar.Weeks>
+        </Calendar.DayGrid>
+    </Calendar.Root>
+</template>
+```
+
+</Framework>
+
 The rows' function closes over `openDay`, so it is called again when the open day changes (React's
-contract). The [more events guide](/docs/guides/more-events) builds the popover with Fragiola UI.
+contract); in Vue, the slot reads the `openDay` ref, and Vue renders the rows again when it changes. The [more events guide](/docs/guides/more-events) builds the popover with Fragiola UI.
 
 <Example id="more-events" />
 
@@ -71,6 +117,9 @@ contract). The [more events guide](/docs/guides/more-events) builds the popover 
 
 `MoreProps`; it also takes the [common props](/docs/api/root#common-props) and every `button`
 attribute.
+
+In Vue: the same props (in kebab-case in a template), and slots in place of `children`; see
+[Vue primitives](/docs/api/vue).
 
 | prop | type | description |
 | --- | --- | --- |

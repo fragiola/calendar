@@ -22,7 +22,7 @@ import type {
     CalendarModel,
     CalendarState,
     CommandEvent,
-} from "@fragiola/calendar-react";
+} from "@fragiola/calendar-react"; // or "@fragiola/calendar-vue"
 
 const UNDO_META = { undo: true } as const;
 
@@ -65,7 +65,11 @@ rows whose events changed.
 ## Buttons and shortcuts
 
 `_kit/undo.ts` adds a snapshot (`canUndo`, `canRedo`, the steps' command names) with
-`subscribe` and `getSnapshot`, ready for `useSyncExternalStore`:
+`subscribe` and `getSnapshot`:
+
+<Framework name="react">
+
+`useSyncExternalStore` reads it:
 
 ```tsx
 import { useSyncExternalStore } from "react";
@@ -85,6 +89,34 @@ function UndoButtons({ undo }: { undo: UndoManager }) {
     );
 }
 ```
+
+</Framework>
+
+<Framework name="vue">
+
+A `shallowRef` holds the snapshot, set again on each change:
+
+```vue title="undo-buttons.vue"
+<script setup lang="ts">
+import { onBeforeUnmount, shallowRef } from "vue";
+import type { UndoManager } from "./undo";
+
+const props = defineProps<{ undo: UndoManager }>();
+
+const history = shallowRef(props.undo.getSnapshot());
+const stop = props.undo.subscribe(() => {
+    history.value = props.undo.getSnapshot();
+});
+onBeforeUnmount(stop);
+</script>
+
+<template>
+    <button type="button" :disabled="!history.canUndo" @click="undo.undo()">Undo</button>
+    <button type="button" :disabled="!history.canRedo" @click="undo.redo()">Redo</button>
+</template>
+```
+
+</Framework>
 
 The example binds Ctrl or Cmd + Z (and Shift + Z, or Y, to redo) on the document; a text field
 keeps its own.

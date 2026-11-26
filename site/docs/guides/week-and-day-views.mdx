@@ -14,6 +14,8 @@ structural geometry. The sizes, the lines, the event boxes and every label are y
 
 ## The parts of a time grid
 
+<Framework name="react">
+
 ```tsx
 import {
     Calendar,
@@ -130,6 +132,124 @@ function TimedEvent({ segment }: { segment: TimeSegment }) {
 }
 ```
 
+</Framework>
+
+<Framework name="vue">
+
+```vue title="week-calendar.vue"
+<script setup lang="ts">
+import { createCalendarModel, typedCalendar } from "@fragiola/calendar-vue";
+import AllDayEvent from "./all-day-event.vue";
+import DayHeader from "./day-header.vue";
+import SlotTime from "./slot-time.vue";
+import TimedEvent from "./timed-event.vue";
+
+const Calendar = typedCalendar<Types>();
+const model = createCalendarModel<Types>({
+    version: 1,
+    events: [
+        {
+            id: "review",
+            title: "Design review",
+            start: "2026-11-26T10:00:00-05:00",
+            end: "2026-11-26T11:30:00-05:00",
+            allDay: false,
+        },
+    ],
+    calendars: [],
+    settings: { timeZone: "America/New_York" },
+    view: { type: "week", anchorDate: "2026-11-26" },
+});
+</script>
+
+<template>
+    <Calendar.Root :model="model" class="week">
+        <Calendar.TimeGrid aria-label="Week" class="grid">
+            <Calendar.ColumnHeaders v-slot="{ date }" class="headers">
+                <DayHeader :date="date" />
+            </Calendar.ColumnHeaders>
+            <Calendar.AllDayRow class="all-day">
+                <Calendar.Days v-slot="{ day }">
+                    <Calendar.Day :day="day" class="all-day-cell">
+                        <Calendar.DayEvents v-slot="{ segment }">
+                            <AllDayEvent :segment="segment" />
+                        </Calendar.DayEvents>
+                    </Calendar.Day>
+                </Calendar.Days>
+            </Calendar.AllDayRow>
+            <Calendar.Scroller class="scroller">
+                <div class="body">
+                    <Calendar.SlotRows v-slot="{ slot }">
+                        <Calendar.SlotRow :slot="slot" class="slot-row">
+                            <Calendar.SlotLabel class="slot-label">
+                                <SlotTime v-if="slot.time.endsWith(':00')" :time="slot.time" />
+                            </Calendar.SlotLabel>
+                            <Calendar.Slots v-slot="{ column }">
+                                <Calendar.Slot :date="column.date" class="slot" />
+                            </Calendar.Slots>
+                        </Calendar.SlotRow>
+                    </Calendar.SlotRows>
+                    <Calendar.Columns v-slot="{ column }" class="columns">
+                        <Calendar.Column :column="column" class="column">
+                            <Calendar.ColumnEvents v-slot="{ segment }">
+                                <TimedEvent :segment="segment" />
+                            </Calendar.ColumnEvents>
+                        </Calendar.Column>
+                    </Calendar.Columns>
+                </div>
+            </Calendar.Scroller>
+        </Calendar.TimeGrid>
+    </Calendar.Root>
+</template>
+```
+
+```vue title="day-header.vue"
+<script setup lang="ts">
+import { Calendar, useDayHeader } from "@fragiola/calendar-vue";
+
+const props = defineProps<{ date: string }>();
+const parts = useDayHeader(() => props.date); // the weekday and the day, in the locale's order
+</script>
+
+<template>
+    <Calendar.ColumnHeader :date="date" class="header">
+        {{ parts.map((part) => part.value).join("") }}
+    </Calendar.ColumnHeader>
+</template>
+```
+
+```vue title="slot-time.vue"
+<script setup lang="ts">
+import { useSlotLabel } from "@fragiola/calendar-vue";
+
+const props = defineProps<{ time: string }>();
+const parts = useSlotLabel(() => props.time, { hour: "numeric" });
+</script>
+
+<template>
+    <span>{{ parts.map((part) => part.value).join("") }}</span>
+</template>
+```
+
+```vue title="timed-event.vue"
+<script setup lang="ts">
+import { Calendar, type TimeSegment, useCalendar } from "@fragiola/calendar-vue";
+
+defineProps<{ segment: TimeSegment }>();
+const { model } = useCalendar();
+</script>
+
+<template>
+    <Calendar.TimeEvent :segment="segment" class="event">
+        {{ model.get("event-by", { id: segment.eventId })?.title }}
+    </Calendar.TimeEvent>
+</template>
+```
+
+`all-day-event.vue` is the same with `Calendar.Segment` and a `Segment`.
+
+</Framework>
+
 What each part is:
 
 - `Calendar.ColumnHeaders` is the header row, one `Calendar.ColumnHeader` per day. The time axis
@@ -137,7 +257,7 @@ What each part is:
 - `Calendar.AllDayRow` is the time grid's day-grid row: its days and segments work as a month
   row's ([Month view](/docs/guides/month-view)).
 - `Calendar.Scroller` is the element that scrolls. The engine autoscrolls it during a drag.
-- `Calendar.SlotRows` calls your function per slot; `Calendar.SlotRow` is the row,
+- `Calendar.SlotRows` calls your function (in Vue, its slot) per slot; `Calendar.SlotRow` is the row,
   `Calendar.SlotLabel` its row header and `Calendar.Slots` its cells, one `Calendar.Slot` per day.
   The slots are the grid's cells and its roving focus.
 - `Calendar.Columns` is the layer of day columns, the grid's last row; each `Calendar.Column` is a
@@ -200,7 +320,7 @@ padding of your own keeps two side-by-side events apart.
 The same parts show a day or any number of days: the view's type decides how many columns the
 layout has.
 
-```tsx
+```ts
 model.run("view.set", { type: "day" });
 model.run("view.set", { type: "days", days: 3 }); // three days from the anchor date
 ```
@@ -243,8 +363,10 @@ slots, and its events sit at their wall-clock times. See [Time zones and DST](/d
 
 ## Opening at a time of day
 
-The scroll position is yours. A ref callback on the scroller can open the grid at 08:00 from the
-slot rows' `data-time`:
+The scroll position is yours. A ref on the scroller can open the grid at 08:00 from the slot
+rows' `data-time`:
+
+<Framework name="react">
 
 ```tsx
 function scrollToMorning(element: HTMLElement | null) {
@@ -257,11 +379,41 @@ function scrollToMorning(element: HTMLElement | null) {
 </Calendar.Scroller>;
 ```
 
+</Framework>
+
+<Framework name="vue">
+
+A template ref on a part is its component, and `$el` its element:
+
+```vue
+<script setup lang="ts">
+import { type ComponentPublicInstance, onMounted, useTemplateRef } from "vue";
+
+const scroller = useTemplateRef<ComponentPublicInstance>("scroller");
+onMounted(() => scrollToMorning(scroller.value?.$el ?? null));
+
+function scrollToMorning(element: HTMLElement | null) {
+    const eight = element?.querySelector<HTMLElement>('[data-time="08:00"]');
+    if (element && eight) element.scrollTop = eight.offsetTop;
+}
+</script>
+
+<template>
+    <Calendar.Scroller ref="scroller" class="scroller">
+        <!-- the slot rows and the columns -->
+    </Calendar.Scroller>
+</template>
+```
+
+</Framework>
+
 ## The current time
 
-With `nowIndicator()` (`@fragiola/calendar-react/now-indicator`), a `NowIndicator` in today's
+With `nowIndicator()` (`@fragiola/calendar-react/now-indicator`, `@fragiola/calendar-vue/now-indicator`), a `NowIndicator` in today's
 column draws the current time's line, moved by the engine's clock every minute (or every
 `interval`). It renders only in today's column, so it can go in every column.
+
+<Framework name="react">
 
 ```tsx
 import { NowIndicator, nowIndicator } from "@fragiola/calendar-react/now-indicator";
@@ -275,5 +427,28 @@ const features = [nowIndicator()] as const;
     <NowIndicator className="now" />
 </Calendar.Column>;
 ```
+
+</Framework>
+
+<Framework name="vue">
+
+```vue
+<script setup lang="ts">
+import { NowIndicator, nowIndicator } from "@fragiola/calendar-vue/now-indicator";
+
+const features = [nowIndicator()] as const;
+</script>
+
+<template>
+    <Calendar.Column :column="column" class="column">
+        <Calendar.ColumnEvents v-slot="{ segment }">
+            <TimedEvent :segment="segment" />
+        </Calendar.ColumnEvents>
+        <NowIndicator class="now" />
+    </Calendar.Column>
+</template>
+```
+
+</Framework>
 
 See [NowIndicator](/docs/api/now-indicator) and the [now indicator example](/examples/now-indicator).

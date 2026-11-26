@@ -19,6 +19,8 @@ It renders `data-calendar-part="view-button"` on a `button` with `type="button"`
 
 ## Usage
 
+<Framework name="react">
+
 ```tsx
 import { Calendar } from "@fragiola/calendar-react";
 
@@ -42,12 +44,37 @@ function ViewSwitcher() {
 }
 ```
 
+</Framework>
+
+<Framework name="vue">
+
+```vue title="view-switcher.vue"
+<script setup lang="ts">
+import { Calendar } from "@fragiola/calendar-vue";
+</script>
+
+<template>
+
+    <div role="group" aria-label="View">
+        <Calendar.ViewButton view="month" class="segment">Month</Calendar.ViewButton>
+        <Calendar.ViewButton view="week" class="segment">Week</Calendar.ViewButton>
+        <Calendar.ViewButton view="days" :days="3" class="segment">3 days</Calendar.ViewButton>
+        <Calendar.ViewButton view="list" class="segment">Agenda</Calendar.ViewButton>
+    </div>
+</template>
+```
+
+</Framework>
+
 Style the pressed one with `[data-pressed]` or `[aria-pressed="true"]`.
 
 ## Props
 
 `ViewButtonProps`; it also takes the [common props](/docs/api/root#common-props) and every
 `button` attribute.
+
+In Vue: the same props (in kebab-case in a template), and slots in place of `children`; see
+[Vue primitives](/docs/api/vue).
 
 | prop | type | description |
 | --- | --- | --- |

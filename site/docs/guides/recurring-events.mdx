@@ -125,7 +125,7 @@ The package never asks. To ask the user, hold the command in a middleware, open 
 run it again with the scope they choose; `meta` marks the re-run so the middleware lets it
 through, and dry runs (a drag's previews) pass untouched:
 
-```tsx
+```ts
 import { createCalendarModel, type EditScope, veto } from "@fragiola/calendar-react";
 import { dragAndDrop } from "@fragiola/calendar-react/drag-and-drop";
 import { recurrence } from "@fragiola/calendar-react/recurrence";

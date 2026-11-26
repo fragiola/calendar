@@ -21,6 +21,8 @@ wrapper).
 
 ## Usage
 
+<Framework name="react">
+
 ```tsx
 import { Calendar, type TimeGridColumn } from "@fragiola/calendar-react";
 import { useCallback } from "react";
@@ -55,6 +57,38 @@ export function DayColumns(props: { highlighted: string | null }) {
 }
 ```
 
+</Framework>
+
+<Framework name="vue">
+
+```vue title="day-columns.vue"
+<script setup lang="ts">
+import { Calendar } from "@fragiola/calendar-vue";
+
+// the slot reads `highlighted`: Vue renders a column again when it changes
+defineProps<{ highlighted: string | null }>();
+</script>
+
+<template>
+
+    <Calendar.Columns
+        v-slot="{ column }"
+        :style="{ position: 'absolute', inset: 0, display: 'flex' }"
+    >
+        <Calendar.Column :column="column" class="column">
+            <Calendar.ColumnEvents v-slot="{ segment }">
+                <Calendar.TimeEvent
+                    :segment="segment"
+                    :data-highlighted="segment.eventId === highlighted ? '' : undefined"
+                />
+            </Calendar.ColumnEvents>
+        </Calendar.Column>
+    </Calendar.Columns>
+</template>
+```
+
+</Framework>
+
 When `highlighted` changes every column is called again, so the highlight is always current; any
 other render of the app re-renders only the columns whose layout changed.
 
@@ -67,6 +101,9 @@ other render of the app re-renders only the columns whose layout changed.
 | `style` | `pointer-events: none` (structural) |
 
 ## Props
+
+In Vue: the same props (in kebab-case in a template), and slots in place of `children`; see
+[Vue primitives](/docs/api/vue).
 
 `ColumnsProps` takes the [common props](/docs/api/root#common-props) and any `div` attribute, and:
 

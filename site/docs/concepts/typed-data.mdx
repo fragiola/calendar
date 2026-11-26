@@ -26,11 +26,14 @@ optional when it allows `undefined` (`focus` above). An event without a `kind` h
 
 ## Type the document and the model
 
+The model and its types come from your framework's package (`@fragiola/calendar-react`,
+`@fragiola/calendar-vue`), which re-exports the core `@fragiola/calendar`:
+
 ```ts
 import {
     type CalendarDocument,
     createCalendarModel,
-} from "@fragiola/calendar-react";
+} from "@fragiola/calendar";
 
 const json: CalendarDocument<Types> = {
     version: 1,
@@ -81,6 +84,8 @@ const calendar = model.get("calendar-by", { id: "ada" });
 calendar?.data?.color; // "blue" | "green" | "orange" | undefined
 ```
 
+<Framework name="react">
+
 In a component, pass the registry to the hook, which cannot infer it through context:
 
 ```tsx
@@ -90,6 +95,31 @@ function Room({ eventId }: { eventId: string }) {
     return event?.kind === "meeting" ? <span>{event.data?.room}</span> : null;
 }
 ```
+
+</Framework>
+
+<Framework name="vue">
+
+In a component, pass the registry to the composable, which cannot infer it through injection;
+the root takes it from `typedCalendar<Types>()`, the namespace typed by the registry:
+
+```vue title="room.vue"
+<script setup lang="ts">
+import { useCalendar } from "@fragiola/calendar-vue";
+import { computed } from "vue";
+import type { Types } from "./types";
+
+const props = defineProps<{ eventId: string }>();
+const { model } = useCalendar<Types>();
+const event = computed(() => model.get("event-by", { id: props.eventId }));
+</script>
+
+<template>
+    <span v-if="event?.kind === 'meeting'">{{ event.data?.room }}</span>
+</template>
+```
+
+</Framework>
 
 ## Data is JSON
 

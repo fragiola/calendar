@@ -9,6 +9,8 @@ factory from its own entry point that the main entry never imports, so a calenda
 drag ships no drag code ([Features](/docs/concepts/features)). The features are given to the model
 once, for its life; which ones a screen offers is yours.
 
+<Framework name="react">
+
 ```tsx
 import { Calendar } from "@fragiola/calendar-react";
 import { dragAndDrop } from "@fragiola/calendar-react/drag-and-drop";
@@ -27,10 +29,36 @@ export function Planner() {
 }
 ```
 
-Each React entry `@fragiola/calendar-react/<entry>` re-exports the core's `@fragiola/calendar/<entry>`
-and adds the feature's parts and hooks, so a React app installs one package. A feature's command,
+</Framework>
+
+<Framework name="vue">
+
+```vue title="planner.vue"
+<script setup lang="ts">
+import { Calendar } from "@fragiola/calendar-vue";
+import { dragAndDrop } from "@fragiola/calendar-vue/drag-and-drop";
+import { resize } from "@fragiola/calendar-vue/resize";
+import { selection } from "@fragiola/calendar-vue/selection";
+
+// a const tuple, read once by the root (typedCalendar<Types, typeof FEATURES>() types its events)
+const FEATURES = [selection(), dragAndDrop(), resize()] as const;
+</script>
+
+<template>
+
+    <Calendar.Root :features="FEATURES" default-view="week">
+        <!-- the time grid, with Selection, DragPreview and ResizeHandle parts -->
+    </Calendar.Root>
+</template>
+```
+
+</Framework>
+
+Each adapter's entry (`@fragiola/calendar-react/<entry>`, `@fragiola/calendar-vue/<entry>`) re-exports
+the core's `@fragiola/calendar/<entry>` and adds the feature's parts and hooks (Vue's composables of
+the same names), so an app installs one package. A feature's command,
 key, setting or document field in a model without it is refused, naming the feature; a feature's
-root callback (`onSelect`) is a type error without it.
+root callback (`onSelect`, or `@select` on a `typedCalendar` root in Vue) is a type error without it.
 
 ## The features
 

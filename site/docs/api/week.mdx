@@ -22,6 +22,8 @@ It renders `data-calendar-part="week"`.
 
 ## Usage
 
+<Framework name="react">
+
 ```tsx
 import { Calendar, type DayGridWeek } from "@fragiola/calendar-react";
 import { Selection } from "@fragiola/calendar-react/selection";
@@ -44,10 +46,41 @@ function weekRow(week: DayGridWeek) {
 }
 ```
 
+</Framework>
+
+<Framework name="vue">
+
+```vue title="week-row.vue"
+<script setup lang="ts">
+import { Calendar, type DayGridWeek } from "@fragiola/calendar-vue";
+import { Selection } from "@fragiola/calendar-vue/selection";
+
+defineProps<{ week: DayGridWeek }>();
+</script>
+
+<template>
+
+    <Calendar.Week :week="week" class="week" :style="{ '--calendar-row-inset': '2.5rem' }">
+        <Calendar.WeekNumber v-slot="{ weekNumber }" class="week-number">
+            {{ weekNumber }}
+        </Calendar.WeekNumber>
+        <Calendar.Days v-slot="{ day }">
+            <Calendar.Day :day="day" class="day" />
+        </Calendar.Days>
+        <Selection class="selected-range" />
+    </Calendar.Week>
+</template>
+```
+
+</Framework>
+
 ## Props
 
 `WeekProps`; it also takes the [common props](/docs/api/root#common-props) and every `div`
 attribute.
+
+In Vue: the same props (in kebab-case in a template), and slots in place of `children`; see
+[Vue primitives](/docs/api/vue).
 
 | prop | type | description |
 | --- | --- | --- |

@@ -336,6 +336,10 @@
                 {
                     "label": "Hooks",
                     "path": "api/hooks"
+                },
+                {
+                    "label": "Vue primitives",
+                    "path": "api/vue"
                 }
             ]
         },

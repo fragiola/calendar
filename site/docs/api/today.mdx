@@ -18,6 +18,8 @@ It renders `data-calendar-part="today"` on a `button` with `type="button"`.
 
 ## Usage
 
+<Framework name="react">
+
 ```tsx
 import { Calendar } from "@fragiola/calendar-react";
 
@@ -27,10 +29,31 @@ import { Calendar } from "@fragiola/calendar-react";
 </Calendar.Today>
 ```
 
+</Framework>
+
+<Framework name="vue">
+
+```vue
+<!-- inside Calendar.Root; the render slot hands the state -->
+<Calendar.Today>
+    <template #render="{ props, state, children }">
+        <button v-bind="props" :class="state.disabled ? 'button muted' : 'button'">
+            <component :is="children" />
+        </button>
+    </template>
+    Today
+</Calendar.Today>
+```
+
+</Framework>
+
 ## Props
 
 `TodayProps`; it also takes the [common props](/docs/api/root#common-props) and every `button`
 attribute.
+
+In Vue: the same props (in kebab-case in a template), and slots in place of `children`; see
+[Vue primitives](/docs/api/vue).
 
 | prop | type | description |
 | --- | --- | --- |

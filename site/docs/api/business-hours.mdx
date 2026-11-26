@@ -22,6 +22,8 @@ shade is yours.
 
 ## Usage
 
+<Framework name="react">
+
 ```tsx
 import { Calendar, createCalendarModel } from "@fragiola/calendar-react";
 import { BusinessHours, constraints } from "@fragiola/calendar-react/constraints";
@@ -62,6 +64,50 @@ export function OfficeWeek() {
 }
 ```
 
+</Framework>
+
+<Framework name="vue">
+
+```vue title="office-week.vue"
+<script setup lang="ts">
+import { Calendar, createCalendarModel } from "@fragiola/calendar-vue";
+import { BusinessHours, constraints } from "@fragiola/calendar-vue/constraints";
+
+const FEATURES = [constraints()] as const;
+
+// created once, in setup (never in ref() or reactive())
+const model = createCalendarModel(
+    {
+        version: 1,
+        events: [],
+        calendars: [],
+        settings: {
+            businessHours: [
+                { daysOfWeek: [1, 2, 3, 4, 5], startTime: "09:00", endTime: "17:00" },
+            ],
+        },
+        view: { type: "week", anchorDate: "2026-11-26" },
+    },
+    { features: FEATURES },
+);
+</script>
+
+<template>
+
+    <Calendar.Root :model="model">
+        <Calendar.TimeGrid aria-label="Week">
+            <Calendar.Columns v-slot="{ column }">
+                <Calendar.Column :column="column">
+                    <BusinessHours class="business-hours" />
+                </Calendar.Column>
+            </Calendar.Columns>
+        </Calendar.TimeGrid>
+    </Calendar.Root>
+</template>
+```
+
+</Framework>
+
 Each weekday's column shows a block from 09:00 to 17:00; the weekend shows none. A real grid also
 renders its slot rows (see [Calendar.TimeGrid](/docs/api/time-grid)). `useBusinessHours` (on the
 [hooks page](/docs/api/hooks)) gives the ranges themselves.
@@ -78,6 +124,9 @@ renders its slot rows (see [Calendar.TimeGrid](/docs/api/time-grid)). `useBusine
 | `style` | `position: absolute`, `top`, `height` (structural) |
 
 ## Props
+
+In Vue: the same props (in kebab-case in a template), and slots in place of `children`; see
+[Vue primitives](/docs/api/vue).
 
 `BusinessHoursProps` takes the [common props](/docs/api/root#common-props) and any `div`
 attribute, and:

@@ -115,6 +115,8 @@ size the slots yourself: the events place themselves as fractions of their colum
 
 ## A class per part
 
+<Framework name="react">
+
 When you prefer classes, every part takes `className` (a string or a function of its state) and
 `style` (an object or a function of its state):
 
@@ -125,6 +127,24 @@ When you prefer classes, every part takes `className` (a string or a function of
 />
 ```
 
-[Styling with Tailwind](/docs/guides/styling-tailwind) uses the same props with utility classes,
+</Framework>
+
+<Framework name="vue">
+
+When you prefer classes, every part takes `class` and `style` as any element does (Vue joins your
+classes with the part's own). A class that depends on the part's state comes from its `#render`
+slot, which hands the element's props and the state:
+
+```vue
+<Calendar.Segment :segment="segment">
+    <template #render="{ props, state }">
+        <div v-bind="props" :class="state.grabbed ? 'event event--grabbed' : 'event'" />
+    </template>
+</Calendar.Segment>
+```
+
+</Framework>
+
+[Styling with Tailwind](/docs/guides/styling-tailwind) does the same with utility classes,
 and [Theming](/docs/guides/theming) shows themes that change the calendar's shapes as well as its
 colours.

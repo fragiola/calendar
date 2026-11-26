@@ -57,6 +57,8 @@ so does every slot whose start is within them, so CSS can shade the slots withou
 `BusinessHours` renders one element per range of the day, positioned at its fractions of the
 column, in a `Calendar.Column`:
 
+<Framework name="react">
+
 ```tsx
 import { Calendar } from "@fragiola/calendar-react";
 import { BusinessHours } from "@fragiola/calendar-react/constraints";
@@ -69,8 +71,30 @@ import { BusinessHours } from "@fragiola/calendar-react/constraints";
 </Calendar.Column>;
 ```
 
+</Framework>
+
+<Framework name="vue">
+
+```vue
+<script setup lang="ts">
+import { Calendar } from "@fragiola/calendar-vue";
+import { BusinessHours } from "@fragiola/calendar-vue/constraints";
+</script>
+
+<template>
+    <Calendar.Column :column="column" class="column">
+        <BusinessHours class="business-hours" />
+        <Calendar.ColumnEvents v-slot="{ segment }">
+            <Calendar.TimeEvent :segment="segment" />
+        </Calendar.ColumnEvents>
+    </Calendar.Column>
+</template>
+```
+
+</Framework>
+
 Put it before the events so they paint above it. It is hidden from assistive technology.
-`useBusinessHours(date)` gives a day's ranges (their instants and fractions) for anything else
+`useBusinessHours(date)` gives a day's ranges (their instants and fractions; in Vue, a computed) for anything else
 you draw, and `model.get("business-hours-in", { range })` the same for any days.
 
 ## Where events may go

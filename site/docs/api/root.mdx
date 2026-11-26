@@ -33,6 +33,8 @@ add.
 
 ## Usage
 
+<Framework name="react">
+
 ```tsx
 import {
     Calendar,
@@ -84,14 +86,102 @@ export function TeamWeek() {
 }
 ```
 
+</Framework>
+
+<Framework name="vue">
+
+```vue title="title.vue"
+<script setup lang="ts">
+import { useCalendarTitle } from "@fragiola/calendar-vue";
+
+const parts = useCalendarTitle();
+</script>
+
+<template>
+
+    <h2>{{ parts.map((part) => part.value).join("") }}</h2>
+</template>
+```
+
+```vue title="team-week.vue"
+<script setup lang="ts">
+import {
+    type CalendarEngineEventOf,
+    type CalendarEventJson,
+    typedCalendar,
+} from "@fragiola/calendar-vue";
+import { dragAndDrop } from "@fragiola/calendar-vue/drag-and-drop";
+import Title from "./title.vue";
+
+type Types = { events: { meeting: { room: string } }; calendar: undefined };
+
+const features = [dragAndDrop()] as const;
+// the namespace typed by the registry and the features: what React passes as type arguments
+const Calendar = typedCalendar<Types, typeof features>();
+
+const events: CalendarEventJson<Types>[] = [
+    {
+        id: "standup",
+        title: "Standup",
+        start: "2026-11-26T09:00:00-03:00",
+        end: "2026-11-26T09:15:00-03:00",
+        allDay: false,
+        kind: "meeting",
+        data: { room: "Blue" },
+    },
+];
+
+function opened(event: CalendarEngineEventOf<"event-click">) {
+    console.log("open", event.eventId);
+}
+
+function moved(event: CalendarEngineEventOf<"drop">) {
+    console.log("moved to", event.start);
+}
+</script>
+
+<template>
+
+    <Calendar.Root
+        aria-label="Team calendar"
+        :default-events="events"
+        :settings="{ timeZone: 'America/Sao_Paulo', locale: 'en-US' }"
+        default-view="week"
+        :features="features"
+        @event-click="opened"
+        @event-drop="moved"
+    >
+        <!-- the render slot hands the state: no class function in Vue -->
+        <template #render="{ props, state, children }">
+            <div v-bind="props" :class="state.gestureActive ? 'cal dragging' : 'cal'">
+                <component :is="children" />
+            </div>
+        </template>
+        <Title />
+        <Calendar.Previous>Previous</Calendar.Previous>
+        <Calendar.Today>Today</Calendar.Today>
+        <Calendar.Next>Next</Calendar.Next>
+        <!-- a Calendar.TimeGrid, a Calendar.DayGrid or a Calendar.List -->
+    </Calendar.Root>
+</template>
+```
+
+</Framework>
+
 The root's type arguments are the registry and the features (`RootProps<T, F>`): with them, a
 feature's callback such as `onEventDrop` is typed, and without its feature it is a type error. A
-`model` carries its own, so `<Calendar.Root model={model}>` needs none.
+`model` carries its own, so `<Calendar.Root model={model}>` needs none. A Vue template passes no
+type argument: `typedCalendar<Types, typeof features>()` gives the namespace typed by both, and
+`@event-drop` without its feature is a `vue-tsc` error ([Vue primitives](/docs/api/vue)).
 
 ## Props
 
 The root's own props (`RootBaseProps<T, F>`); it also takes the [common props](/docs/api/root#common-props),
 the engine props and the event props below, and every `div` attribute.
+
+In Vue, the same props in kebab-case, `v-model:events`, `v-model:view` and `v-model:date` for the
+controlled ones, and listeners for the callbacks (`@events-change`, `@event-click`, …): see
+[Vue primitives](/docs/api/vue).
 
 | prop | type | default | description |
 | --- | --- | --- | --- |
@@ -160,6 +250,8 @@ Every part that renders an element takes these, on top of its element's attribut
 A `render` function receives `RenderedProps`: spread them on the element it returns (their `ref`
 is a callback ref).
 
+<Framework name="react">
+
 ```tsx
 <Calendar.Day
     day={day}
@@ -168,6 +260,22 @@ is a callback ref).
     )}
 />
 ```
+
+</Framework>
+
+<Framework name="vue">
+
+```vue
+<Calendar.Day :day="day">
+    <template #render="{ props, state, children }">
+        <section v-bind="props" :aria-current="state.day.today ? 'date' : undefined">
+            <component :is="children" />
+        </section>
+    </template>
+</Calendar.Day>
+```
+
+</Framework>
 
 ## State
 

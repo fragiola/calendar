@@ -32,8 +32,10 @@ it then holds no lanes of its own, and a resize of the calendar measures again.
 ## The "+N more" button
 
 `Calendar.More` goes in a `Calendar.Day`. It renders only while `hiddenCount` is more than zero,
-and its children are elements or a function of its state (`hiddenCount`, `hiddenOccurrenceIds`,
-`date`):
+and its children are elements or a function of its state (in Vue, its default slot's scope:
+`hiddenCount`, `hiddenOccurrenceIds`, `date`):
+
+<Framework name="react">
 
 ```tsx
 <Calendar.Day day={day} className="day">
@@ -46,17 +48,37 @@ and its children are elements or a function of its state (`hiddenCount`, `hidden
 </Calendar.Day>
 ```
 
+</Framework>
+
+<Framework name="vue">
+
+```vue
+<Calendar.Day :day="day" class="day">
+    <Calendar.DayEvents v-slot="{ segment }" class="events">
+        <EventSegment :segment="segment" />
+    </Calendar.DayEvents>
+    <Calendar.More v-slot="{ hiddenCount }" class="more">
+        +{{ hiddenCount }} more
+    </Calendar.More>
+</Calendar.Day>
+```
+
+</Framework>
+
 On the keyboard it is the last item of the day's events: Down from the day's last event focuses
 it, Enter on a day whose events are all hidden focuses it, Up goes back and Escape returns to the
 day. It stays outside the roving focus (`tabindex="-1"`), so Tab never stops on it.
 
-## Opening a popover from `onMoreClick`
+## Opening a popover from the more click
 
 A press on the button, Enter on it, or an assistive technology's click is the engine's
-`more-click`, which the root reports as `onMoreClick` with the day and the hidden occurrences.
-The popover opens from that callback. With Fragiola UI's popover, `Calendar.More` is the
-trigger it is anchored to (`render`), and the trigger's own toggle is cancelled, since the
-engine's event already says when to open:
+`more-click`, which the root reports (`onMoreClick` in React, `@more-click` in Vue) with the day
+and the hidden occurrences. The popover opens from that callback.
+
+<Framework name="react">
+
+With Fragiola UI's popover, `Calendar.More` is the trigger it is anchored to (`render`), and the
+trigger's own toggle is cancelled, since the engine's event already says when to open:
 
 ```tsx
 import {
@@ -141,17 +163,115 @@ function MorePopover(props: { date: string; open: boolean; onClose: () => void }
 }
 ```
 
+</Framework>
+
+<Framework name="vue">
+
+With Fragiola UI's popover (on Reka UI), `Calendar.More` is the trigger it is anchored to
+(`as-child`). The popover's `open` is the app's: the trigger's own toggle asks to open it, which
+the engine's event already did, and only a close is heard:
+
+```vue title="busy-month.vue"
+<script setup lang="ts">
+import { Calendar, createCalendarModel } from "@fragiola/calendar-vue";
+import { ref } from "vue";
+import MorePopover from "./more-popover.vue";
+
+const model = createCalendarModel({
+    version: 1,
+    events: [],
+    calendars: [],
+    settings: { dayMaxEvents: 2 },
+    view: { type: "month", anchorDate: "2026-11-26" },
+});
+// the day whose popover is open
+const open = ref<string | null>(null);
+</script>
+
+<template>
+    <Calendar.Root :model="model" @more-click="(event) => (open = event.date)">
+        <Calendar.DayGrid aria-label="Month">
+            <Calendar.Weeks v-slot="{ week }">
+                <Calendar.Week :week="week" class="week">
+                    <template #day="{ day }">
+                        <Calendar.Day :day="day" class="day">
+                            <Calendar.DayEvents v-slot="{ segment }">
+                                <Calendar.Segment :segment="segment" />
+                            </Calendar.DayEvents>
+                            <MorePopover
+                                :date="day.date"
+                                :open="open === day.date"
+                                @close="open = null"
+                            />
+                        </Calendar.Day>
+                    </template>
+                </Calendar.Week>
+            </Calendar.Weeks>
+        </Calendar.DayGrid>
+    </Calendar.Root>
+</template>
+```
+
+```vue title="more-popover.vue"
+<script setup lang="ts">
+import { Calendar, useCalendar } from "@fragiola/calendar-vue";
+import { Popover } from "#/components/ui/popover";
+
+const props = defineProps<{ date: string; open: boolean }>();
+const emit = defineEmits<{ close: [] }>();
+const { model } = useCalendar();
+
+/** The day's events, read as the open popover renders. */
+function items() {
+    return model.get("list").days.find((day) => day.date === props.date)?.items ?? [];
+}
+</script>
+
+<template>
+    <Popover.Root :open="open" @update:open="(next) => !next && emit('close')">
+        <Popover.Trigger as-child>
+            <Calendar.More v-slot="{ hiddenCount }" class="more">
+                +{{ hiddenCount }} more
+            </Calendar.More>
+        </Popover.Trigger>
+        <Popover.Content align="start">
+            <ul>
+                <li v-for="item in items()" :key="item.occurrenceId">
+                    {{ model.get("event-by", { id: item.eventId })?.title }}
+                </li>
+            </ul>
+        </Popover.Content>
+    </Popover.Root>
+</template>
+```
+
+</Framework>
+
 The popover lists every event of the day, not only the hidden ones: `model.get("list")` gives
 any view's visible days with their occurrences. Escape and a press outside close it.
+
+<Framework name="react">
 
 The children function of `Calendar.Weeks` closes over `open`: when it changes, the rows render
 again with the new value, so the right day's popover opens. See
 [Composition](/docs/concepts/composition) for when a children function is called again.
 
+</Framework>
+
+<Framework name="vue">
+
+The days' slot reads `open`, a ref: when it changes, the rows render again with the new value, so
+the right day's popover opens. See [Composition](/docs/concepts/composition) for when a slot is
+called again.
+
+</Framework>
+
 ## Opening the day instead
 
 A popover is one choice. The month example switches to the `day` view on the day and shows it as
 an agenda:
+
+<Framework name="react">
 
 ```tsx
 <Calendar.Root
@@ -164,5 +284,26 @@ an agenda:
     {/* the month, or the day as a Calendar.List */}
 </Calendar.Root>
 ```
+
+</Framework>
+
+<Framework name="vue">
+
+```vue
+<script setup lang="ts">
+function openDay({ date }: { date: string }) {
+    model.run("view.set", { type: "day" });
+    model.run("view.go-to", { date });
+}
+</script>
+
+<template>
+    <Calendar.Root :model="model" @more-click="openDay">
+        <!-- the month, or the day as a Calendar.List -->
+    </Calendar.Root>
+</template>
+```
+
+</Framework>
 
 See [List view](/docs/guides/list-view) for the agenda's parts.

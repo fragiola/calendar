@@ -29,6 +29,8 @@ It renders `data-calendar-part="segment"`. Its accessible name is yours: its tex
 
 ## Usage
 
+<Framework name="react">
+
 ```tsx
 import { Calendar, type Segment, useCalendar } from "@fragiola/calendar-react";
 import { ResizeHandle } from "@fragiola/calendar-react/resize";
@@ -57,6 +59,46 @@ function EventChip({ segment }: { segment: Segment }) {
 }
 ```
 
+</Framework>
+
+<Framework name="vue">
+
+```vue title="event-chip.vue"
+<script setup lang="ts">
+import { Calendar, type Segment, type SegmentState, useCalendar } from "@fragiola/calendar-vue";
+import { ResizeHandle } from "@fragiola/calendar-vue/resize";
+
+const props = defineProps<{ segment: Segment }>();
+const { model } = useCalendar();
+const title = model.get("occurrence-by", { id: props.segment.occurrenceId })?.title;
+
+function chipClass(state: SegmentState) {
+    return [
+        "chip",
+        state.continuesBefore && "chip-open-start",
+        state.continuesAfter && "chip-open-end",
+        state.dragging && "chip-dragging",
+    ]
+        .filter(Boolean)
+        .join(" ");
+}
+</script>
+
+<template>
+
+    <Calendar.Segment :segment="segment">
+        <!-- the render slot hands the state: no class function in Vue -->
+        <template #render="{ props: chip, state, children }">
+            <div v-bind="chip" :class="chipClass(state)"><component :is="children" /></div>
+        </template>
+        {{ title }}
+        <ResizeHandle edge="end" class="chip-handle" />
+    </Calendar.Segment>
+</template>
+```
+
+</Framework>
+
 The same element can come from `useSegment(segment)` ([hooks](/docs/api/hooks)).
 
 <Example id="all-day-and-multi-day" variant="card" />
@@ -65,6 +107,9 @@ The same element can come from `useSegment(segment)` ([hooks](/docs/api/hooks)).
 
 `SegmentProps`; it also takes the [common props](/docs/api/root#common-props) and every `div`
 attribute.
+
+In Vue: the same props (in kebab-case in a template), and slots in place of `children`; see
+[Vue primitives](/docs/api/vue).
 
 | prop | type | description |
 | --- | --- | --- |

@@ -21,6 +21,8 @@ for it. The row's markup, height and look are yours.
 
 ## Usage
 
+<Framework name="react">
+
 ```tsx
 import { Calendar, type DayGridWeek } from "@fragiola/calendar-react";
 
@@ -38,7 +40,29 @@ function weekRow(week: DayGridWeek) {
 </Calendar.DayGrid>;
 ```
 
+</Framework>
+
+<Framework name="vue">
+
+```vue
+<!-- the slot reads only its scope: Vue keeps it stable, a row renders again only when it changed -->
+<Calendar.DayGrid aria-label="Month">
+    <Calendar.Weeks v-slot="{ week }">
+        <Calendar.Week :week="week" class="week">
+            <template #day="{ day }">
+                <Calendar.Day :day="day" class="day" />
+            </template>
+        </Calendar.Week>
+    </Calendar.Weeks>
+</Calendar.DayGrid>
+```
+
+</Framework>
+
 ## Props
+
+In Vue: the same props (in kebab-case in a template), and slots in place of `children`; see
+[Vue primitives](/docs/api/vue).
 
 `WeeksProps` (it renders no element, so it takes no other prop):
 

@@ -17,6 +17,8 @@ Give the feature two functions: `accept` says from the drag's `DataTransfer.type
 drop here, and `draft` turns a drop into an event (`event.add`'s payload without its times, which
 the target gives), or `null` to leave the drop to you.
 
+<Framework name="react">
+
 ```tsx
 import { Calendar, type CalendarEngineEventOf } from "@fragiola/calendar-react";
 import { DragPreview, dragAndDrop } from "@fragiola/calendar-react/drag-and-drop";
@@ -84,13 +86,88 @@ export function Planner() {
 }
 ```
 
+</Framework>
+
+<Framework name="vue">
+
+```vue title="planner.vue"
+<script setup lang="ts">
+import { type CalendarEngineEventOf, typedCalendar } from "@fragiola/calendar-vue";
+import { dragAndDrop } from "@fragiola/calendar-vue/drag-and-drop";
+import { externalDrop } from "@fragiola/calendar-vue/external-drop";
+import type { Types } from "./calendar-data";
+
+/** The app's own drag type: the task's id. */
+const TASK_TYPE = "application/x-task";
+
+const TASKS = [
+    { id: "report", title: "Write the quarterly report", minutes: 90 },
+    { id: "invoices", title: "Review invoices", minutes: 30 },
+];
+
+const features = [
+    dragAndDrop(),
+    externalDrop({
+        accept: (types) => types.includes(TASK_TYPE) || types.includes("Files"),
+        draft: (data) => {
+            const task = TASKS.find((one) => one.id === data.getData(TASK_TYPE));
+            if (task) {
+                return { title: task.title, duration: { minutes: task.minutes } };
+            }
+            const file = data.files[0];
+            return file ? { title: `Read ${file.name}` } : null;
+        },
+    }),
+] as const;
+
+const Calendar = typedCalendar<Types, typeof features>();
+
+function dragStart(event: DragEvent, task: (typeof TASKS)[number]) {
+    if (!event.dataTransfer) return;
+    event.dataTransfer.setData(TASK_TYPE, task.id);
+    event.dataTransfer.setData("text/plain", task.title);
+    event.dataTransfer.effectAllowed = "copy";
+}
+
+function dropped(event: CalendarEngineEventOf<"external-drop">) {
+    // eventId: the event it added, or null when the draft was null
+    if (event.eventId === null && event.dataTransfer) {
+        console.log("left to the app:", event.types);
+    }
+}
+</script>
+
+<template>
+    <ul aria-label="Tasks">
+        <li
+            v-for="task in TASKS"
+            :key="task.id"
+            draggable="true"
+            @dragstart="dragStart($event, task)"
+        >
+            {{ task.title }}
+        </li>
+    </ul>
+    <Calendar.Root
+        :default-events="[]"
+        default-view="week"
+        :features="features"
+        @external-drop="dropped"
+    >
+        <!-- the week's parts, with a DragPreview in each column and in the all-day row -->
+    </Calendar.Root>
+</template>
+```
+
+</Framework>
+
 The drop's target gives the times: a slot makes a timed event starting there for
 `duration.minutes` (default `defaultTimedDuration`); a day of the all-day row or of a month makes
 an all-day event for `duration.days` (default `defaultAllDayDuration`). The new event goes
 through `event.add`, so edit rules, constraints and middleware apply.
 
 A native drag's content cannot be read until the drop (the browser keeps it private), so a native
-drag shows no preview while it moves. `onExternalDrop` hears every drop: the event it added
+drag shows no preview while it moves. The root's `onExternalDrop` (`@external-drop`) hears every drop: the event it added
 (`eventId`), the grid point it landed on (`point`), the drag's `types`, and, when your draft made
 nothing of it, the `dataTransfer` for you to read.
 
@@ -100,6 +177,8 @@ A drag the browser does not run (a custom gesture, a pointer drag from another l
 board's card) talks to the engine through three actions: start it with the event's draft, move it
 with the pointer's client coordinates, and end it. Unlike a native drag, it previews:
 `DragPreview` shows the event where it would land (`kind: "external"`).
+
+<Framework name="react">
 
 ```tsx
 import { type AnyTypes, useCalendarRef } from "@fragiola/calendar-react";
@@ -133,6 +212,46 @@ function useExternalDrag() {
 ```
 
 Give `calendar` to the root's `calendarRef` and `start(task.title)` to a card's `onPointerDown`.
+
+</Framework>
+
+<Framework name="vue">
+
+```ts title="use-external-drag.ts"
+import { type AnyTypes, useCalendarRef } from "@fragiola/calendar-vue";
+
+export function useExternalDrag() {
+    const calendar = useCalendarRef<AnyTypes, typeof features>();
+    const start = (title: string) => (down: PointerEvent) => {
+        const engine = calendar.value?.engine;
+        if (!engine) return;
+        engine.run("external-drag-start", { event: { title } });
+        const move = (event: PointerEvent) =>
+            engine.run("external-drag-move", {
+                clientX: event.clientX,
+                clientY: event.clientY,
+            });
+        const end = (event: PointerEvent) => {
+            window.removeEventListener("pointermove", move);
+            window.removeEventListener("pointerup", end);
+            window.removeEventListener("pointercancel", end);
+            // dropped where it is: event.add; cancelled: nothing
+            engine.run("external-drag-end", { cancel: event.type === "pointercancel" });
+        };
+        window.addEventListener("pointermove", move);
+        window.addEventListener("pointerup", end);
+        window.addEventListener("pointercancel", end);
+        move(down);
+    };
+    return { calendar, start };
+}
+```
+
+Call it in a component's `setup`, give `calendar` to the root as `:calendar-ref="calendar"` and
+`start(task.title)` to a card's `@pointerdown`.
+
+</Framework>
+
 `external-drag-move` answers the grid point under the pointer (`null` outside the calendar), and
 `external-drag-end` the new event's id (`null` when nothing was added). This is how another
 Fragiola library's drag, or a drag and drop library, hands a drop to the calendar.
@@ -140,4 +259,4 @@ Fragiola library's drag, or a drag and drop library, hands a drop to the calenda
 ## Telling the user
 
 A drop is a change like any other: the model's listeners hear its `event.add`. To remove a task
-from its list once it is planned, watch `onExternalDrop`'s `eventId`, as the example does.
+from its list once it is planned, watch the external drop's `eventId`, as the example does.

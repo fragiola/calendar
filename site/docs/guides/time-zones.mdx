@@ -17,6 +17,8 @@ The display zone is the `timeZone` setting: an IANA name (`"Europe/London"`) or 
 host's zone (the default). Changing it with `settings.set` moves every event to its wall clock in
 the new zone; the instants stay the same.
 
+<Framework name="react">
+
 ```tsx
 import { useCalendar } from "@fragiola/calendar-react";
 
@@ -43,6 +45,39 @@ function ZoneSwitcher() {
     );
 }
 ```
+
+</Framework>
+
+<Framework name="vue">
+
+```vue title="zone-switcher.vue"
+<script setup lang="ts">
+import { useCalendar } from "@fragiola/calendar-vue";
+
+const ZONES = ["America/New_York", "Europe/London", "Asia/Tokyo"] as const;
+
+const { model } = useCalendar();
+
+function change(event: Event) {
+    const timeZone = (event.target as HTMLSelectElement).value;
+    model.run("settings.set", { settings: { timeZone } });
+}
+</script>
+
+<template>
+    <select
+        aria-label="Time zone"
+        :value="model.state.settings.timeZone"
+        @change="change"
+    >
+        <option v-for="zone in ZONES" :key="zone" :value="zone">
+            {{ zone }}
+        </option>
+    </select>
+</template>
+```
+
+</Framework>
 
 The time grid's axis is the display zone's wall clock: a 23-hour or a 25-hour day keeps the same
 slots, and each event sits at its wall-clock times. A zone name the engine does not know is

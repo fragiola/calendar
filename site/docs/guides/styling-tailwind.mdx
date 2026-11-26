@@ -4,11 +4,14 @@ description: Style the calendar with Tailwind's data variants and class function
 ---
 
 Every state of the calendar is a `data-*` attribute or an ARIA attribute, present or absent, so
-Tailwind's `data-*` and `aria-*` variants style it without a line of custom CSS. Each part takes
-`className` as a string or a function of its state. The utility classes, the palette and the
+Tailwind's `data-*` and `aria-*` variants style it without a line of custom CSS. In React each
+part takes `className` as a string or a function of its state; in Vue it takes `class`, and the
+`#render` slot gives its state. The utility classes, the palette and the
 design are yours; the examples use Fragiola UI's palette roles.
 
 ## Data variants
+
+<Framework name="react">
 
 ```tsx
 <Calendar.Day
@@ -16,6 +19,19 @@ design are yours; the examples use Fragiola UI's palette roles.
     className="border-s p-1 data-outside:opacity-50 data-today:bg-blue-50 data-selected:bg-blue-100 data-weekend:bg-gray-50 focus-visible:outline-2"
 />
 ```
+
+</Framework>
+
+<Framework name="vue">
+
+```vue
+<Calendar.Day
+    :day="day"
+    class="border-s p-1 data-outside:opacity-50 data-today:bg-blue-50 data-selected:bg-blue-100 data-weekend:bg-gray-50 focus-visible:outline-2"
+/>
+```
+
+</Framework>
 
 A boolean attribute is a bare variant (`data-today:`, `data-grabbed:`); a valued one takes an
 arbitrary variant: `data-[edge=start]:top-0` on a `ResizeHandle`, or
@@ -26,6 +42,8 @@ arbitrary variant: `data-[edge=start]:top-0` on a `ResizeHandle`, or
 A function receives the part's state, typed: an event's `calendarId`, `allDay`, `focused`,
 `dragging`, `grabbed`, `resizing`. Use it for what a variant cannot reach, such as a class per
 calendar:
+
+<Framework name="react">
 
 ```tsx
 import { Calendar, type TimeEventState } from "@fragiola/calendar-react";
@@ -44,6 +62,42 @@ const event = (state: TimeEventState) =>
 <Calendar.TimeEvent segment={segment} className={event} />;
 ```
 
+</Framework>
+
+<Framework name="vue">
+
+In Vue, `class` is a plain value: the `#render` slot replaces the part's element and gives its
+state, so the function is called there, on the element that takes the part's props.
+
+```vue
+<script setup lang="ts">
+import { Calendar, type TimeEventState, type TimeSegment } from "@fragiola/calendar-vue";
+
+defineProps<{ segment: TimeSegment }>();
+
+const PALETTES: Record<string, string> = {
+    ada: "bg-sky-100 text-sky-900",
+    alan: "bg-amber-100 text-amber-900",
+};
+
+const event = (state: TimeEventState) =>
+    [
+        "rounded px-1.5 text-xs select-none data-dragging:opacity-40",
+        PALETTES[state.calendarId ?? ""] ?? "bg-gray-100",
+    ].join(" ");
+</script>
+
+<template>
+    <Calendar.TimeEvent :segment="segment">
+        <template #render="{ props, state }">
+            <div v-bind="props" :class="event(state)"><!-- the title and times --></div>
+        </template>
+    </Calendar.TimeEvent>
+</template>
+```
+
+</Framework>
+
 ## One styles file per component
 
 The examples keep every class string in a `styles.ts` beside the component: one string, or one
@@ -51,7 +105,7 @@ function of the state, per part, and no class strings in the markup. A component
 its structure:
 
 ```ts title="styles.ts"
-import type { SegmentState } from "@fragiola/calendar-react";
+import type { SegmentState } from "@fragiola/calendar-react"; // or "@fragiola/calendar-vue"
 import { cn } from "#/lib/cn";
 
 export const day = cn(
@@ -66,6 +120,8 @@ export const segment = (state: SegmentState) =>
     );
 ```
 
+<Framework name="react">
+
 ```tsx
 import * as styles from "./styles";
 
@@ -77,6 +133,24 @@ import * as styles from "./styles";
     </Calendar.DayEvents>
 </Calendar.Day>;
 ```
+
+</Framework>
+
+<Framework name="vue">
+
+```vue
+<Calendar.Day :day="day" :class="styles.day">
+    <Calendar.DayEvents v-slot="{ segment }">
+        <Calendar.Segment :segment="segment">
+            <template #render="{ props, state }">
+                <div v-bind="props" :class="styles.segment(state)" />
+            </template>
+        </Calendar.Segment>
+    </Calendar.DayEvents>
+</Calendar.Day>
+```
+
+</Framework>
 
 ## Custom properties as utilities
 

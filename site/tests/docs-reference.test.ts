@@ -500,6 +500,110 @@ describe("the React feature entries", () => {
     });
 });
 
+describe("the Vue reference", () => {
+    const VUE_SRC = join(ROOT, "packages/vue/src");
+    const vueIndex = read(join(VUE_SRC, "index.ts"));
+    const vueParts = namedExports(read(join(VUE_SRC, "parts.ts")));
+    const mdx = page("vue");
+    const kebab = (name: string) =>
+        name.replace(
+            /[A-Z]/g,
+            (letter, at: number) =>
+                `${at > 0 ? "-" : ""}${letter.toLowerCase()}`,
+        );
+
+    it("re-exports the core and exports the Calendar namespace from parts.ts", () => {
+        expect(vueIndex).toMatch(/^export \* from "@fragiola\/calendar";$/m);
+        expect(vueIndex).toMatch(/export \* as Calendar from "\.\/parts"/);
+    });
+
+    it("mentions every named export on api/vue.mdx", () => {
+        const names = namedExports(vueIndex).map((entry) => entry.name);
+        expect(names.length).toBeGreaterThan(100);
+        expect(names.filter((name) => !mentions(mdx, name))).toEqual([]);
+    });
+
+    it("mentions every export of the Vue feature entries on api/vue.mdx", () => {
+        for (const [entry] of FEATURE_ENTRIES) {
+            const source = read(join(VUE_SRC, entry, "index.ts"));
+            expect(source, entry).toMatch(
+                new RegExp(
+                    `^export \\* from "@fragiola/calendar/${entry}";$`,
+                    "m",
+                ),
+            );
+            const names = namedExports(source).map((entry) => entry.name);
+            expect(
+                names.filter((name) => !mentions(mdx, name)),
+                `@fragiola/calendar-vue/${entry}`,
+            ).toEqual([]);
+            expect(mdx, entry).toContain(`@fragiola/calendar-vue/${entry}`);
+        }
+    });
+
+    it("lists every part as Calendar.<Part> in its components table, the same parts as React's", () => {
+        expect(vueParts.map((entry) => entry.name).sort()).toEqual(
+            partExports.map((entry) => entry.name).sort(),
+        );
+        for (const { name } of vueParts) {
+            expect(mdx, `Calendar.${name}`).toMatch(
+                new RegExp(`^\\| \`Calendar\\.${name}\` \\|`, "m"),
+            );
+        }
+        for (const [name] of FEATURE_PARTS) {
+            expect(mdx, name).toMatch(new RegExp(`^\\| \`${name}\` \\|`, "m"));
+        }
+    });
+
+    it("lists every prop of Calendar.Root and every event", () => {
+        const root = read(join(VUE_SRC, "components/root.ts"));
+        const fields = interfaceFields(root, "RootBaseProps")?.fields ?? [];
+        expect(fields.length).toBeGreaterThan(10);
+        // the engine options, `Pick<CalendarEngineOptions, "host" | …>`
+        const engineProps = /export type RootEngineProps = Pick<[^,]+,([^>]+)>/
+            .exec(root)?.[1]
+            ?.match(/"\w+"/g)
+            ?.map((name) => name.slice(1, -1));
+        expect(engineProps).toEqual([
+            "host",
+            "longPressDelay",
+            "dragThreshold",
+            "autoScroll",
+        ]);
+        const row = mdx
+            .split("\n")
+            .find((line) => line.startsWith("| `Calendar.Root` |"));
+        for (const field of [...fields, ...(engineProps ?? [])]) {
+            expect(row, field).toContain(`\`${field}\``);
+        }
+        const engineEvents = Object.values(core.ENGINE_EVENT_CALLBACKS).map(
+            kebab,
+        );
+        expect(engineEvents).toContain("event-click");
+        for (const event of [
+            "update:events",
+            "update:view",
+            "update:date",
+            "events-change",
+            "view-change",
+            "date-change",
+            ...engineEvents,
+        ]) {
+            expect(row, event).toContain(`\`${event}\``);
+        }
+    });
+
+    it("is linked from every part's page", () => {
+        for (const { module } of partExports) {
+            const slug = MODULE_PAGES[module] ?? "";
+            expect(page(slug), `api/${slug}.mdx`).toContain("](/docs/api/vue)");
+        }
+        for (const [, , , slug] of FEATURE_PARTS) {
+            expect(page(slug), `api/${slug}.mdx`).toContain("](/docs/api/vue)");
+        }
+    });
+});
+
 describe("the concept pages", () => {
     it("list every part name on the state attributes page", () => {
         const mdx = docsPage("concepts/state-attributes");

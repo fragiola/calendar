@@ -1,6 +1,6 @@
 ---
 title: The primitive contract
-description: What every Calendar part accepts and guarantees, render, ref, handlers, className and style, so any part composes the same way with your code.
+description: What every Calendar part accepts and guarantees (its element, ref, handlers, class and style), so any part composes the same way with your code.
 ---
 
 Every part of `Calendar.*`, and every feature part (`Selection`, `DragPreview`, `ResizeHandle`,
@@ -8,6 +8,8 @@ Every part of `Calendar.*`, and every feature part (`Selection`, `DragPreview`, 
 it once and every part composes the same way.
 
 ## What a part accepts
+
+<Framework name="react">
 
 | prop | what it does |
 | --- | --- |
@@ -28,6 +30,35 @@ it once and every part composes the same way.
     {title}
 </Calendar.TimeEvent>
 ```
+</Framework>
+
+<Framework name="vue">
+
+| attribute | what it does |
+| --- | --- |
+| `as` | replaces the element with another tag or a component (`as="section"`), which receives the part's props |
+| `#render="{ props, state, children }"` | a scoped slot that replaces the element: `v-bind="props"` on yours, `<component :is="children" />` for the part's content. Never `asChild` |
+| a template ref | the part's component (`$el` is its element); the part keeps its own ref for the engine |
+| `class` | a static class (the part sets none); a class from the state goes through `#render`'s `state`, or CSS on the `data-*` attributes |
+| `style` | a plain value, merged under the part's structural keys, which win |
+| listeners | composed: the part's runs first, then yours |
+| any other attribute | passed to the element (`aria-label`, `id`, `data-*`, …) |
+
+```vue
+<Calendar.TimeEvent :segment="segment" @dblclick="openEditor(segment.eventId)">
+    <template #render="{ props, state }">
+        <div
+            v-bind="props"
+            :class="state.dragging ? 'event event-dragging' : 'event'"
+            :style="{ opacity: state.grabbed ? 0.6 : 1 }"
+        >
+            {{ title }}
+        </div>
+    </template>
+</Calendar.TimeEvent>
+```
+
+</Framework>
 
 ## What a part guarantees
 
@@ -49,6 +80,8 @@ it once and every part composes the same way.
 
 ## Children
 
+<Framework name="react">
+
 A part's children are elements, or a function of its state where it has one:
 
 ```tsx
@@ -61,10 +94,32 @@ A part's children are elements, or a function of its state where it has one:
 
 A collection part takes a function called per entity ([Composition](/docs/concepts/composition)).
 
+</Framework>
+
+<Framework name="vue">
+
+A part's default slot holds elements, and receives its state where it has one:
+
+```vue
+<Calendar.More v-slot="{ hiddenCount }" class="more">+{{ hiddenCount }} more</Calendar.More>
+
+<Calendar.Segment v-slot="state" :segment="segment">
+    {{ state.continuesBefore ? `… ${title}` : title }}
+</Calendar.Segment>
+```
+
+A collection part's default slot is called per entity ([Composition](/docs/concepts/composition)).
+
+</Framework>
+
+
 ## Part hooks
 
-What a part does is also a hook with one shape, `{ state, props }`: spread `props` on any element
-of yours (it holds the role, the attributes, the ref, the handlers and the structural style).
+What a part does is also a hook (a composable in Vue) with one shape, `{ state, props }`: put
+`props` on any element of yours (it holds the role, the attributes, the ref, the handlers and the
+structural style).
+
+<Framework name="react">
 
 ```tsx
 import { type TimeSegment, useTimeEvent } from "@fragiola/calendar-react";
@@ -78,6 +133,27 @@ function EventCard({ segment }: { segment: TimeSegment }) {
     );
 }
 ```
+
+</Framework>
+
+<Framework name="vue">
+
+`state` and `props` are computed refs; the composable takes a value, a ref or a getter.
+
+```vue title="event-card.vue"
+<script setup lang="ts">
+import { type TimeSegment, useTimeEvent } from "@fragiola/calendar-vue";
+
+const props = defineProps<{ segment: TimeSegment }>();
+const { state, props: part } = useTimeEvent(() => props.segment);
+</script>
+
+<template>
+    <article v-bind="part" class="card">{{ state.allDay ? "All day" : "" }}</article>
+</template>
+```
+
+</Framework>
 
 [Hooks](/docs/api/hooks) lists them; [Calendar.Root](/docs/api/root#common-props) lists the
 common props.
