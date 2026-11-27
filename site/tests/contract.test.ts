@@ -2,7 +2,7 @@
 // (itself from Tree's).
 import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { beforeAll, describe, expect, it } from "vitest";
 import {
     CATEGORIES,
@@ -10,6 +10,7 @@ import {
 } from "../../examples/shared/src/meta-types.ts";
 import { THEMES } from "../../examples/shared/src/themes/themes.ts";
 import {
+    type Base,
     CONTRACT_VERSION,
     contractVersion,
     contractVersionOf,
@@ -18,12 +19,13 @@ import {
     frontmatter,
     LIMITS,
     type Site,
+    validateExport,
     validateSite,
 } from "../contract.ts";
 import { baseProblem, readExamplesSource, readSite } from "../sources.ts";
 
 // The export is checked in memory against the site export contract (fragiola/www CONTRACT.md,
-// v1.7) as www checks it, and against what this project decided for its own pages
+// v1.8) as www checks it, and against what this project decided for its own pages
 // (guidelines docs/site.md: Dockable's information architecture, and the landing's rules).
 
 let site: Site;
@@ -41,8 +43,8 @@ const PAGE = (body: string) =>
     `---\ntitle: A page\ndescription: A page that exists only in this test, long enough to be a valid description.\n---\n\n${body}\n`;
 
 describe("the site export", () => {
-    it("implements contract v1.7", () => {
-        expect(CONTRACT_VERSION).toBe("1.7");
+    it("implements contract v1.8", () => {
+        expect(CONTRACT_VERSION).toBe("1.8");
     });
 
     it("reads the contract version from www's CONTRACT.md, the pinned one where www is absent", () => {
@@ -58,19 +60,24 @@ describe("the site export", () => {
         // a checkout: www beside an ancestor of the worktree
         mkdirSync(join(root, "www"));
         const file = join(root, "www", "CONTRACT.md");
-        writeFileSync(file, "# Site export contract, v1.7\n\nText.\n");
+        writeFileSync(file, "# Site export contract, v1.8\n\nText.\n");
         expect(findWwwContract(repo)).toBe(file);
         const same = contractVersion(file);
-        expect(same).toEqual({ version: "1.7", source: "www" });
+        expect(same).toEqual({ version: "1.8", source: "www" });
         expect(contractVersionProblem(same)).toBeUndefined();
         // www moved on: the export says so instead of exporting against an old contract
-        writeFileSync(file, "# Site export contract, v1.8\n");
+        writeFileSync(file, "# Site export contract, v1.9\n");
         expect(contractVersionProblem(contractVersion(file))).toMatch(
-            /v1\.8, this export implements v1\.7/,
+            /v1\.9, this export implements v1\.8/,
+        );
+        // or still on an older one
+        writeFileSync(file, "# Site export contract, v1.7\n");
+        expect(contractVersionProblem(contractVersion(file))).toMatch(
+            /v1\.7, this export implements v1\.8/,
         );
         writeFileSync(file, "# Something else\n");
         expect(() => contractVersion(file)).toThrow(/no "# Site export/);
-        expect(contractVersionOf("## Site export contract, v1.7")).toBe(
+        expect(contractVersionOf("## Site export contract, v1.8")).toBe(
             undefined,
         );
     });
@@ -150,6 +157,162 @@ describe("project.json", () => {
         // nothing this project does not ship
         expect(project.registry).toBeUndefined();
         expect("create" in project).toBe(false);
+        // v1.8: one base, so no bases to switch between (§2)
+        expect("bases" in project).toBe(false);
+    });
+
+    it("checks bases when a project declares them (v1.8)", () => {
+        const withBases = (bases: unknown): string[] =>
+            validateSite({
+                ...site,
+                project: { ...site.project, bases: bases as Base[] },
+            });
+        expect(
+            withBases([
+                {
+                    name: "primitives",
+                    title: "Fragiola Primitives",
+                    default: true,
+                },
+                { name: "base", title: "Base UI" },
+            ]),
+        ).toEqual([]);
+        const cases: [unknown, RegExp][] = [
+            [[], /2–8 bases/],
+            [[{ name: "a", title: "A", default: true }], /2–8 bases/],
+            [
+                Array.from({ length: 9 }, (_, i) => ({
+                    name: `b${i}`,
+                    title: "B",
+                    default: i === 0,
+                })),
+                /2–8 bases/,
+            ],
+            [
+                [
+                    { name: "a", title: "A", default: true },
+                    { name: "a", title: "A again" },
+                ],
+                /"a" is listed twice/,
+            ],
+            [
+                [
+                    { name: "Base UI", title: "Base UI", default: true },
+                    { name: "b", title: "B" },
+                ],
+                /is not a base name/,
+            ],
+            [
+                [
+                    { name: "index", title: "Index", default: true },
+                    { name: "b", title: "B" },
+                ],
+                /is not a base name/,
+            ],
+            [
+                [
+                    { name: "a", title: "", default: true },
+                    { name: "b", title: "B" },
+                ],
+                /"a" needs a title/,
+            ],
+            [
+                [
+                    { name: "a", title: "A" },
+                    { name: "b", title: "B" },
+                ],
+                /exactly one base is the default, 0 are/,
+            ],
+            [
+                [
+                    { name: "a", title: "A", default: true },
+                    { name: "b", title: "B", default: true },
+                ],
+                /exactly one base is the default, 2 are/,
+            ],
+        ];
+        for (const [bases, problem] of cases) {
+            expect(withBases(bases).join("\n"), JSON.stringify(bases)).toMatch(
+                problem,
+            );
+        }
+    });
+
+    it("checks a non-default base's embeds and registry in an export (v1.8)", () => {
+        const out = mkdtempSync(join(tmpdir(), "calendar-bases-"));
+        const write = (file: string, content: string) => {
+            mkdirSync(dirname(join(out, file)), { recursive: true });
+            writeFileSync(join(out, file), content);
+        };
+        const manifest = (ids: string[]) =>
+            JSON.stringify({
+                files: {},
+                examples: ids.map((id) => ({
+                    id,
+                    files: [],
+                    registry: [],
+                    packages: [],
+                    features: [],
+                })),
+            });
+        const html = (base: string) =>
+            `<html><head><meta name="robots" content="noindex"><script src="${base}x.js"></script></head></html>`;
+        write(
+            "project.json",
+            JSON.stringify({
+                ...site.project,
+                frameworks: ["react"],
+                registry: { namespace: "@fragiola" },
+                bases: [
+                    {
+                        name: "primitives",
+                        title: "Fragiola Primitives",
+                        default: true,
+                    },
+                    { name: "base", title: "Base UI" },
+                ],
+            }),
+        );
+        write("examples.json", JSON.stringify(site.examples));
+        write("docs/config.json", JSON.stringify({ sections: [] }));
+        write("docs/index.mdx", site.pages.get("index") ?? "");
+        write("embed/react/index.html", html("/calendar/embed/react/"));
+        write("embed/react/manifest.json", manifest(["a", "b"]));
+        write(
+            "r/index.json",
+            JSON.stringify({ items: [{ name: "x" }, { name: "y" }] }),
+        );
+        const baseProblems = () =>
+            validateExport(out, "/calendar").filter((p) =>
+                /§5\.6|§7\)/.test(p),
+            );
+        expect(baseProblems()).toEqual([
+            "embed/react/base/index.html is missing (§5.6)",
+            "embed/react/base/manifest.json is missing (§5.6)",
+            "r/base/index.json is missing (§7)",
+        ]);
+        // built for the default base's path, a different example, an item missing
+        write("embed/react/base/index.html", html("/calendar/embed/react/"));
+        write("embed/react/base/manifest.json", manifest(["a", "c"]));
+        write("r/base/index.json", JSON.stringify({ items: [{ name: "x" }] }));
+        expect(baseProblems()).toEqual([
+            "embed/react/base/index.html was not built for /calendar/embed/react/base/ (§5.6)",
+            "embed/react/base/manifest.json: the example ids differ from embed/react/manifest.json's (§5.6)",
+            "r/base/index.json: the item names differ from r/index.json's (§7)",
+            "r/base/x.json is missing (§7)",
+        ]);
+        write(
+            "embed/react/base/index.html",
+            html("/calendar/embed/react/base/"),
+        );
+        write("embed/react/base/manifest.json", manifest(["b", "a"]));
+        write(
+            "r/base/index.json",
+            JSON.stringify({ items: [{ name: "y" }, { name: "x" }] }),
+        );
+        write("r/base/x.json", "{}");
+        write("r/base/y.json", "{}");
+        expect(baseProblems()).toEqual([]);
     });
 });
 
