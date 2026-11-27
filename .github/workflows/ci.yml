@@ -1,5 +1,8 @@
 # CI: the Fragiola project jobs. From Tree (fragiola/tree, .github/workflows/ci.yml), itself from
-# Dockable's; the rules of the guidelines (repository.md#ci).
+# Dockable's; the www trigger from Flow's; the rules of the guidelines (repository.md#ci). It runs
+# on every pull request and on a manual run; a push to main runs no tests (main is what its pull
+# request tested), only the www trigger: every other job is `if: github.event_name != 'push'`
+# (Changesets: pull requests only), or needs one that is.
 #
 #   Checks            Biome, the source layout and the generated command reference (`pnpm check`),
 #                     TypeScript, the unit tests and the build (with the .d.ts check and the
@@ -23,17 +26,21 @@
 #                     both its paths.
 #   E2E               the playground's suite and each examples app's (a matrix), in Playwright's
 #                     image (no browser install), when Changes selects them.
-#   Site export       fragiola.com will build /calendar from `pnpm site:export` (contract v1.7,
+#   Site export       fragiola.com builds /calendar from `pnpm site:export` (contract v1.8,
 #                     fragiola/www CONTRACT.md), built and validated the way www's deploy runs it:
 #                     it fails on anything www would reject.
-#
-# Tests run only on pull requests (and on a manual run). A push to main runs nothing: main is what
-# its PR tested, and the www trigger comes once the project is registered on fragiola.com.
+#   Trigger www build on a push to main only, asks fragiola/www to rebuild fragiola.com (a
+#                     repository_dispatch of type "project-updated"). It needs the
+#                     WWW_DISPATCH_TOKEN secret: a fine-grained token with Contents: read & write
+#                     on fragiola/www. Without the secret the step is skipped, not failed.
 
 name: CI
 
 on:
   pull_request:
+  # only for the Trigger www build job: every other job skips a push
+  push:
+    branches: [main]
   workflow_dispatch:
 
 permissions:
@@ -46,6 +53,7 @@ concurrency:
 jobs:
   checks:
     name: Checks
+    if: github.event_name != 'push'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -72,6 +80,7 @@ jobs:
 
   package:
     name: Package
+    if: github.event_name != 'push'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -118,6 +127,7 @@ jobs:
   # a playwright.config.ts).
   changes:
     name: Changes
+    if: github.event_name != 'push'
     runs-on: ubuntu-latest
     outputs:
       playground: ${{ steps.suites.outputs.playground }}
@@ -216,6 +226,7 @@ jobs:
 
   site-export:
     name: Site export
+    if: github.event_name != 'push'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -231,3 +242,20 @@ jobs:
 
       # builds the packages and the embed, writes the export, validates it against the contract
       - run: pnpm site:export --base /calendar --out "$RUNNER_TEMP/site-export"
+
+  trigger-www-build:
+    name: Trigger www build
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    env:
+      WWW_DISPATCH_TOKEN: ${{ secrets.WWW_DISPATCH_TOKEN }}
+    steps:
+      - name: Dispatch project-updated to fragiola/www
+        if: env.WWW_DISPATCH_TOKEN != ''
+        env:
+          GH_TOKEN: ${{ env.WWW_DISPATCH_TOKEN }}
+        run: |
+          gh api repos/fragiola/www/dispatches \
+            -f event_type=project-updated \
+            -f "client_payload[slug]=calendar" \
+            -f "client_payload[sha]=$GITHUB_SHA"
