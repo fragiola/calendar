@@ -21,7 +21,7 @@ the core**.
 | `packages/react` | `@fragiola/calendar-react` | the `Calendar.*` primitives and hooks over the core, every feature's entry mirrored with its parts, and the core re-exported (Issue #7) | the core (`workspace:*`, published as the exact version); peer `react`, `react-dom` (^19) |
 | `packages/vue` | `@fragiola/calendar-vue` | the same `Calendar.*` primitives and composables in Vue idioms, every feature's entry mirrored, `typedCalendar<T, F>()`, and the core re-exported (Issue #11) | the core (`workspace:*`, published as the exact version); peer `vue` (^3.5) |
 | `packages/angular` | `@fragiola/calendar-angular` | the same primitives as standalone Angular directives and injection functions, zoneless, every feature's entry point (ng-packagr secondary entries, an `internal` one shared), and the core re-exported (Issue #14) | the core (`workspace:*`, published as the exact version); peer `@angular/core` (^22) |
-| `site` | `site`, private | the site export (fragiola.com/calendar, contract v1.7): `project.json`, `examples.json`, `export.ts`, `contract.ts`, `dev.ts`, `dev-proxy.ts`, `sources.ts`, the docs (`site/docs`), and the repository's script tests (Issue #9) | |
+| `site` | `site`, private | the site export (fragiola.com/calendar, contract v1.8): `project.json`, `examples.json`, `export.ts`, `contract.ts`, `dev.ts`, `dev-proxy.ts`, `sources.ts`, the docs (`site/docs`), and the repository's script tests (Issue #9) | |
 
 `packages/core`, `packages/react`, `packages/vue`, `packages/angular`, `apps/playground`,
 `examples/shared`, `examples/react`, `examples/vue`, `examples/angular` and `site` exist: v1 is
@@ -118,7 +118,7 @@ Taken while planning Epic #6 (fragiola/calendar#6); binding for every Epic.
 - **D20 Five verbs on model and engine,** bound, `(key, payload, options?)`; guard tests keep the surfaces exact (`run`, `can`, `check`, `get`, `is`, `use`, `subscribe`, `dispatch`); everything only an adapter calls is under `engine.adapter`.
 - **D21 Core guard** (`packages/core/tests/guard.test.ts`): no framework import, zero runtime deps, no global `document`/`window`/`requestAnimationFrame`/`ResizeObserver`/`crypto`/`setTimeout` (timers through the injected host), no `any` in exported declarations, no `.style` outside `structural-style.ts`, no ported-code headers (nothing is ported).
 - **D22 Toolchain** pinned to the newest sibling (`../primitives`, all published ≥ 7 days before 2026-11-26): pnpm 12.21.0, Node >= 24, TypeScript 7.0.2 (TypeScript 6.0.3 only where `vue-tsc` / Angular need it, later Epics), tsdown 0.23.7, Vitest 5.1.0, Biome 2.6.7, Playwright 1.65.1 (later Epics), jsdom 31.0.1, publint 0.3.25, `@arethetypeswrong/cli` 0.18.5, `@changesets/cli` 3.0.3.
-- **D23 Guidelines.** In the same PR, the implementer writes into `../guidelines/` (a local folder outside the repository, not under git): `decisions.md` rows for the date/time representation (D4), no dependency on the primitives toolkit with a structurally identical `PlainDate` (D5), the event-calendar accessibility pattern (D12), the recurrence and occurrence identity (D15), clock injection (D16), the `data-calendar-*` attributes without a path (D17); `ecosystem.md` (the project row), `docs/site.md` (dev port 5192 reserved, not yet in `projects.json`), `architecture/model-api.md` (an injectable clock beside `createId`), `components/primitives.md` (positions as `data-date`/`data-time` where the structure is a calendar). The PR description lists these edits, since they are not in the diff.
+- **D23 Guidelines.** In the same PR, the implementer writes into `../guidelines/` (a local folder outside the repository, not under git): `decisions.md` rows for the date/time representation (D4), no dependency on the primitives toolkit with a structurally identical `PlainDate` (D5), the event-calendar accessibility pattern (D12), the recurrence and occurrence identity (D15), clock injection (D16), the `data-calendar-*` attributes without a path (D17); `ecosystem.md` (the project row), `docs/site.md` (dev port 5192 reserved, not yet in `projects.json`; registered since Issue #21), `architecture/model-api.md` (an injectable clock beside `createId`), `components/primitives.md` (positions as `data-date`/`data-time` where the structure is a calendar). The PR description lists these edits, since they are not in the diff.
 
 ### Decisions taken during implementation
 
@@ -149,6 +149,7 @@ drag and ranges; RFC 5545 for recurrence; FullCalendar's documented default for 
   `removeProperty`); the guard pins that list once the file exists (Issue #5).
 - **Issue #1.** The CI workflow runs on `pull_request` and `workflow_dispatch` only (no `push`
   trigger at all until the www trigger job exists); `site/tests/ci-workflow.test.ts` checks it.
+  (Since Issue #21 the `Trigger www build` job exists: a push to `main` runs it and nothing else.)
 - **Issue #1.** Biome checks code, JSON and CSS, not Markdown (as `../primitives`).
 - **Issue #1.** The first changeset is a `minor` (`0.0.0` → `0.1.0` on the first Version Packages
   PR, once releasing is set up after the user validates the library).
@@ -564,12 +565,12 @@ drag and ranges; RFC 5545 for recurrence; FullCalendar's documented default for 
   performance pages say it.
 
 - **Issue #9, the site export.** `site/` follows Primitives' (itself Tree's and Dockable's):
-  `contract.ts` (`CONTRACT_VERSION` `"1.7"`, checked against `www`'s since Epic #13), `export.ts`, `dev.ts` (defaults `--base /calendar`,
+  `contract.ts` (`CONTRACT_VERSION` `"1.8"` since Issue #21, checked against `www`'s since Epic #13), `export.ts`, `dev.ts` (defaults `--base /calendar`,
   `--port 5192`, `DEV_PORT`), `dev-proxy.ts`, `sources.ts`; `site/examples.json` names the levels
   (`basics`, `interaction`, `data`, `apps`: the shared categories, checked equal) and the five themes
   in switcher order, whose titles, swatches and CSS come from `examples/shared`. `project.json`:
-  `frameworks: ["react", "vue", "angular"]` (Vue since Issue #12, Angular since Issue #15), no `registry`, no `create`, eight keywords. Not registered in
-  `../www/projects.json` and no `Trigger www build` job (after the user validates the library).
+  `frameworks: ["react", "vue", "angular"]` (Vue since Issue #12, Angular since Issue #15), no `registry`, no `create`, no `bases`, eight keywords. Registered on fragiola.com since Issue
+  #21: a push to `main` triggers www's build (`Trigger www build`).
 - **Issue #9, the docs.** Dockable's IA: Getting started (5), Concepts (12, with a glossary),
   Guides (24: the Epic's list plus "+N more", controlled state and performance), API: primitives
   (one page per `Calendar.*` part, one per feature part, and the hooks: 38), API: core (8, with
@@ -610,6 +611,13 @@ drag and ranges; RFC 5545 for recurrence; FullCalendar's documented default for 
   where no `www` is checked out (CI) the pinned `CONTRACT_VERSION` is used. `site:dev` refuses a
   `--port` that is not an integer from 1 to 65535 (`parsePort`) and exits 1 when a dev server is
   ended by a signal (`exitCodeOf`).
+- **Issue #21, fragiola.com.** The export implements contract v1.8: `project.json` `bases` is
+  optional and checked when declared (2–8, valid unique names, a title each, exactly one
+  default; in an export, each non-default base's `embed/<framework>/<base>/` built for its base
+  with the same example ids, and `r/<base>/` with the same items); the calendar is on one base
+  and declares none. CI gains `push: branches: [main]` for the `Trigger www build` job only
+  (Flow's shape: a `project-updated` `repository_dispatch` to `fragiola/www` with the
+  `WWW_DISPATCH_TOKEN` secret, the step skipped without it); every other job skips a push.
 
 - **Issue #12, the Vue examples.** `examples/vue` (`examples-vue`) follows Tree's Vue app: every
   example id as `src/examples/<id>/index.vue` with sibling SFCs (one per React component,
@@ -721,15 +729,18 @@ drag and ranges; RFC 5545 for recurrence; FullCalendar's documented default for 
 | `pnpm --filter examples-react vendor` | re-vendors Fragiola UI (`FRAGIOLA_REGISTRY`) |
 | `pnpm --filter examples-vue dev` | the Vue embed alone (port 5192, `PORT`; `?id=<slug>&theme=<name>`) |
 | `pnpm --filter examples-angular dev` | the Angular embed alone (port 5192, `PORT`; `?id=<slug>&theme=<name>`) |
-| `pnpm site:export --base /calendar --out <dir>` | builds the packages and every framework's embed of `project.json` (`<base>/embed/<framework>/`: React, Vue, Angular), writes `project.json`, `docs/`, `examples.json` and the manifest, then validates the output against `../www/CONTRACT.md` v1.7 (`site/contract.ts`) and exits non-zero on any problem; it only deletes `--out` when it holds a previous export |
+| `pnpm site:export --base /calendar --out <dir>` | builds the packages and every framework's embed of `project.json` (`<base>/embed/<framework>/`: React, Vue, Angular), writes `project.json`, `docs/`, `examples.json` and the manifest, then validates the output against `../www/CONTRACT.md` v1.8 (`site/contract.ts`) and exits non-zero on any problem; it only deletes `--out` when it holds a previous export |
 | `pnpm site:dev [--base /calendar] [--port 5192]` | every framework's embed dev server (hot reload, the packages' sources) behind one Node proxy (`site/dev-proxy.ts`) on port 5192, which `www` in dev proxies under `/calendar/embed/**`; each embed serves its `manifest.json` |
 
 ## CI
 
 `.github/workflows/ci.yml` (its comment header describes every job) runs on pull requests and on a
-manual run; a push to `main` runs nothing (main is what its PR tested; the `Trigger www build` job
-comes only once the project is registered in `../www/projects.json`, after the user validates
-it). Jobs: **Checks** (`pnpm check`, `typecheck`, `test`, `build`, `size`), **Package**
+manual run; a push to `main` runs no tests (main is what its PR tested), only the
+**Trigger www build** job, which asks `fragiola/www` to rebuild fragiola.com (a
+`repository_dispatch` of type `project-updated`, with the `WWW_DISPATCH_TOKEN` secret: a
+fine-grained token with Contents: read & write on `fragiola/www`; without it the step is skipped,
+not failed). Every other job is `if: github.event_name != 'push'` (Changesets: pull requests
+only), or needs one that is. Jobs: **Checks** (`pnpm check`, `typecheck`, `test`, `build`, `size`), **Package**
 (`pnpm check:package`), **Changesets** (`pnpm changeset status --since=origin/<base>`, skipped for
 `changeset-release/*`), **Changes** (`fetch-depth: 2`, `node scripts/e2e-suites.ts`, tested by
 `site/tests/e2e-suites.test.ts`): none for docs only (`site/docs/**`, `*.md`, `AGENTS.md`);
@@ -742,8 +753,8 @@ with a `playwright.config.ts`) run in `mcr.microsoft.com/playwright:v<version>-n
 (`--user 1001`), its tag the version of `@playwright/test`, with no browser install
 (`site/tests/ci-workflow.test.ts`). No shards until a suite's test step passes about 3 minutes
 (today about one minute each). **Site export** runs `pnpm site:export --base /calendar --out
-"$RUNNER_TEMP/site-export"` (self-validated); `ci-workflow.test.ts` checks it and that no www
-trigger exists yet.
+"$RUNNER_TEMP/site-export"` (self-validated); `ci-workflow.test.ts` checks it, the trigger job and that every other
+job skips a push.
 
 ## Repository layout
 

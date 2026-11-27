@@ -1,7 +1,7 @@
 // From Primitives (fragiola/primitives, site/export.ts), same author and licence (itself from Tree's
 // and Dockable's).
 //
-// `pnpm site:export --base /<slug> --out <dir>`: the site export, contract v1.7 (fragiola/www
+// `pnpm site:export --base /<slug> --out <dir>`: the site export, contract v1.8 (fragiola/www
 // CONTRACT.md). Writes what fragiola.com is built from, with this repo's own install:
 //
 //   <out>/project.json               site/project.json

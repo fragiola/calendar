@@ -1,7 +1,7 @@
 // From Primitives (fragiola/primitives, site/contract.ts), same author and licence (itself from Tree's
 // and Dockable's).
 //
-// The site export contract, v1.7 (fragiola/www CONTRACT.md): its types, and the checks this repo
+// The site export contract, v1.8 (fragiola/www CONTRACT.md): its types, and the checks this repo
 // runs on what it exports. `www` runs the same checks on every build; running them here first
 // means an export that `www` would reject never leaves this repo.
 //
@@ -11,15 +11,16 @@
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { dirname, join, relative, sep } from "node:path";
 
-/** v1.1 to v1.7 keep the file format: `project.json` keeps `"contract": 1`. */
+/** v1.1 to v1.8 keep the file format: `project.json` keeps `"contract": 1`. */
 export const CONTRACT = 1;
 /**
  * The version this repo implements (guidelines docs/site.md). v1.3's overlay messages are the
  * embeds' (examples/react/src/embed/overlay-promotion.ts: nothing in the export's files); v1.4 to v1.6 add only what this export does not use (sidebar icons, `adapters`,
  * `create`: a `/create` link stays refused, as `project.json` declares no `create`); v1.7 adds the
- * reserved `/ai` link.
+ * reserved `/ai` link; v1.8 adds the optional `bases`, checked when declared (this project is on
+ * one base and declares none).
  */
-export const CONTRACT_VERSION = "1.7";
+export const CONTRACT_VERSION = "1.8";
 
 /**
  * Where `www`'s contract is: `www/CONTRACT.md` beside the nearest ancestor of `from` that has one
@@ -36,7 +37,7 @@ export function findWwwContract(
     }
 }
 
-/** The version a contract file states in its title (`# Site export contract, v1.7`). */
+/** The version a contract file states in its title (`# Site export contract, v1.8`). */
 export function contractVersionOf(source: string): string | undefined {
     return /^# Site export contract, v(\d+\.\d+)\s*$/m.exec(source)?.[1];
 }
@@ -74,6 +75,7 @@ export const LIMITS = {
     title: 60,
     description: { min: 50, max: 160 },
     keywords: { min: 1, max: 8, length: 40 },
+    bases: { min: 2, max: 8 },
 } as const;
 
 // ─── types ───────────────────────────────────────────────────────────────────
@@ -90,6 +92,15 @@ export interface ProjectInfo {
     repository?: string;
     /** v1.2: 1–8 lowercase topics, for the project's structured data only (§2) */
     keywords?: string[];
+    /** v1.8: the primitive libraries the components are offered on, exactly one the default (§2) */
+    bases?: Base[];
+}
+
+/** v1.8 (§2): a primitive library, the folder of its registry and embeds. */
+export interface Base {
+    name: string;
+    title: string;
+    default?: boolean;
 }
 
 export type SidebarEntry =
@@ -671,6 +682,66 @@ function keywordProblems(keywords: unknown): string[] {
     return problems;
 }
 
+/** Names a base may not take (§2): they are the export's own files. */
+const RESERVED_BASE_NAMES = new Set(["assets", "index", "manifest"]);
+
+/**
+ * `bases` (v1.8, §2): 2–8 bases, each a valid, unique `name` and a `title`, exactly one
+ * `"default": true`.
+ */
+function basesProblems(bases: unknown): string[] {
+    const { min, max } = LIMITS.bases;
+    if (!Array.isArray(bases) || bases.length < min || bases.length > max) {
+        return [`project.json: bases must list ${min}–${max} bases (§2)`];
+    }
+    const problems: string[] = [];
+    const seen = new Set<string>();
+    let defaults = 0;
+    for (const base of bases as unknown[]) {
+        const {
+            name,
+            title,
+            default: isDefault,
+        } = (base ?? {}) as Partial<Record<keyof Base, unknown>>;
+        if (
+            typeof name !== "string" ||
+            !/^[a-z0-9-]+$/.test(name) ||
+            RESERVED_BASE_NAMES.has(name)
+        ) {
+            problems.push(
+                `project.json: bases: ${JSON.stringify(name)} is not a base name: lowercase letters, digits and dashes, not assets, index or manifest (§2)`,
+            );
+            continue;
+        }
+        const where = `project.json: bases: "${name}"`;
+        if (seen.has(name)) problems.push(`${where} is listed twice (§2)`);
+        seen.add(name);
+        if (typeof title !== "string" || title.trim() === "") {
+            problems.push(`${where} needs a title (§2)`);
+        }
+        if (isDefault !== undefined && typeof isDefault !== "boolean") {
+            problems.push(`${where}: default is true or absent (§2)`);
+        }
+        if (isDefault === true) defaults++;
+    }
+    if (defaults !== 1) {
+        problems.push(
+            `project.json: bases: exactly one base is the default, ${defaults} are (§2)`,
+        );
+    }
+    return problems;
+}
+
+/** The non-default bases of a project, by name (§2): each exported one folder down. */
+function otherBases(project: ProjectInfo): string[] {
+    return Array.isArray(project.bases)
+        ? project.bases
+              .filter((base) => base?.default !== true)
+              .map((base) => base?.name)
+              .filter((name): name is string => typeof name === "string")
+        : [];
+}
+
 /** `<meta name="robots" content="noindex">`, whatever the order and quoting of its attributes. */
 function isNoindex(tag: string): boolean {
     return (
@@ -740,6 +811,9 @@ export function validateSite(site: Site): string[] {
     }
     if (project.keywords !== undefined) {
         problems.push(...keywordProblems(project.keywords));
+    }
+    if (project.bases !== undefined) {
+        problems.push(...basesProblems(project.bases));
     }
 
     // examples.json
@@ -1094,6 +1168,80 @@ export function readPages(docs: string): Map<string, string> {
     );
 }
 
+const sameNames = (a: Iterable<string>, b: Iterable<string>): boolean => {
+    const left = [...new Set(a)].sort();
+    const right = [...new Set(b)].sort();
+    return left.length === right.length && left.every((x, i) => x === right[i]);
+};
+
+/**
+ * v1.8 (§5.6, §7): every non-default base has, per framework, an embed app built for its own
+ * base with the default base's example ids, and, when the project has a registry, the same items.
+ */
+function otherBaseProblems(
+    out: string,
+    base: string,
+    project: ProjectInfo,
+    manifests: Map<string, Manifest>,
+    registry: Set<string> | undefined,
+): string[] {
+    const problems: string[] = [];
+    for (const name of otherBases(project)) {
+        for (const framework of project.frameworks) {
+            const at = `embed/${framework}/${name}`;
+            const dir = join(out, "embed", framework, name);
+            const index = join(dir, "index.html");
+            const embedBase = `${base}/embed/${framework}/${name}/`;
+            if (!existsSync(index)) {
+                problems.push(`${at}/index.html is missing (§5.6)`);
+            } else if (
+                !readFileSync(index, "utf-8").includes(`"${embedBase}`)
+            ) {
+                problems.push(
+                    `${at}/index.html was not built for ${embedBase} (§5.6)`,
+                );
+            }
+            const manifest = join(dir, "manifest.json");
+            if (!existsSync(manifest)) {
+                problems.push(`${at}/manifest.json is missing (§5.6)`);
+            } else {
+                const ids = readJson<Manifest>(manifest).examples.map(
+                    (example) => example.id,
+                );
+                const expected = (manifests.get(framework)?.examples ?? []).map(
+                    (example) => example.id,
+                );
+                if (!sameNames(ids, expected)) {
+                    problems.push(
+                        `${at}/manifest.json: the example ids differ from embed/${framework}/manifest.json's (§5.6)`,
+                    );
+                }
+            }
+        }
+        if (registry) {
+            const index = join(out, "r", name, "index.json");
+            if (!existsSync(index)) {
+                problems.push(`r/${name}/index.json is missing (§7)`);
+                continue;
+            }
+            const items = readJson<{ items: { name: string }[] }>(
+                index,
+            ).items.map((item) => item.name);
+            if (!sameNames(items, registry)) {
+                problems.push(
+                    `r/${name}/index.json: the item names differ from r/index.json's (§7)`,
+                );
+            }
+            for (const item of items) {
+                if (!existsSync(join(out, "r", name, `${item}.json`))) {
+                    problems.push(`r/${name}/${item}.json is missing (§7)`);
+                }
+            }
+        }
+    }
+    return problems;
+}
+
 /** Checks a finished export: the in-memory checks, plus the files each part must have. */
 export function validateExport(out: string, base: string): string[] {
     const problems: string[] = [];
@@ -1147,6 +1295,9 @@ export function validateExport(out: string, base: string): string[] {
         );
         registry = new Set(index.items.map((item) => item.name));
     }
+    problems.push(
+        ...otherBaseProblems(out, base, project, manifests, registry),
+    );
     return [
         ...problems,
         ...validateSite({

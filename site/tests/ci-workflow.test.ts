@@ -62,6 +62,49 @@ function workflowProblems(
     return problems;
 }
 
+// `triggers` and `jobs` from Flow (fragiola/flow, site/tests/ci-workflow.test.ts), same author and
+// licence: a push to main runs the www trigger only, every other job skips it.
+
+/** The workflow's top-level `on:` events. */
+function triggers(source: string): string[] {
+    const block = /^on:\n((?:[ \t]+.*\n|\n)*)/m.exec(source)?.[1] ?? "";
+    return [...block.matchAll(/^ {2}([a-z_]+):/gm)].flatMap((match) =>
+        match[1] === undefined ? [] : [match[1]],
+    );
+}
+
+/** The workflow's jobs, by id, in order: each one's `if` (when it has one) and its `needs`. */
+function jobs(
+    source: string,
+): Record<string, { if?: string; needs: string[] }> {
+    const block = source.slice(source.search(/^jobs:\n/m));
+    const found: Record<string, { if?: string; needs: string[] }> = {};
+    for (const match of block.matchAll(
+        /^ {2}([\w-]+):\n((?:(?: {4,}.*)?\n)*)/gm,
+    )) {
+        const [, id = "", body = ""] = match;
+        const condition = /^ {4}if: (.+)$/m.exec(body)?.[1];
+        const needs = /^ {4}needs: (.+)$/m.exec(body)?.[1] ?? "";
+        found[id] = {
+            ...(condition === undefined ? {} : { if: condition.trim() }),
+            needs: needs
+                .replace(/[[\]]/g, "")
+                .split(",")
+                .map((need) => need.trim())
+                .filter((need) => need !== ""),
+        };
+    }
+    return found;
+}
+
+/** Whether a job condition skips a push: `!= 'push'`, or pull requests only (Changesets). */
+function skips(condition: string | undefined): boolean {
+    return (
+        condition === "github.event_name != 'push'" ||
+        condition?.startsWith("github.event_name == 'pull_request' &&") === true
+    );
+}
+
 // The E2E jobs run in Playwright's image instead of installing the browsers: its browsers are the
 // ones of its version, so the tag follows @playwright/test.
 describe("the CI workflow", () => {
@@ -124,15 +167,70 @@ describe("the CI workflow", () => {
         expect(workflowProblems(workflow, new Set(["1.60.0"]))).toEqual([]);
     });
 
-    it("runs on pull requests and manual runs, never on a push to main yet", () => {
+    it("runs on pull requests, manual runs and pushes to main", () => {
         const workflow = read(".github/workflows/ci.yml");
-        const on = /^on:\n((?:\s+.*\n)+?)\n/m.exec(workflow)?.[1] ?? "";
-        expect(on).toContain("pull_request:");
-        expect(on).toContain("workflow_dispatch:");
-        expect(on).not.toContain("push:");
+        expect(triggers(workflow)).toEqual([
+            "pull_request",
+            "push",
+            "workflow_dispatch",
+        ]);
+        expect(workflow).toMatch(/^ {2}push:\n {4}branches: \[main\]\n/m);
+        expect(
+            triggers(
+                "on:\n  pull_request:\n  push:\n    branches: [main]\n\njobs:\n",
+            ),
+        ).toEqual(["pull_request", "push"]);
     });
 
-    it("exports the site the way www builds it, and triggers no www build yet", () => {
+    it("runs only the www trigger on a push to main: no tests", () => {
+        const all = jobs(read(".github/workflows/ci.yml"));
+        expect(Object.keys(all)).toEqual([
+            "checks",
+            "package",
+            "changesets",
+            "changes",
+            "e2e-playground",
+            "e2e-examples",
+            "site-export",
+            "trigger-www-build",
+        ]);
+        for (const [id, job] of Object.entries(all)) {
+            if (id === "trigger-www-build") {
+                expect(job.if).toBe(
+                    "github.event_name == 'push' && github.ref == 'refs/heads/main'",
+                );
+                continue;
+            }
+            // skipped on a push itself, or needs a job that is (a skipped need skips it)
+            const skipsPush = skips(job.if);
+            const needsOne = job.needs.some((need) => skips(all[need]?.if));
+            expect(skipsPush || needsOne, `${id} runs on a push`).toBe(true);
+            // a skipped need skips a job only while its condition does not override it
+            if (!skipsPush) {
+                expect(job.if ?? "", id).not.toMatch(
+                    /always\(\)|cancelled\(\)|failure\(\)/,
+                );
+            }
+        }
+        // a pull request runs every other job as before: nothing but the trigger skips it
+        for (const [id, job] of Object.entries(all)) {
+            if (id === "trigger-www-build") continue;
+            expect(job.if ?? "", id).not.toContain("== 'push'");
+        }
+        // a job condition is one line: a block scalar would hide it from the check
+        expect(read(".github/workflows/ci.yml")).not.toMatch(/^ {4}if: [>|]/m);
+        expect(
+            jobs(
+                "jobs:\n  a:\n    if: x\n    needs: b\n    steps:\n  b:\n    needs: [a, c]\n",
+            ),
+        ).toEqual({ a: { if: "x", needs: ["b"] }, b: { needs: ["a", "c"] } });
+        expect(skips("github.event_name != 'push'")).toBe(true);
+        expect(skips("github.event_name == 'pull_request' && x")).toBe(true);
+        expect(skips("needs.changes.outputs.playground == 'true'")).toBe(false);
+        expect(skips(undefined)).toBe(false);
+    });
+
+    it("exports the site the way www builds it, and dispatches project-updated to www", () => {
         const workflow = read(".github/workflows/ci.yml");
         const job =
             /\n {2}site-export:\n((?: {4}.*\n|\n)+)/.exec(
@@ -142,8 +240,19 @@ describe("the CI workflow", () => {
         expect(job).toContain(
             'pnpm site:export --base /calendar --out "$RUNNER_TEMP/site-export"',
         );
-        expect(workflow).not.toContain("trigger-www-build");
-        expect(workflow).not.toContain("repository_dispatch");
-        expect(workflow).not.toContain("WWW_DISPATCH_TOKEN");
+        const trigger = workflow.slice(
+            workflow.indexOf("\n  trigger-www-build:"),
+        );
+        expect(trigger).toContain("name: Trigger www build");
+        expect(trigger).toContain("repos/fragiola/www/dispatches");
+        expect(trigger).toContain("event_type=project-updated");
+        expect(trigger).toContain("client_payload[slug]=calendar");
+        expect(trigger).toContain("client_payload[sha]=$GITHUB_SHA");
+        // skipped, not failed, without the secret
+        expect(trigger).toMatch(
+            /WWW_DISPATCH_TOKEN: \$\{\{ secrets\.WWW_DISPATCH_TOKEN \}\}/,
+        );
+        expect(trigger).toContain("if: env.WWW_DISPATCH_TOKEN != ''");
+        expect(trigger).toContain("GH_TOKEN: ${{ env.WWW_DISPATCH_TOKEN }}");
     });
 });
