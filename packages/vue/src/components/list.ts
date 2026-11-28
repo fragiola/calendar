@@ -28,8 +28,10 @@ export const List: CalendarComponent<ListProps, ListSlots> = definePrimitive<
 >("List", ["as"], (props, { attrs, slots }) => {
     const context = useCalendarContext("List");
     const part = usePart(context, "list", () => ({}));
-    const empty = useCalendarValue(context, () =>
-        context.model.is("list-empty"),
+    const empty = useCalendarValue(
+        context,
+        () => context.model.is("list-empty"),
+        { part: "list" },
     );
     const state = computed(() => ({ empty: empty.value }));
     return () =>

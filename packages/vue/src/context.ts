@@ -3,9 +3,9 @@
 // `F` through injection, so the typed surface is `typedCalendar<T, F>()` and the composables' type
 // arguments (`useCalendar<Types, typeof features>()`). The root's context never changes while its
 // model stays (another model remounts the root): each part reads what it shows through a computed
-// on the root's `version` (`useCalendarValue`), so a change re-renders only the parts whose value
-// changed. The model's state is frozen data, never made reactive: only `version` and `engine` are
-// refs.
+// on the root's `version`, or its part's `revision` (`useCalendarValue`), so a change re-renders
+// only the parts whose value changed. The model's state is frozen data, never made reactive: only
+// `version`, the revisions and `engine` are refs.
 import type {
     AnyTypes,
     CalendarEngine,
@@ -17,6 +17,7 @@ import type {
     DayGridWeek,
     ListDay,
     PartAttributeOptions,
+    PartName,
     TimeGridColumn,
     TimeSegment,
     TimeSlot,
@@ -56,6 +57,11 @@ export interface CalendarContextValue {
     readonly publicEngine: CalendarEngine;
     /** bumped on every commit of the model and every view change of the engine */
     readonly version: Readonly<Ref<number>>;
+    /**
+     * a part's revision: bumped on every commit of the model and on the view changes that may
+     * change what the part shows (the engine's `affects`, Issue #25)
+     */
+    readonly revision: (part: PartName) => Readonly<Ref<number>>;
     /** the names of the model's features */
     readonly installed: ReadonlySet<string>;
     /** warns once per message and root */

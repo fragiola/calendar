@@ -19,7 +19,9 @@ import {
     ENGINE_EVENT_CALLBACKS,
     type EngineEventTypeOf,
     emittersOf,
+    type PartName,
     partAttributes,
+    type ViewChange,
     type ViewType,
 } from "@fragiola/calendar";
 import {
@@ -30,6 +32,7 @@ import {
     onMounted,
     onScopeDispose,
     provide,
+    type ShallowRef,
     shallowRef,
     toRaw,
     watch,
@@ -382,13 +385,34 @@ const RootCalendar = definePrimitive<
         const facade = createEngineFacade();
         const version = shallowRef(0);
         const engine = shallowRef<AnyCalendarEngine | null>(null);
+        // a revision per part name, bumped by the changes that may reach it (Issue #25): a preview
+        // moving bumps the previews', so the other parts' computeds never run again
+        const revisions = new Map<PartName, ShallowRef<number>>();
+        const revision = (part: PartName): ShallowRef<number> => {
+            let current = revisions.get(part);
+            if (!current) {
+                current = shallowRef(0);
+                revisions.set(part, current);
+            }
+            return current;
+        };
+        /** a change: the model's or a new engine (null), or the engine's view change */
+        const changed = (change: ViewChange | null) => {
+            version.value++;
+            const live = engine.value;
+            for (const [part, current] of revisions) {
+                if (
+                    change === null ||
+                    live === null ||
+                    live.adapter.affects(change, part)
+                ) {
+                    current.value++;
+                }
+            }
+        };
         // on the client only: a server render never subscribes to a model other requests may share
         onClient(() => {
-            onScopeDispose(
-                model.subscribe(() => {
-                    version.value++;
-                }),
-            );
+            onScopeDispose(model.subscribe(() => changed(null)));
         });
 
         // the engine is created once mounted, so that no render ever subscribes to the model or
@@ -412,9 +436,7 @@ const RootCalendar = definePrimitive<
                     }
                 }
             });
-            const stopView = created.adapter.subscribe(() => {
-                version.value++;
-            });
+            const stopView = created.adapter.subscribe(changed);
             stop = () => {
                 stopEvents();
                 stopView();
@@ -587,6 +609,7 @@ const RootCalendar = definePrimitive<
             engine,
             publicEngine: facade.engine,
             version,
+            revision,
             installed,
             warn,
             partOptions: {
@@ -599,17 +622,26 @@ const RootCalendar = definePrimitive<
         };
         provide(CalendarKey, context);
 
-        const attributes = useCalendarValue(context, () => {
-            const live = engine.value;
-            return live
-                ? live.adapter.attributes("root", {})
-                : partAttributes(model, "root", {});
-        });
+        const attributes = useCalendarValue(
+            context,
+            () => {
+                const live = engine.value;
+                return live
+                    ? live.adapter.attributes("root", {})
+                    : partAttributes(model, "root", {});
+            },
+            { part: "root" },
+        );
         const gestureActive = useCalendarValue(
             context,
             () => engine.value?.is("gesture-active") ?? false,
+            { part: "root" },
         );
-        const viewType = useCalendarValue(context, () => model.state.view.type);
+        const viewType = useCalendarValue(
+            context,
+            () => model.state.view.type,
+            { part: "root" },
+        );
         const rootRef = elementRef(
             (element) => {
                 const live = engine.value;

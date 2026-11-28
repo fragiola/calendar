@@ -14,11 +14,16 @@ export function useBusinessHours(
     const all = useCalendarValue(
         context,
         () => context.model.get("business-hours-in") ?? [],
+        { part: "business-hours" },
     );
-    return useCalendarValue(context, () => {
-        const day = toValue(date);
-        return day === undefined
-            ? all.value
-            : all.value.filter((range) => range.date === day);
-    });
+    return useCalendarValue(
+        context,
+        () => {
+            const day = toValue(date);
+            return day === undefined
+                ? all.value
+                : all.value.filter((range) => range.date === day);
+        },
+        { part: "business-hours" },
+    );
 }

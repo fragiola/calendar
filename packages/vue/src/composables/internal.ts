@@ -44,18 +44,26 @@ export function sameValue(a: unknown, b: unknown): boolean {
 
 /**
  * @internal a value read from the root's model and engine, as a computed: read again on each
- * change of either (the root's `version`, the engine appearing) and of any reactive value `read`
- * uses (a prop), the last object kept while equal, so a render that reads it re-runs only when
- * what it shows changed (packages/react's `useCalendarValue`)
+ * change that may change it (the root's `version`, or, for a `part`, its revision: a model commit
+ * and the view changes the engine's `affects` names for it), on the engine appearing and on a
+ * change of any reactive value `read` uses (a prop), the last object kept while equal, so a render
+ * that reads it re-runs only when what it shows changed (packages/react's `useCalendarValue`)
  */
 export function useCalendarValue<S>(
     context: CalendarContextValue,
     read: () => S,
-    isEqual: (a: S, b: S) => boolean = sameValue,
+    options: {
+        /** the part whose view changes may change the value (none: every change) */
+        part?: PartName;
+        isEqual?: (a: S, b: S) => boolean;
+    } = {},
 ): ComputedRef<S> {
+    const { part, isEqual = sameValue } = options;
+    const revision =
+        part === undefined ? context.version : context.revision(part);
     let has = false;
     return computed((previous?: S) => {
-        context.version.value;
+        revision.value;
         context.engine.value;
         const value = read();
         if (has && isEqual(previous as S, value)) return previous as S;
@@ -95,15 +103,20 @@ export function usePart<P extends PartName>(
     register = true,
 ): PartWiring {
     const { model } = context;
-    const attributes = useCalendarValue(context, () => {
-        const engine = context.engine.value;
-        const options = {
-            weekNumberColumn: context.partOptions.weekNumberColumn,
-        };
-        return engine
-            ? engine.adapter.attributes(part, payload(), options)
-            : partAttributes(model, part, payload(), options);
-    });
+    // the engine's record is the same object while the part's attributes are (Issue #24)
+    const attributes = useCalendarValue(
+        context,
+        () => {
+            const engine = context.engine.value;
+            const options = {
+                weekNumberColumn: context.partOptions.weekNumberColumn,
+            };
+            return engine
+                ? engine.adapter.attributes(part, payload(), options)
+                : partAttributes(model, part, payload(), options);
+        },
+        { part },
+    );
     const props = computed(() => {
         context.engine.value;
         return { ...attributes.value };

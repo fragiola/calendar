@@ -12,11 +12,15 @@ export function useCalendarTitle(
     format?: MaybeRefOrGetter<FormatOptions | undefined>,
 ): ComputedRef<readonly Intl.DateTimeRangeFormatPart[]> {
     const context = useCalendarContext("useCalendarTitle");
-    return useCalendarValue(context, () => {
-        const options = toValue(format);
-        return context.model.get(
-            "title-parts",
-            options === undefined ? {} : { format: options },
-        );
-    });
+    return useCalendarValue(
+        context,
+        () => {
+            const options = toValue(format);
+            return context.model.get(
+                "title-parts",
+                options === undefined ? {} : { format: options },
+            );
+        },
+        { part: "root" },
+    );
 }

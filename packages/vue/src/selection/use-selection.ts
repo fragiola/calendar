@@ -17,10 +17,12 @@ export function useSelection(): ComputedRef<CalendarSelection> {
     const range = useCalendarValue(
         context,
         () => context.model.get("selected-range") ?? null,
+        { part: "selection" },
     );
     const preview = useCalendarValue(
         context,
         () => context.engine.value?.get("selection-preview") ?? null,
+        { part: "selection" },
     );
     return computed(() => ({ range: range.value, preview: preview.value }));
 }

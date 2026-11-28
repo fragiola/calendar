@@ -38,11 +38,19 @@ export const ColumnHeaders: CalendarComponent<
         const context = useCalendarContext("ColumnHeaders");
         const { model } = context;
         const part = usePart(context, "column-headers", () => ({}));
-        const columns = useCalendarValue(context, () => model.get("time-grid"));
-        const grid = useCalendarValue(context, () => {
-            const engine = context.engine.value;
-            return engine ? engine.get("day-grid") : model.get("day-grid");
-        });
+        const columns = useCalendarValue(
+            context,
+            () => model.get("time-grid"),
+            { part: "column-headers" },
+        );
+        const grid = useCalendarValue(
+            context,
+            () => {
+                const engine = context.engine.value;
+                return engine ? engine.get("day-grid") : model.get("day-grid");
+            },
+            { part: "column-headers" },
+        );
         const dates = computed(() =>
             columns.value
                 ? columns.value.columns.map((column) => column.date)

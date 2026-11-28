@@ -11,8 +11,12 @@ import { useCalendarValue } from "./internal";
 export function useDayGrid(): ComputedRef<DayGrid | null> {
     const context = useCalendarContext("useDayGrid");
     const { model } = context;
-    return useCalendarValue(context, () => {
-        const engine = context.engine.value;
-        return engine ? engine.get("day-grid") : model.get("day-grid");
-    });
+    return useCalendarValue(
+        context,
+        () => {
+            const engine = context.engine.value;
+            return engine ? engine.get("day-grid") : model.get("day-grid");
+        },
+        { part: "day-grid" },
+    );
 }
