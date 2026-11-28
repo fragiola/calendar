@@ -8,5 +8,7 @@ import {
 /** The visible days with their occurrences, empty days left out (a list view's, D11). */
 export function injectListLayout(): Signal<ListLayout> {
     const context = injectCalendarContext("injectListLayout");
-    return calendarValue(context, () => context.model().get("list"));
+    return calendarValue(context, () => context.model().get("list"), {
+        part: "list",
+    });
 }

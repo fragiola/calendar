@@ -1,9 +1,17 @@
 import type { Signal } from "@angular/core";
 import type { DragPreview } from "@fragiola/calendar";
 import {
+    type AnyCalendarEngine,
     calendarValue,
     injectCalendarContext,
 } from "@fragiola/calendar-angular/internal";
+
+/** @internal the engine's drag or resize preview (null: none, or no engine) */
+export function previewOf(
+    engine: AnyCalendarEngine | null,
+): DragPreview | null {
+    return engine?.get("drag-preview") ?? engine?.get("resize-preview") ?? null;
+}
 
 /**
  * The occurrence being dragged (`dragAndDrop()`, an outside drag with `externalDrop()`) or
@@ -12,10 +20,7 @@ import {
  */
 export function injectDragPreview(): Signal<DragPreview | null> {
     const context = injectCalendarContext("injectDragPreview");
-    return calendarValue(context, () => {
-        const engine = context.engine();
-        return (
-            engine?.get("drag-preview") ?? engine?.get("resize-preview") ?? null
-        );
+    return calendarValue(context, () => previewOf(context.engine()), {
+        part: "drag-preview",
     });
 }

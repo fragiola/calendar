@@ -12,10 +12,14 @@ import {
  */
 export function injectDayGrid(): Signal<DayGrid | null> {
     const context = injectCalendarContext("injectDayGrid");
-    return calendarValue(context, () => {
-        const engine = context.engine();
-        return engine
-            ? engine.get("day-grid")
-            : context.model().get("day-grid");
-    });
+    return calendarValue(
+        context,
+        () => {
+            const engine = context.engine();
+            return engine
+                ? engine.get("day-grid")
+                : context.model().get("day-grid");
+        },
+        { part: "day-grid" },
+    );
 }

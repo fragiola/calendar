@@ -2,8 +2,8 @@
 // and the engine with the registry erased (`AnyTypes`) and every feature's keys: a child cannot
 // infer the root's `T` and `F` through injection, so the typed surface is each directive's inputs
 // and the injection functions' type arguments (`injectCalendar<Types, typeof features>()`). Each
-// part reads what it shows through the root's `version` (`calendarValue`), so a change renders
-// again only the parts whose value changed.
+// part reads what it shows through the root's `version`, or its part's revision (`calendarValue`),
+// so a change renders again only the parts whose value changed.
 import { InjectionToken, inject, type Signal } from "@angular/core";
 import type {
     AnyTypes,
@@ -16,6 +16,7 @@ import type {
     DayGridWeek,
     ListDay,
     PartAttributeOptions,
+    PartName,
     TimeGridColumn,
     TimeSegment,
     TimeSlot,
@@ -49,6 +50,16 @@ export interface CalendarContext {
     readonly publicEngine: CalendarEngine;
     /** bumped on every commit of the model and every view change of the engine */
     readonly version: Signal<number>;
+    /**
+     * a part's revision: bumped on every commit of the model and on the view changes that may
+     * change what the part shows (the engine's `affects`, Issue #25)
+     */
+    revision(part: PartName): Signal<number>;
+    /**
+     * the calendar's views were touched (a change, an element registered or gone, a collection's
+     * template checked): the root tells the engine after the next render (`committed()`)
+     */
+    touched(): void;
     /** the names of the model's features */
     readonly installed: Signal<ReadonlySet<string>>;
     /** how the app renders the parts (the root's `weekNumberColumn`), for every part's attributes */

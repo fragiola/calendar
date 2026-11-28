@@ -15,11 +15,15 @@ export function injectBusinessHours(
     date?: ValueOrSignal<string | undefined>,
 ): Signal<readonly BusinessHoursRange[]> {
     const context = injectCalendarContext("injectBusinessHours");
-    return calendarValue(context, () => {
-        const all = context.model().get("business-hours-in") ?? [];
-        const day = date === undefined ? undefined : valueNow(date);
-        return day === undefined
-            ? all
-            : all.filter((range) => range.date === day);
-    });
+    return calendarValue(
+        context,
+        () => {
+            const all = context.model().get("business-hours-in") ?? [];
+            const day = date === undefined ? undefined : valueNow(date);
+            return day === undefined
+                ? all
+                : all.filter((range) => range.date === day);
+        },
+        { part: "business-hours" },
+    );
 }

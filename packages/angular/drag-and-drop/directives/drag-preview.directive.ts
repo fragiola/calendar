@@ -1,5 +1,4 @@
 import {
-    computed,
     Directive,
     effect,
     inject,
@@ -14,6 +13,7 @@ import type {
 import {
     bindPart,
     bindStructuralStyle,
+    calendarValue,
     injectCalendarContext,
     injectWhere,
     onDestroy,
@@ -21,7 +21,7 @@ import {
     previewSegmentsIn,
     previewStyle,
 } from "@fragiola/calendar-angular/internal";
-import { injectDragPreview } from "../inject/inject-drag-preview";
+import { previewOf } from "../inject/inject-drag-preview";
 
 export interface DragPreviewState {
     /** the moved, resized or dropped-in occurrence where it would land: its times */
@@ -53,10 +53,18 @@ export class CalendarDragPreviewDirective {
     }
 
     private readonly context = injectCalendarContext("*calendarDragPreview");
-    private readonly preview = injectDragPreview();
     private readonly where = injectWhere();
-    private readonly segments = computed(() =>
-        previewSegmentsIn(this.preview(), this.where()),
+    /** the preview where this one is: a move elsewhere keeps it null (nothing runs here) */
+    private readonly shown = calendarValue(
+        this.context,
+        () => {
+            const preview = previewOf(this.context.engine());
+            const segments = previewSegmentsIn(preview, this.where());
+            return preview && segments.length > 0
+                ? { preview, segments }
+                : null;
+        },
+        { part: "drag-preview" },
     );
 
     constructor() {
@@ -76,14 +84,15 @@ export class CalendarDragPreviewDirective {
             },
         );
         effect(() => {
-            const preview = this.preview();
-            const segments = this.segments();
+            const shown = this.shown();
             views.sync(
-                preview
-                    ? segments.map((segment, index) => ({
+                shown
+                    ? shown.segments.map((segment, index) => ({
                           // a preview has one segment per place
                           key: String(index),
-                          context: { $implicit: { preview, segment } },
+                          context: {
+                              $implicit: { preview: shown.preview, segment },
+                          },
                       }))
                     : [],
             );

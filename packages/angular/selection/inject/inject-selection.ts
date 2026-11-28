@@ -16,8 +16,12 @@ export interface CalendarSelection {
 /** The selected range and the one being selected, as a signal that changes with either. */
 export function injectSelection(): Signal<CalendarSelection> {
     const context = injectCalendarContext("injectSelection");
-    return calendarValue(context, () => ({
-        range: context.model().get("selected-range") ?? null,
-        preview: context.engine()?.get("selection-preview") ?? null,
-    }));
+    return calendarValue(
+        context,
+        () => ({
+            range: context.model().get("selected-range") ?? null,
+            preview: context.engine()?.get("selection-preview") ?? null,
+        }),
+        { part: "selection" },
+    );
 }

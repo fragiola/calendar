@@ -8,5 +8,7 @@ import {
 /** The time grid the calendar shows (week, day and `days` views; `null` otherwise). */
 export function injectTimeGrid(): Signal<TimeGrid | null> {
     const context = injectCalendarContext("injectTimeGrid");
-    return calendarValue(context, () => context.model().get("time-grid"));
+    return calendarValue(context, () => context.model().get("time-grid"), {
+        part: "time-grid",
+    });
 }

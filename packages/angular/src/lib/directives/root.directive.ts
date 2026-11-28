@@ -12,6 +12,7 @@ import {
     type Signal,
     signal,
     untracked,
+    type WritableSignal,
 } from "@angular/core";
 import {
     type AnyTypes,
@@ -32,7 +33,9 @@ import {
     createCalendarModel,
     type DateInput,
     type PartAttributeOptions,
+    type PartName,
     partAttributes,
+    type ViewChange,
     type ViewType,
 } from "@fragiola/calendar";
 import {
@@ -243,6 +246,15 @@ export class CalendarRootDirective<
 
     private readonly current = signal<AnyCalendarEngine | null>(null);
     private readonly version = signal(0);
+    /**
+     * a revision per part name, bumped by the changes that may reach it (Issue #25): a preview
+     * moving bumps the previews', so the other parts' computeds never run again
+     */
+    private readonly revisions = new Map<PartName, WritableSignal<number>>();
+    /** the calendar's views were touched since the engine was last told a render committed */
+    private touchedViews = true;
+    /** the root's subtree's mutations: a render that made none did not touch the calendar */
+    private mutations: MutationObserver | undefined;
     private readonly warned = new Set<string>();
     private readonly application = inject(ApplicationRef);
     private readonly errorHandler = inject(ErrorHandler);
@@ -254,6 +266,10 @@ export class CalendarRootDirective<
         engine: this.current.asReadonly(),
         publicEngine: this.facade.engine,
         version: this.version.asReadonly(),
+        revision: (part) => this.revision(part),
+        touched: () => {
+            this.touchedViews = true;
+        },
         installed: computed(
             () =>
                 new Set(
@@ -272,19 +288,27 @@ export class CalendarRootDirective<
         warn: (message) => this.warn(message),
     };
 
-    private readonly attributes = calendarValue(this.context, () => {
-        const engine = this.current();
-        const options = this.context.partOptions();
-        return engine
-            ? engine.adapter.attributes("root", {}, options)
-            : partAttributes(this.erased(), "root", {}, options);
-    });
+    private readonly attributes = calendarValue(
+        this.context,
+        () => {
+            const engine = this.current();
+            const options = this.context.partOptions();
+            return engine
+                ? engine.adapter.attributes("root", {}, options)
+                : partAttributes(this.erased(), "root", {}, options);
+        },
+        { part: "root" },
+    );
 
     /** what the root shows (`#calendar="calendarRoot"`, then `calendar.state().view`) */
-    readonly state: Signal<RootState> = calendarValue(this.context, () => ({
-        view: this.erased().state.view.type,
-        gestureActive: this.current()?.is("gesture-active") ?? false,
-    }));
+    readonly state: Signal<RootState> = calendarValue(
+        this.context,
+        () => ({
+            view: this.erased().state.view.type,
+            gestureActive: this.current()?.is("gesture-active") ?? false,
+        }),
+        { part: "root" },
+    );
 
     constructor() {
         bindAttributes(this.element, this.attributes);
@@ -316,14 +340,27 @@ export class CalendarRootDirective<
                     autoScroll: this.autoScroll(),
                 }) as unknown as AnyCalendarEngine;
                 const stops = [
-                    created.adapter.subscribe(() => this.changed()),
+                    created.adapter.subscribe((change) => this.changed(change)),
                     created.subscribe((event) => this.emit(event)),
                 ];
                 this.facade.set(created as unknown as CalendarEngine);
                 created.adapter.attachRoot(this.element);
+                const Observer =
+                    this.element.ownerDocument.defaultView?.MutationObserver;
+                const mutations = Observer ? new Observer(() => {}) : undefined;
+                mutations?.observe(this.element, {
+                    subtree: true,
+                    childList: true,
+                    attributes: true,
+                    characterData: true,
+                });
+                this.mutations = mutations;
                 this.current.set(created);
                 this.changed();
                 onCleanup(() => {
+                    mutations?.disconnect();
+                    if (this.mutations === mutations)
+                        this.mutations = undefined;
                     for (const stop of stops) stop();
                     this.current.set(null);
                     this.facade.set(null);
@@ -376,11 +413,18 @@ export class CalendarRootDirective<
             }
         });
 
-        // after every render: the engine measures and focuses what it waited for (React's layout
+        // after a render that touched the calendar's views (a change of the calendar, an element
+        // registered or gone, or any mutation of the root's subtree), not after every render of
+        // the application: the engine measures and focuses what it waited for (React's layout
         // effect after each commit), once the parts registered their elements (`write`)
         afterEveryRender({
             mixedReadWrite: () => {
+                const mutated = (this.mutations?.takeRecords().length ?? 0) > 0;
+                if (!this.touchedViews && !mutated) return;
+                this.touchedViews = false;
                 untracked(this.current)?.adapter.committed();
+                // what the engine wrote (focus, its structural style) is not a render's
+                this.mutations?.takeRecords();
             },
         });
 
@@ -537,9 +581,33 @@ export class CalendarRootDirective<
         }
     }
 
-    /** The model or the engine's view changed: the parts read again, rendered before the next task. */
-    private changed(): void {
+    /** A part name's revision (created on its first read). */
+    private revision(part: PartName): Signal<number> {
+        let current = this.revisions.get(part);
+        if (!current) {
+            current = signal(0);
+            this.revisions.set(part, current);
+        }
+        return current.asReadonly();
+    }
+
+    /**
+     * The model or the engine changed (`null`), or the engine's view (a scoped change): the parts
+     * it may reach read again, rendered before the next task.
+     */
+    private changed(change: ViewChange | null = null): void {
         this.version.update((value) => value + 1);
+        const engine = untracked(this.current);
+        for (const [part, current] of this.revisions) {
+            if (
+                change === null ||
+                engine === null ||
+                engine.adapter.affects(change, part)
+            ) {
+                current.update((value) => value + 1);
+            }
+        }
+        this.touchedViews = true;
         this.renderSoon();
     }
 
