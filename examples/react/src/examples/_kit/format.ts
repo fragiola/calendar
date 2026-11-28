@@ -1,22 +1,32 @@
 // Text from data: the calendar gives dates and titles as data (`Intl` parts, model fields) and
 // never renders them; these helpers are the app's own formatting. No calendar assembly.
-import type { CalendarModel, CalendarTypes } from "@fragiola/calendar-react";
+import {
+    type CalendarModel,
+    type CalendarTypes,
+    resolveTimeZone,
+} from "@fragiola/calendar-react";
 
 /** Every formatter built so far, by locale and options: building one costs far more than using it. */
 const FORMATTERS = new Map<string, Intl.DateTimeFormat>();
 
 /**
  * An `Intl.DateTimeFormat` for a locale and options, built once and kept: an event's times are
- * formatted on every render of every event, and a drop renders several.
+ * formatted on every render of every event, and a drop renders several. No zone is the host's,
+ * named as the calendar reads it (`resolveTimeZone("local")`, read again when the engine finds it
+ * changed), so a kept formatter never shows a zone the host has left.
  */
 export function dateTimeFormat(
     locale: string | undefined,
     options: Intl.DateTimeFormatOptions,
 ): Intl.DateTimeFormat {
-    const key = `${locale ?? ""} ${JSON.stringify(options)}`;
+    const zoned = {
+        ...options,
+        timeZone: resolveTimeZone(options.timeZone ?? "local"),
+    };
+    const key = `${locale ?? ""} ${JSON.stringify(zoned)}`;
     let format = FORMATTERS.get(key);
     if (!format) {
-        format = new Intl.DateTimeFormat(locale, options);
+        format = new Intl.DateTimeFormat(locale, zoned);
         FORMATTERS.set(key, format);
     }
     return format;

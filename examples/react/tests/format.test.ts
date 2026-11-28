@@ -1,4 +1,4 @@
-import { createCalendarModel } from "@fragiola/calendar-react";
+import { createCalendarModel, resolveTimeZone } from "@fragiola/calendar-react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { dateTimeFormat, dayText, timesOf } from "../src/examples/_kit/format";
 
@@ -32,6 +32,15 @@ describe("dateTimeFormat", () => {
         });
         expect(utc).not.toBe(local);
         expect(utc.resolvedOptions().timeZone).toBe("UTC");
+    });
+
+    it("keys no zone by the host's, as the calendar reads it", () => {
+        const host = resolveTimeZone("local");
+        const local = dateTimeFormat("en-US", { hour: "numeric" });
+        expect(local.resolvedOptions().timeZone).toBe(host);
+        expect(
+            dateTimeFormat("en-US", { hour: "numeric", timeZone: host }),
+        ).toBe(local);
     });
 });
 
