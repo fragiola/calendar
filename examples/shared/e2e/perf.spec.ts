@@ -24,7 +24,8 @@ import {
 // spec). A week and a month drag of drag-and-resize: no long task over 50 ms while it moves, a
 // frame's p95 at most 20 ms (60 fps), the dropped event painted within 50 ms of the release. A
 // drop of recurring-events' standup: its scope dialog visible within 100 ms, 150 ms in a host
-// page that promotes the frame over its page (serve.ts, `promote=1`).
+// page that promotes the frame over its page (serve.ts, `promote=1`). Next in week: the next
+// week painted within 50 ms of the click.
 //
 // Each measure is the median of 3 runs, each on a fresh page. In CI every budget is doubled: a
 // shared runner is slower and noisier than a developer's machine (AGENTS.md records both).
@@ -38,6 +39,7 @@ const BUDGET = {
     dropPainted: 50 * SCALE,
     dialogVisible: 100 * SCALE,
     dialogVisibleHosted: 150 * SCALE,
+    weekNext: 50 * SCALE,
 };
 const RUNS = 3;
 /** The CPU slowdown: a mid-range phone's, about. */
@@ -78,6 +80,11 @@ function probe() {
         released: null as number | null,
         painted: null as number | null,
         paintedWidth: null as number | null,
+        // the browser's own clock, frame and timer, kept before the fixed clock (installed after
+        // this script) replaces them with its own, which run frame callbacks on a 16 ms grid
+        now: performance.now.bind(performance),
+        frame: requestAnimationFrame.bind(window),
+        timeout: setTimeout.bind(window),
     };
     Object.assign(window, { __perf: state });
     // shown: a box, and an opacity through its ancestors (a held overlay's portal is transparent)
@@ -350,5 +357,73 @@ test("in a promoting host, the scope dialog is visible within 150 ms", async ({
     record({ dialogVisibleHosted: visible });
     expect(visible, "the scope dialog visible").toBeLessThanOrEqual(
         BUDGET.dialogVisibleHosted,
+    );
+});
+
+/** Clicks on Next a week view shows. */
+const NEXTS = 6;
+
+test("Next in a week paints the next week within 50 ms", async ({ page }) => {
+    await page.addInitScript(probe);
+    const cdp = await page.context().newCDPSession(page);
+    const all: number[] = [];
+    for (let run = 0; run < RUNS; run++) {
+        const stage = await openExample(page, "week");
+        const first = stage
+            .locator('[data-calendar-part="column-header"]')
+            .first();
+        const start = await first.getAttribute("data-date");
+        await page
+            .mainFrame()
+            .evaluate(
+                () =>
+                    new Promise<void>((resolve) =>
+                        requestIdleCallback(() => resolve(), { timeout: 1000 }),
+                    ),
+            );
+        await throttle(cdp, THROTTLE);
+        const clicks: number[] = [];
+        for (let click = 0; click < NEXTS; click++) {
+            // from the click to the end of the frame that shows the next week (its paint done)
+            clicks.push(
+                await page.mainFrame().evaluate(
+                    () =>
+                        new Promise<number>((resolve) => {
+                            const { now, frame, timeout } = (
+                                window as unknown as {
+                                    __perf: {
+                                        now: () => number;
+                                        frame: typeof requestAnimationFrame;
+                                        timeout: typeof setTimeout;
+                                    };
+                                }
+                            ).__perf;
+                            const next = document.querySelector<HTMLElement>(
+                                '[data-calendar-part="next"]',
+                            );
+                            const clicked = now();
+                            next?.click();
+                            frame(() =>
+                                timeout(() => resolve(now() - clicked)),
+                            );
+                        }),
+                ),
+            );
+            await page.waitForTimeout(100);
+        }
+        await throttle(cdp, 1);
+        // six weeks on
+        const shown = new Date(`${start}T12:00:00Z`);
+        shown.setUTCDate(shown.getUTCDate() + 7 * NEXTS);
+        await expect(first).toHaveAttribute(
+            "data-date",
+            shown.toISOString().slice(0, 10),
+        );
+        all.push(median(clicks));
+    }
+    const painted = Math.round(median(all) * 10) / 10;
+    record({ weekNext: painted });
+    expect(painted, "the next week painted").toBeLessThanOrEqual(
+        BUDGET.weekNext,
     );
 });
