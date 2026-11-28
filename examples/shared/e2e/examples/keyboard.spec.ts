@@ -92,3 +92,31 @@ test("Escape cancels a grab, and Shift + arrows on a slot select a range", async
         "",
     );
 });
+
+test("PageDown shows the next week on the same cell, and the live region says the range", async ({
+    page,
+}) => {
+    const stage = await openExample(page, "keyboard");
+    const status = stage.getByRole("status");
+    const cell = slot(stage, "2026-11-26", "10:00");
+    await cell.focus();
+    const before = await cell.elementHandle();
+    await page.keyboard.press("PageDown");
+    await expect
+        .poll(() => focused(page))
+        .toMatchObject({ part: "slot", date: "2026-12-03", time: "10:00" });
+    // the cells are keyed by position: focus stayed on the element, no focus event to hear
+    expect(
+        await page.evaluate(
+            (element) => element === document.activeElement,
+            before,
+        ),
+    ).toBe(true);
+    await expect(status).toHaveText(
+        /^November 29\s–\sDecember 5, 2026\. Thursday, December 3.*10:00\sAM\.$/,
+    );
+    await page.keyboard.press("PageUp");
+    await expect(status).toHaveText(
+        /^November 22\s–\s28, 2026\. Thursday, November 26/,
+    );
+});
