@@ -25,13 +25,15 @@ describe("dateTimeFormat", () => {
     });
 
     it("tells an undefined zone from a named one", () => {
+        // A named zone other than the host's: with no zone, the key is the host's own (CI runs in UTC).
+        const named = resolveTimeZone("local") === "Asia/Tokyo" ? "UTC" : "Asia/Tokyo";
         const local = dateTimeFormat("en-US", { hour: "numeric" });
-        const utc = dateTimeFormat("en-US", {
+        const other = dateTimeFormat("en-US", {
             hour: "numeric",
-            timeZone: "UTC",
+            timeZone: named,
         });
-        expect(utc).not.toBe(local);
-        expect(utc.resolvedOptions().timeZone).toBe("UTC");
+        expect(other).not.toBe(local);
+        expect(other.resolvedOptions().timeZone).toBe(named);
     });
 
     it("keys no zone by the host's, as the calendar reads it", () => {
