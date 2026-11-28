@@ -441,6 +441,16 @@ export function mount<const F extends CalendarFeatures = readonly []>(
         events,
         element,
         has: (key: string) => elements.has(key),
+        /** every registered part, keyed as its element */
+        parts: () => new Map(registered),
+        /** every registered part's attributes, as an adapter reads them after a change */
+        attributesOfAll: () =>
+            new Map(
+                [...registered].map(([key, { part, payload }]) => [
+                    key,
+                    engine.adapter.attributes(part as never, payload as never),
+                ]),
+            ),
         center,
         pointer,
         drag,
