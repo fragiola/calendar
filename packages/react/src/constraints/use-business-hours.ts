@@ -11,8 +11,14 @@ export function useBusinessHours(date?: string): readonly BusinessHoursRange[] {
     const all = useCalendarValue(
         context,
         () => context.model.get("business-hours-in") ?? [],
+        { part: "business-hours" },
     );
-    return useCalendarValue(context, () =>
-        date === undefined ? all : all.filter((range) => range.date === date),
+    return useCalendarValue(
+        context,
+        () =>
+            date === undefined
+                ? all
+                : all.filter((range) => range.date === date),
+        { part: "business-hours" },
     );
 }

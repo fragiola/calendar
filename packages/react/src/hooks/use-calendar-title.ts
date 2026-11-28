@@ -10,10 +10,13 @@ export function useCalendarTitle(
     format?: FormatOptions,
 ): readonly Intl.DateTimeRangeFormatPart[] {
     const context = useCalendarContext("useCalendarTitle");
-    return useCalendarValue(context, () =>
-        context.model.get(
-            "title-parts",
-            format === undefined ? {} : { format },
-        ),
+    return useCalendarValue(
+        context,
+        () =>
+            context.model.get(
+                "title-parts",
+                format === undefined ? {} : { format },
+            ),
+        { part: "root" },
     );
 }

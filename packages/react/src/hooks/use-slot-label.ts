@@ -18,5 +18,6 @@ export function useSlotLabel(
                 "slot-label-by",
                 format === undefined ? { time } : { time, format },
             ) ?? [],
+        { part: "slot-label" },
     );
 }

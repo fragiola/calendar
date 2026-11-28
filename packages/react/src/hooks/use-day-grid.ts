@@ -10,7 +10,9 @@ import { useCalendarValue } from "./internal";
 export function useDayGrid(): DayGrid | null {
     const context = useCalendarContext("useDayGrid");
     const { model, engine } = context;
-    return useCalendarValue(context, () =>
-        engine ? engine.get("day-grid") : model.get("day-grid"),
+    return useCalendarValue(
+        context,
+        () => (engine ? engine.get("day-grid") : model.get("day-grid")),
+        { part: "day-grid" },
     );
 }

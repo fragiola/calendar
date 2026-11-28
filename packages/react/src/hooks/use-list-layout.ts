@@ -5,5 +5,7 @@ import { useCalendarValue } from "./internal";
 /** The visible days with their occurrences, empty days left out (a list view's, D11). */
 export function useListLayout(): ListLayout {
     const context = useCalendarContext("useListLayout");
-    return useCalendarValue(context, () => context.model.get("list"));
+    return useCalendarValue(context, () => context.model.get("list"), {
+        part: "list",
+    });
 }

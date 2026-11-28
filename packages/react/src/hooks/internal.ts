@@ -46,29 +46,36 @@ export function sameValue(a: unknown, b: unknown): boolean {
 }
 
 /**
- * @internal a value read from the root's model and engine: read again on each change of either
- * (and on each render, as `read` may close over props), the last object kept while equal, so the
- * part re-renders only when what it shows changed
+ * @internal a value read from the root's model and engine: read again on each change that may
+ * change it (any change, or, for a `part`, a model commit and the view changes the engine's
+ * `affects` names for it) and on each render (as `read` may close over props), the last object kept
+ * while equal, so the part re-renders only when what it shows changed
  */
 export function useCalendarValue<S>(
     context: CalendarContextValue,
     read: () => S,
-    isEqual: (a: S, b: S) => boolean = sameValue,
+    options: {
+        /** the part whose view changes may change the value (none: every change) */
+        part?: PartName;
+        isEqual?: (a: S, b: S) => boolean;
+    } = {},
 ): S {
     const { store } = context;
+    const { part, isEqual = sameValue } = options;
     const cache = React.useRef<
         { version: number; read: () => S; value: S } | undefined
     >(undefined);
-    const latest = React.useRef({ read, isEqual });
-    latest.current = { read, isEqual };
+    const latest = React.useRef({ read, isEqual, part });
+    latest.current = { read, isEqual, part };
     const getSnapshot = (): S => {
         const version = store.version();
         const previous = cache.current;
-        if (
-            previous?.version === version &&
-            previous.read === latest.current.read
-        ) {
-            return previous.value;
+        if (previous !== undefined && previous.read === latest.current.read) {
+            if (previous.version === version) return previous.value;
+            if (!store.changedSince(previous.version, latest.current.part)) {
+                previous.version = version;
+                return previous.value;
+            }
         }
         const value = latest.current.read();
         const kept =
@@ -127,10 +134,14 @@ export function usePart<P extends PartName>(
 ): PartWiring {
     const { model, engine, partOptions } = context;
     const key = JSON.stringify(payload);
-    const attributes = useCalendarValue(context, () =>
-        engine
-            ? engine.adapter.attributes(part, payload, partOptions)
-            : partAttributes(model, part, payload, partOptions),
+    // the engine's record is the same object while the part's attributes are (Issue #24)
+    const attributes = useCalendarValue(
+        context,
+        () =>
+            engine
+                ? engine.adapter.attributes(part, payload, partOptions)
+                : partAttributes(model, part, payload, partOptions),
+        { part },
     );
     // biome-ignore lint/correctness/useExhaustiveDependencies: the payload is its key
     const ref = React.useCallback<React.RefCallback<HTMLElement>>(

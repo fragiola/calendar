@@ -25,9 +25,13 @@ export function ColumnHeaders(props: ColumnHeadersProps) {
     const context = useCalendarContext("ColumnHeaders");
     const { model, engine } = context;
     const part = usePart(context, "column-headers", {});
-    const columns = useCalendarValue(context, () => model.get("time-grid"));
-    const grid = useCalendarValue(context, () =>
-        engine ? engine.get("day-grid") : model.get("day-grid"),
+    const columns = useCalendarValue(context, () => model.get("time-grid"), {
+        part: "column-headers",
+    });
+    const grid = useCalendarValue(
+        context,
+        () => (engine ? engine.get("day-grid") : model.get("day-grid")),
+        { part: "column-headers" },
     );
     const dates = React.useMemo(
         () =>

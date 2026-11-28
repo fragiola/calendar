@@ -43,10 +43,12 @@ function SelectionElements(props: SelectionProps) {
     const shown = useCalendarValue(
         context,
         () => engine?.get("selection-segments") ?? null,
+        { part: "selection" },
     );
     const pending = useCalendarValue(
         context,
         () => (engine?.get("selection-preview") ?? null) !== null,
+        { part: "selection" },
     );
     const segments = previewSegmentsIn(shown, where);
     return (
