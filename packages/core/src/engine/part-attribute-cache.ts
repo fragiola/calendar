@@ -18,6 +18,7 @@ import { resolveTimeZone } from "../time-zone/resolve-time-zone";
 import type { PartName, ViewChange } from "./adapter";
 import type { FocusPosition } from "./grid-point";
 import {
+    AttributeLookups,
     type BaseAttributes,
     baseAttributes,
     composeAttributes,
@@ -84,6 +85,8 @@ export class PartAttributeCache {
     private today = Number.NaN;
     private zone = "";
     private baseStamp = 0;
+    /** the reads every part's base shares, for the base stamp */
+    private lookups: AttributeLookups | undefined;
     private focusSource: FocusPosition | null | typeof UNREAD = UNREAD;
     private focusBase = -1;
     private focusSignature = "";
@@ -120,7 +123,8 @@ export class PartAttributeCache {
         if (entry && entry.baseStamp === this.baseStamp) {
             base = entry.base;
         } else {
-            base = baseAttributes(model, part, payload, options);
+            this.lookups ??= new AttributeLookups(model);
+            base = baseAttributes(model, part, payload, options, this.lookups);
         }
         const focusStamp = base.focusable ? this.syncFocus() : -1;
         if (
@@ -169,6 +173,7 @@ export class PartAttributeCache {
             this.today = today;
             this.zone = zone;
             this.baseStamp++;
+            this.lookups = undefined;
         }
     }
 

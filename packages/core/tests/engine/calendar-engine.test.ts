@@ -386,6 +386,21 @@ describe("hit-testing (D14)", () => {
     });
 });
 
+describe("an element reused for another position (Epic #27)", () => {
+    it("stays registered when its new key comes before its old one goes", () => {
+        const m = mount({ view: { type: "month", anchorDate: "2026-11-26" } });
+        const cell = m.element("day 2026-11-26");
+        const at = m.center("day 2026-11-26");
+        // an adapter gives the 26th's element the 27th (the next range's cell at its position),
+        // registering the new date before it unregisters the old one
+        m.engine.adapter.register("day", { date: "2026-11-27" }, cell);
+        m.engine.adapter.register("day", { date: "2026-11-26" }, null);
+        expect(
+            m.engine.get("point-at", { clientX: at.x, clientY: at.y }),
+        ).toEqual({ kind: "day", date: "2026-11-27" });
+    });
+});
+
 describe("the midnight refresh (D16)", () => {
     it("moves today at the display zone's midnight, from the injected clock", () => {
         const m = mount({

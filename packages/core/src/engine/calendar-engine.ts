@@ -252,6 +252,19 @@ class Engine<T extends CalendarTypes, F extends CalendarFeatures> {
         NonNullable<EngineHost["ResizeObserver"]>
     > | null = null;
     private focusPosition: FocusPosition | null = null;
+    private tabStopMemo:
+        | {
+              readonly state: unknown;
+              readonly today: number;
+              readonly zone: string;
+              readonly focus: FocusPosition | null;
+              /** the measured lanes (where a day-grid segment shows) */
+              readonly lanes: number | null;
+              readonly stop: FocusPosition | null;
+              /** the key of the stop's element, once asked */
+              key: string | null | undefined;
+          }
+        | undefined;
     private pendingFocus = false;
     private press: Press | undefined;
     private keyGesture: FeatureGesture | undefined;
@@ -603,11 +616,52 @@ class Engine<T extends CalendarTypes, F extends CalendarFeatures> {
         return isShown(this.erased(), position);
     }
 
+    /**
+     * The tab stop, kept for the inputs it was read from (the state, today, the host's zone, the
+     * focus position and the measured lanes): every focusable part's registration and attributes
+     * ask for it.
+     */
     private tabStop(): FocusPosition | null {
-        if (this.focusPosition && this.shown(this.focusPosition)) {
-            return this.focusPosition;
+        const state = this.model.state;
+        const today = this.todayNow();
+        const zone = this.timeZone();
+        const focus = this.focusPosition;
+        const kept = this.tabStopMemo;
+        if (
+            kept &&
+            kept.state === state &&
+            kept.today === today &&
+            kept.zone === zone &&
+            kept.focus === focus &&
+            kept.lanes === this.maxLanes
+        ) {
+            return kept.stop;
         }
-        return defaultTabStop(this.erased(), this.todayNow());
+        const stop =
+            focus && this.shown(focus)
+                ? focus
+                : defaultTabStop(this.erased(), today);
+        this.tabStopMemo = {
+            state,
+            today,
+            zone,
+            focus,
+            lanes: this.maxLanes,
+            stop,
+            key: undefined,
+        };
+        return stop;
+    }
+
+    /** The key of the tab stop's element (as {@link shownAt} places it), kept with the tab stop. */
+    private tabStopKey(): string | null {
+        const stop = this.tabStop();
+        const kept = this.tabStopMemo;
+        if (!kept || kept.stop !== stop) {
+            return stop && this.keyOfPosition(this.shownAt(stop));
+        }
+        kept.key ??= stop && this.keyOfPosition(this.shownAt(stop));
+        return kept.key;
     }
 
     /** The key of a position's element. */
@@ -1063,10 +1117,14 @@ class Engine<T extends CalendarTypes, F extends CalendarFeatures> {
         const known = this.registry.get(key);
         if (known && known.element !== element) {
             this.registry.delete(key);
-            this.byElement.delete(known.element);
-            this.observer?.unobserve(known.element);
-            if (part === "event" && this.dragsEvents) {
-                clearEventTouchAction(known.element);
+            // an element an adapter reuses for another position (the cells of the next range)
+            // may be registered under its new key before its old one is removed: it stays
+            if (this.byElement.get(known.element) === known) {
+                this.byElement.delete(known.element);
+                this.observer?.unobserve(known.element);
+                if (part === "event" && this.dragsEvents) {
+                    clearEventTouchAction(known.element);
+                }
             }
         }
         this.geometry = undefined;
@@ -1081,14 +1139,17 @@ class Engine<T extends CalendarTypes, F extends CalendarFeatures> {
         if (part === "day-events") this.observer?.observe(element);
         if (FOCUSABLE.has(part) && this.model.state.view.type !== "list") {
             const position = this.positionOf(registration);
-            const stop = this.tabStop();
-            element.tabIndex =
+            const stop = this.tabStopKey();
+            const index =
                 position &&
-                stop &&
-                this.keyOfPosition(position) ===
-                    this.keyOfPosition(this.shownAt(stop))
-                    ? 0
-                    : -1;
+                stop !== null &&
+                this.keyOfPosition(position) === stop
+                    ? "0"
+                    : "-1";
+            // written only when it changes: an element the adapter reuses mostly keeps its own
+            if (element.getAttribute("tabindex") !== index) {
+                element.tabIndex = Number(index);
+            }
         }
         if (
             this.pendingFocus &&

@@ -32,6 +32,7 @@ import type {
 } from "../features/engine-types";
 import { featuresOf } from "../features/registry";
 import type { CalendarFeatures, PartAttributes } from "../features/types";
+import type { TimeGrid } from "../layout/time-grid";
 import type { CalendarModel } from "../model/calendar-model";
 import { clockOf } from "../model/model-clock";
 import { todayOf } from "../view/today";
@@ -91,23 +92,65 @@ function focusAttributes(
             : undefined;
 }
 
-/** Whether a model has `selection()` installed (its date cells are selectable). */
-function selectable(model: CalendarModel): boolean {
-    return featuresOf(model).list.some(
-        (feature) => feature.name === "selection",
-    );
-}
+/**
+ * What the parts' attributes read of one model state, read once for all of them: the time grid,
+ * its columns by date, each day's attributes, whether `selection()` is installed. The engine's
+ * cache keeps one while the model's state, today and the host's zone stay (Epic #27: a range's
+ * few hundred cells read the same grid and the same seven days).
+ */
+export class AttributeLookups {
+    private readonly model: CalendarModel;
+    private grid: TimeGrid | null | undefined;
+    private columns: Map<string, string> | undefined;
+    private readonly days = new Map<string, PartAttributes | undefined>();
+    private selection: boolean | undefined;
 
-/** A time grid's column of a date (the axis is 1, the days from 2), `undefined` outside one. */
-function columnIndex(
-    model: CalendarModel,
-    date: string | undefined,
-): string | undefined {
-    if (date === undefined) return undefined;
-    const grid = model.get("time-grid");
-    if (!grid) return undefined;
-    const index = grid.columns.findIndex((column) => column.date === date);
-    return index < 0 ? undefined : String(index + 2);
+    constructor(model: CalendarModel) {
+        this.model = model;
+    }
+
+    /** the model's time grid (null outside one) */
+    timeGrid(): TimeGrid | null {
+        if (this.grid === undefined) {
+            this.grid = this.model.get("time-grid") as TimeGrid | null;
+        }
+        return this.grid;
+    }
+
+    /** A time grid's column of a date (the axis is 1, the days from 2), `undefined` outside one. */
+    columnOf(date: string | undefined): string | undefined {
+        if (date === undefined) return undefined;
+        if (this.columns === undefined) {
+            this.columns = new Map(
+                (this.timeGrid()?.columns ?? []).map((column, index) => [
+                    column.date,
+                    String(index + 2),
+                ]),
+            );
+        }
+        return this.columns.get(date);
+    }
+
+    /** a date's `day-attributes-by` */
+    dayAttributes(date: string): PartAttributes | undefined {
+        if (!this.days.has(date)) {
+            this.days.set(
+                date,
+                this.model.get("day-attributes-by", { date }) as
+                    | PartAttributes
+                    | undefined,
+            );
+        }
+        return this.days.get(date);
+    }
+
+    /** Whether the model has `selection()` installed (its date cells are selectable). */
+    selectable(): boolean {
+        this.selection ??= featuresOf(this.model).list.some(
+            (feature) => feature.name === "selection",
+        );
+        return this.selection;
+    }
 }
 
 /** Whether a month's columns are numbered: its rows render a week number first. */
@@ -137,7 +180,7 @@ function monthColumnIndex(
 
 /** The ARIA a date cell's day state says (`day`, `slot`): `aria-current`, `aria-disabled`. */
 function cellStates(
-    model: CalendarModel,
+    lookups: AttributeLookups,
     part: PartName,
     date: string | undefined,
     head: MutablePartAttributes,
@@ -148,7 +191,7 @@ function cellStates(
         if (head["data-disabled"] === "") into["aria-disabled"] = "true";
     } else if (date !== undefined) {
         // a slot holds no day state of its own: its day's says whether it is outside the range
-        const day = model.get("day-attributes-by", { date });
+        const day = lookups.dayAttributes(date);
         if (day?.["data-disabled"] === "") into["aria-disabled"] = "true";
     }
 }
@@ -180,11 +223,12 @@ export function baseAttributes(
     part: PartName,
     payload: Readonly<Record<string, unknown>>,
     options: PartAttributeOptions = {},
+    lookups: AttributeLookups = new AttributeLookups(model),
 ): BaseAttributes {
     const into: MutablePartAttributes = { "data-calendar-part": part };
     const date = typeof payload.date === "string" ? payload.date : undefined;
     const dayAttributes = () =>
-        date === undefined ? {} : model.get("day-attributes-by", { date });
+        date === undefined ? {} : lookups.dayAttributes(date);
     let focusable = false;
     switch (part) {
         case "root":
@@ -193,8 +237,8 @@ export function baseAttributes(
         case "day-grid":
         case "time-grid": {
             into.role = "grid";
-            if (selectable(model)) into["aria-multiselectable"] = "true";
-            const grid = part === "time-grid" ? model.get("time-grid") : null;
+            if (lookups.selectable()) into["aria-multiselectable"] = "true";
+            const grid = part === "time-grid" ? lookups.timeGrid() : null;
             if (grid) into["aria-colcount"] = String(grid.columns.length + 1);
             if (part === "day-grid" && numberedMonth(model, options)) {
                 const days = model.get("day-grid")?.weeks[0]?.days.length ?? 0;
@@ -217,7 +261,7 @@ export function baseAttributes(
             Object.assign(
                 into,
                 part === "day"
-                    ? model.get("day-attributes-by", { date: date ?? "" })
+                    ? lookups.dayAttributes(date ?? "")
                     : model.get("slot-attributes-by", {
                           date: date ?? "",
                           time: String(payload.time),
@@ -233,7 +277,7 @@ export function baseAttributes(
         case "slot-label":
             into.role = "rowheader";
             into["data-time"] = String(payload.time);
-            if (model.get("time-grid")) into["aria-colindex"] = "1";
+            if (lookups.timeGrid()) into["aria-colindex"] = "1";
             break;
         case "column-header": {
             into.role = "columnheader";
@@ -252,14 +296,14 @@ export function baseAttributes(
             }
             Object.assign(into, day);
             if (into["data-today"] === "") into["aria-current"] = "date";
-            const column = columnIndex(model, date);
+            const column = lookups.columnOf(date);
             if (column !== undefined) into["aria-colindex"] = column;
             break;
         }
         case "column": {
             Object.assign(into, dayAttributes());
             into.role = "gridcell";
-            const column = columnIndex(model, date);
+            const column = lookups.columnOf(date);
             if (column !== undefined) into["aria-colindex"] = column;
             break;
         }
@@ -346,16 +390,16 @@ export function baseAttributes(
         };
     }
     const states: MutablePartAttributes = {};
-    cellStates(model, part, date, into, states);
+    cellStates(lookups, part, date, into, states);
     return {
         head: into,
         states,
         column:
             part === "day" && numberedMonth(model, options)
                 ? monthColumnIndex(model, date)
-                : columnIndex(model, date),
+                : lookups.columnOf(date),
         focusable,
-        selectable: selectable(model),
+        selectable: lookups.selectable(),
     };
 }
 

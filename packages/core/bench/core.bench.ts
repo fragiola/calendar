@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 // The core's budgets (Issue #24, `pnpm bench`): a week's time grid and a month's day grid read
 // from a new state, a drag of 30 previews with an adapter reading every part after each change,
-// and a drop. Each budget is the median, about twice the one measured on a developer machine (the
+// a drop, and a week's Next with the new range's parts registered and read (Epic #27). Each budget is the median, about twice the one measured on a developer machine (the
 // CI margin; measured in the pull request of Issue #24): a slow phone runs about 4x that machine,
 // and Epic #27's goal is at most 8 ms of core work per pointer move there.
 import { afterAll, describe, expect, test } from "vitest";
@@ -15,12 +15,13 @@ import { modelOf, timed } from "../tests/fixture";
 
 afterAll(unmountAll);
 
-/** Budgets, the median milliseconds of a run (measured: 0.06, 0.09, 11 and 6). */
+/** Budgets, the median milliseconds of a run (measured: 0.06, 0.09, 11, 6 and 6). */
 const BUDGET = {
     timeGrid: 0.2,
     dayGrid: 0.2,
     drag: 25,
     drop: 12,
+    next: 12,
 };
 
 /** A busy week: three events a day and a daily recurring one, in the host's zone. */
@@ -151,5 +152,18 @@ describe("the core's budgets", () => {
         expect(drops).toBeGreaterThanOrEqual(drop.latency.samplesCount);
         expect(moves.latency.p50).toBeLessThan(BUDGET.drag);
         expect(drop.latency.p50).toBeLessThan(BUDGET.drop);
+    });
+
+    test("a week's Next and Previous", async ({ bench }) => {
+        const m = week();
+        // each run goes a week on and back: the cells of the new range registered and read
+        const next = await bench(
+            "a week's Next (an adapter registering and reading every part)",
+            () => {
+                m.model.run("view.next", {});
+                m.model.run("view.previous", {});
+            },
+        ).run();
+        expect(next.latency.p50 / 2).toBeLessThan(BUDGET.next);
     });
 });
