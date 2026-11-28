@@ -93,8 +93,11 @@ describe("week numbers", () => {
         });
     });
 
+    // about 200,000 days compared: by hand, one assertion at the end (an `expect` a day took over a
+    // second, and timed out once under the full suite's load)
     it("agree with a day-by-day count for every rule and every day of 2020–2030", () => {
         const DAY = 86_400_000;
+        const mismatches: string[] = [];
         for (let firstDay = 0; firstDay <= 6; firstDay++) {
             for (let minimalDays = 1; minimalDays <= 7; minimalDays++) {
                 // walk the days, starting a new week on each first day and a new week-year on the
@@ -132,15 +135,19 @@ describe("week numbers", () => {
                         if (plain.year > 2030) {
                             continue;
                         }
-                        expect(
-                            weekOfYear(plain, {
-                                firstDay: firstDay as Weekday,
-                                minimalDays,
-                            }),
-                        ).toEqual({ year: weekYear, week });
+                        const got = weekOfYear(plain, {
+                            firstDay: firstDay as Weekday,
+                            minimalDays,
+                        });
+                        if (got.year !== weekYear || got.week !== week) {
+                            mismatches.push(
+                                `${firstDay}/${minimalDays} ${utc.toISOString().slice(0, 10)}: ${got.year}-W${got.week}, counted ${weekYear}-W${week}`,
+                            );
+                        }
                     }
                 }
             }
         }
+        expect(mismatches).toEqual([]);
     });
 });
