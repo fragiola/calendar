@@ -83,27 +83,18 @@ test("a scope dialog closed while it is held sends overlay closed", async ({
         id: "recurring-events",
         promote: "mute",
     });
-    // within the hold: Escape as soon as the dialog mounts (focused, unseen); its exit waits for
-    // its held opening, and the frame goes back once its portal is gone
-    const escaped = hostedFrame(page).evaluate(
-        () =>
-            new Promise<void>((resolve) => {
-                new MutationObserver((_, observer) => {
-                    const dialog = document.querySelector('[role="dialog"]');
-                    if (!dialog) return;
-                    observer.disconnect();
-                    (document.activeElement ?? dialog).dispatchEvent(
-                        new KeyboardEvent("keydown", {
-                            key: "Escape",
-                            bubbles: true,
-                        }),
-                    );
-                    resolve();
-                }).observe(document.body, { childList: true, subtree: true });
-            }),
-    );
+    // within the hold: Escape once the dialog has mounted and taken the focus (unseen); its exit
+    // waits for its held opening, and the frame goes back once its portal is gone
     await dropStandup(page, frame);
-    await escaped;
+    await hostedFrame(page).waitForFunction(
+        () =>
+            document
+                .querySelector('[role="dialog"]')
+                ?.contains(document.activeElement) === true,
+        undefined,
+        { polling: "raf" },
+    );
+    await page.keyboard.press("Escape");
     await expect(frame.locator('[role="dialog"]')).toHaveCount(0);
     await expect
         .poll(() => overlayMessages(page))
