@@ -401,6 +401,92 @@ describe("an element reused for another position (Epic #27)", () => {
     });
 });
 
+describe("announcing a range a key showed (Epic #27)", () => {
+    const ranges = (m: Mounted) =>
+        m.events.filter(
+            (event) =>
+                event.type === "announce" &&
+                event.announcement.kind === "range",
+        );
+
+    it("tells PageDown's range and focused slot, on the element reused for it", () => {
+        // keyed by position, as the adapters are: the next week reuses the focused element
+        const m = mount({
+            view: { type: "week", anchorDate: "2026-11-26" },
+            positionKeys: true,
+        });
+        m.engine.run("focus", { date: "2026-11-26", time: "09:00" });
+        const cell = document.activeElement;
+        const focusEvents: Event[] = [];
+        cell?.addEventListener("focus", (event) => focusEvents.push(event));
+        m.key("PageDown");
+        expect(document.activeElement).toBe(cell);
+        expect(focusedKey()).toBe("slot 2026-12-03 09:00");
+        expect(focusEvents).toEqual([]);
+        expect(m.events).toEqual([
+            {
+                type: "announce",
+                announcement: {
+                    kind: "range",
+                    range: { start: "2026-11-29", end: "2026-12-06" },
+                    focused: {
+                        kind: "slot",
+                        date: "2026-12-03",
+                        time: "09:00",
+                    },
+                },
+            },
+        ]);
+        expect(m.engine.get("focused")).toEqual({
+            kind: "slot",
+            date: "2026-12-03",
+            time: "09:00",
+        });
+    });
+
+    it("tells Shift + PageUp and a month's PageDown and arrow past the grid, once each", () => {
+        const m = mount({ view: { type: "month", anchorDate: "2026-11-26" } });
+        m.engine.run("focus", { date: "2026-11-26" });
+        m.key("PageDown");
+        m.key("PageUp", { shiftKey: true });
+        expect(ranges(m)).toEqual([
+            {
+                type: "announce",
+                announcement: {
+                    kind: "range",
+                    range: { start: "2026-12-01", end: "2027-01-01" },
+                    focused: { kind: "day", date: "2026-12-26" },
+                },
+            },
+            {
+                type: "announce",
+                announcement: {
+                    kind: "range",
+                    range: { start: "2025-12-01", end: "2026-01-01" },
+                    focused: { kind: "day", date: "2025-12-26" },
+                },
+            },
+        ]);
+        // an arrow inside the range moves DOM focus (its own focus event): nothing to announce
+        m.key("ArrowRight");
+        expect(ranges(m)).toHaveLength(2);
+    });
+
+    it("tells nothing for navigation that is not a key, or a key the range refuses", () => {
+        const m = mount({
+            view: { type: "month", anchorDate: "2026-11-26" },
+            settings: {
+                validRange: { start: "2026-11-01", end: "2026-12-01" },
+            },
+        });
+        m.engine.run("focus", { date: "2026-11-26" });
+        // a toolbar's button runs the command: the app's own control, its own name
+        m.model.run("view.go-to", { date: "2026-11-02" });
+        m.key("PageDown");
+        expect(ranges(m)).toEqual([]);
+    });
+});
+
 describe("the midnight refresh (D16)", () => {
     it("moves today at the display zone's midnight, from the injected clock", () => {
         const m = mount({

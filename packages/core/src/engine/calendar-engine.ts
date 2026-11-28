@@ -31,7 +31,7 @@ import type { Occurrence } from "../layout/occurrence";
 import type { TimeGrid } from "../layout/time-grid";
 import type { CalendarModel } from "../model/calendar-model";
 import { clockOf } from "../model/model-clock";
-import type { QueryArgs } from "../state/queries";
+import type { DateRangeJson, QueryArgs } from "../state/queries";
 import { fromEpochDay } from "../time/epoch-day";
 import { formatPlainDate } from "../time/format-plain-date";
 import {
@@ -56,7 +56,7 @@ import {
     type TimeAxis,
     timePoint,
 } from "./hit-test";
-import { type GridCells, keyTarget } from "./keyboard";
+import { type GridCells, type KeyTarget, keyTarget } from "./keyboard";
 import { PartAttributeCache } from "./part-attribute-cache";
 import type { PartAttributeOptions } from "./part-attributes";
 import {
@@ -969,37 +969,75 @@ class Engine<T extends CalendarTypes, F extends CalendarFeatures> {
         }
         const target = keyTarget(position, event, this.gridCells());
         if (!target) return false;
+        if ("step" in target || target.navigate) {
+            const before = this.currentRange();
+            this.navigateByKey(target);
+            this.announceRange(before);
+            return true;
+        }
+        this.focusOn(target.cell);
+        return true;
+    }
+
+    /** The days the view is about (`current-range`). */
+    private currentRange(): DateRangeJson {
+        return this.model.get("current-range") as DateRangeJson;
+    }
+
+    /**
+     * Tells the app a key showed another range (`announce`, kind `range`): with the cells reused
+     * by position, the focus may stay on the same element, and no `focus` event says the date
+     * changed (D12, Epic #27).
+     */
+    private announceRange(before: DateRangeJson): void {
+        const range = this.currentRange();
+        const focused = this.focusPosition;
+        if (
+            !focused ||
+            (range.start === before.start && range.end === before.end)
+        ) {
+            return;
+        }
+        this.emit({
+            type: "announce",
+            announcement: {
+                kind: "range",
+                range,
+                focused: focused.kind === "event" ? focused.cell : focused,
+            },
+        });
+    }
+
+    /** A key's move to a cell of another range: the view goes there first. */
+    private navigateByKey(target: NonNullable<KeyTarget>): void {
         if ("step" in target) {
             const column = target.column;
             const stepped = this.model.run(
                 target.step > 0 ? "view.next" : "view.previous",
                 {},
             );
-            if (!stepped.ok) return true;
+            if (!stepped.ok) return;
             const columns = this.gridCells().columns;
             const date = columns[Math.min(column, columns.length - 1)];
-            if (date === undefined) return true;
+            if (date === undefined) return;
             this.focusOn(
                 target.cell.kind === "slot"
                     ? { kind: "slot", date, time: target.cell.time }
                     : { kind: "day", date },
             );
-            return true;
+            return;
         }
-        if (target.navigate) {
-            const navigated = this.model.run("view.go-to", {
-                date: target.cell.date,
-            });
-            if (!navigated.ok) return true;
-            if (!this.shown(target.cell)) {
-                // focus stays in the grid: on the view's tab stop, never lost to the page
-                const stop = this.tabStop();
-                if (stop) this.focusOn(stop);
-                return true;
-            }
+        const navigated = this.model.run("view.go-to", {
+            date: target.cell.date,
+        });
+        if (!navigated.ok) return;
+        if (!this.shown(target.cell)) {
+            // focus stays in the grid: on the view's tab stop, never lost to the page
+            const stop = this.tabStop();
+            if (stop) this.focusOn(stop);
+            return;
         }
         this.focusOn(target.cell);
-        return true;
     }
 
     /**
