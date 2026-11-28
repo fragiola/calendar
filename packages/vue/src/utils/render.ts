@@ -140,18 +140,24 @@ export function renderElement<State>(
     options: RenderOptions<State>,
 ): VNodeChild {
     const { attrs, state, children } = options;
-    const { style: consumerStyle, ...external } = attrs;
-    const merged = mergeProps(options.props, external);
-    const ownStyle = styleObject(consumerStyle);
-    // structural keys win, an undefined one included (it removes the consumer's, as in React)
-    const style: Record<string, unknown> = { ...ownStyle, ...options.style };
-    for (const [key, value] of Object.entries(style)) {
-        if (value === undefined) {
-            delete style[key];
-        }
+    // one pass over the attributes (a time grid renders hundreds of cells, Epic #27)
+    let consumerStyle: unknown;
+    const external: Record<string, unknown> = {};
+    for (const key in attrs) {
+        if (key === "style") consumerStyle = attrs[key];
+        else external[key] = attrs[key];
     }
-    if (Object.keys(style).length > 0) {
-        merged.style = style;
+    const merged = mergeProps(options.props, external);
+    if (consumerStyle !== undefined || options.style !== undefined) {
+        // structural keys win, an undefined one included (it removes the consumer's, as in React)
+        const style: Record<string, unknown> = {
+            ...styleObject(consumerStyle),
+            ...options.style,
+        };
+        for (const key in style) {
+            if (style[key] === undefined) delete style[key];
+        }
+        if (Object.keys(style).length > 0) merged.style = style;
     }
     if (options.ref) {
         merged.ref = options.ref;
