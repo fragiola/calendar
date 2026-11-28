@@ -718,6 +718,36 @@ drag and ranges; RFC 5545 for recurrence; FullCalendar's documented default for 
   long task, 40 ms p95, 100 ms drop, 200 ms dialog, 300 ms hosted). Each test prints its medians
   (`perf (<framework>) <test>: {...}`) and annotates them. Measured locally (medians): week drop
   35–44 ms, month 19–28 ms, p95 17 ms, no long task; dialog 33–63 ms, hosted 81–127 ms.
+- **Epic #27, week Next.** Next in `week` at 4x painted in 66 ms (React), 92 ms (Vue), 147 ms
+  (Angular). CDP CPU profiles of six clicks per framework found: every column header, all-day
+  day, slot and column keyed by its date, so the next range unmounted and created some 400
+  elements with their effects, refs and registrations (Angular: a view per cell, its `[class]`
+  binding adding each class with `classList.add`, about 23 ms a click; Vue: component instances
+  and DOM moves); each part's base attributes asking the model for the time grid, the column
+  index and the day's attributes (`columnIndex`, `cellStates`: a third of `read`); every focusable
+  registration computing the default tab stop (`gridCellsOf`) again. Fixed: those collections are
+  keyed by **position** in the three adapters (React `key={index}`, `useEntityCalls`'s
+  `keyOf(entity, index)`; Vue `key: index`; Angular `SlotViews` keys `String(index)`), so Next
+  updates the same elements (views) with their new dates; `AttributeLookups`
+  (`engine/part-attributes.ts`) reads the grid, its columns by date, each day's attributes and
+  `selectable` once per base stamp; the engine keeps its tab stop and the key of its element
+  (state, today, zone, focus position, measured lanes) and writes a registered element's
+  `tabindex` only when it differs; an element re-registered under a new key before its old key
+  goes stays in `byElement` (`tests/engine/calendar-engine.test.ts`, "an element reused");
+  Vue's `renderElement` makes one pass over the attributes and `Calendar.Slot` renders
+  `useSlotPart`'s props without copies. No layout read, scroll reset or style recalculation was
+  on the path (26 elements restyled after the fix). An app's own state in a cell's component now
+  stays with its position (the performance guide says how to key it by date). After: 34–43 ms
+  (React), 42–48 ms (Vue, the closest to its budget: about 40% of a click is Vue's per-slot
+  component update, 336 `Calendar.Slot`s, and its `flushPreFlushCbs` scan per child update),
+  35–42 ms (Angular). `tests/next-range.test.*` per adapter: the same elements with their new
+  dates, one tab stop, the keyboard and a press on the reused cells. `pnpm bench`: a week's Next
+  with the range registered and read, budget 12 ms (6 measured). The perf spec's
+  "Next in a week" test times six clicks per run with the browser's own `performance.now`,
+  `requestAnimationFrame` and `setTimeout`, kept by the probe before the fixed clock replaces
+  them (the fixed clock runs frame callbacks on a 16 ms grid and makes `Date.now` a script);
+  budget 50 ms, 100 ms in CI. Reusing the focused cell's element means PageDown in a time grid
+  moves no DOM focus (the same element, a new date): no `focus` event for a screen reader.
 
 - **Issue #12, the Vue examples.** `examples/vue` (`examples-vue`) follows Tree's Vue app: every
   example id as `src/examples/<id>/index.vue` with sibling SFCs (one per React component,

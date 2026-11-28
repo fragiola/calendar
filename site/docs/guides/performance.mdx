@@ -21,6 +21,16 @@ the rows that show it.
 Each part reads its value through a store that keeps the last object while it is equal (React's
 `useSyncExternalStore`, a `computed` in Vue and in Angular), so a part re-renders only when what it shows changed.
 
+## The next range reuses the cells
+
+The time grid's column headers, all-day days, slots and columns, and a row's days, are keyed by
+their position, not their date: Next, Previous and Today give the same elements (in Angular, the
+same views) their new dates, and the framework updates their attributes instead of creating a few
+hundred elements again. Your children function is still called for each cell whose layout object
+changed, with the new date. State of your own in a cell's component stays with its position: to
+start it over with each date, key your element by the date (`key={date}`, `:key="date"`, in
+Angular `@for (one of [date]; track one)`).
+
 ## When a children function is called again
 
 <Framework name="react">
@@ -397,8 +407,8 @@ state measures nothing.
 The examples hold time budgets in the browser, with the CPU slowed four times (about a
 mid-range phone): a week or a month drag of `drag-and-resize` runs at 60 fps (a frame's p95 at
 most 20 ms, no long task over 50 ms), the dropped event is on screen within 50 ms of the release,
-and `recurring-events`' scope dialog within 100 ms of the drop (150 ms in a host page that
-promotes the frame over its page). Each framework's end-to-end suite checks them
+`recurring-events`' scope dialog within 100 ms of the drop (150 ms in a host page that
+promotes the frame over its page), and Next in `week` paints the next week within 50 ms. Each framework's end-to-end suite checks them
 (`examples/shared/e2e/perf.spec.ts`).
 
 ## Other costs that are yours
