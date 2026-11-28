@@ -1,6 +1,6 @@
 ---
 title: Performance
-description: How the calendar re-renders only what changed, and how to keep children functions and slots stable so moving an event re-renders the rows it touches.
+description: How the calendar re-renders only what changed, and how stable children, leaf state and cached formatters keep a drop to the rows it touches.
 ---
 
 A busy week shows thousands of elements: slots, columns, events. The core keeps the layout's
@@ -228,6 +228,133 @@ template, and every row renders again with it. Put the condition inside the temp
 
 </Framework>
 
+## State near the leaves
+
+A component re-renders with its own state. When the component holding the calendar keeps the
+text of a status line, the edit a dialog is waiting for, or the last announcement, each of them
+re-renders the calendar's parts that are its children, up to every row whose children function is
+inline. Keep such state in the leaf that shows it: the dialog holds its pending edit, the status
+line its text, and the calendar's callback only tells them.
+
+<Framework name="react">
+
+```tsx
+import {
+    Calendar,
+    type CalendarEngineEventOf,
+    type CalendarModel,
+} from "@fragiola/calendar-react";
+import { type Ref, useImperativeHandle, useRef, useState } from "react";
+
+interface StatusLine {
+    show(text: string): void;
+}
+
+/** The last drop in words: its text is its own state. */
+function DropStatus({ ref }: { ref: Ref<StatusLine> }) {
+    const [text, setText] = useState("");
+    useImperativeHandle(ref, () => ({ show: setText }), []);
+    return <p role="status">{text}</p>;
+}
+
+function Planner({ model }: { model: CalendarModel }) {
+    const status = useRef<StatusLine>(null);
+    return (
+        <Calendar.Root
+            model={model}
+            onEventDrop={(event: CalendarEngineEventOf<"drop">) =>
+                status.current?.show(`Moved ${event.eventId}`)
+            }
+        >
+            <DropStatus ref={status} />
+            {/* the grid: a drop re-renders the line, not the grid */}
+        </Calendar.Root>
+    );
+}
+```
+
+A dialog that asks before an edit runs installs its middleware itself
+(`useEffect(() => model.use(...), [model])`, the model from `useCalendar()`) and keeps the
+waiting edit in its own state: the `recurring-events` and `team-planner` examples do.
+
+</Framework>
+
+<Framework name="vue">
+
+```vue title="drop-status.vue"
+<script setup lang="ts">
+import { ref } from "vue";
+
+// the last drop in words: its text is its own state
+const text = ref("");
+defineExpose({ show: (next: string) => (text.value = next) });
+</script>
+
+<template>
+    <p role="status">{{ text }}</p>
+</template>
+```
+
+The component holding the calendar calls it through a template ref
+(`useTemplateRef("status")`, `status.value?.show(...)` in `@event-drop`). A dialog that asks
+before an edit runs takes the model from `useCalendar()`, installs its middleware
+(`onBeforeUnmount(model.use(...))`) and keeps the waiting edit in its own `ref`.
+
+</Framework>
+
+<Framework name="angular">
+
+```ts title="drop-status.ts"
+import { Component, signal } from "@angular/core";
+
+// the last drop in words: its text is its own state
+@Component({
+    selector: "app-drop-status",
+    template: `<p role="status">{{ text() }}</p>`,
+})
+export class DropStatus {
+    protected readonly text = signal("");
+
+    show(text: string) {
+        this.text.set(text);
+    }
+}
+```
+
+The component holding the calendar reaches it with `viewChild.required(DropStatus)` and calls
+`show` from `(eventDrop)`. A dialog that asks before an edit runs takes the model from
+`injectCalendar()`, installs its middleware in an `effect` (its cleanup removes it) and keeps
+the waiting edit in its own signal.
+
+</Framework>
+
+## Cached formatters
+
+Building an `Intl.DateTimeFormat` costs far more than formatting with one, and an event's time
+is formatted on every render of every event: a drop renders several, a preview moving renders
+its label on each move. Keep one formatter per locale and options:
+
+```ts
+const formatters = new Map<string, Intl.DateTimeFormat>();
+
+export function dateTimeFormat(
+    locale: string | undefined,
+    options: Intl.DateTimeFormatOptions,
+): Intl.DateTimeFormat {
+    const key = `${locale ?? ""} ${JSON.stringify(options)}`;
+    let format = formatters.get(key);
+    if (!format) {
+        format = new Intl.DateTimeFormat(locale, options);
+        formatters.set(key, format);
+    }
+    return format;
+}
+```
+
+The examples' `_kit/format.ts` does this for every text they format. The calendar's own text
+(`get("title-parts")`, `useDayHeader`, `slot-label-by`) is already formatted with kept
+formatters.
+
 ## Previews cost nothing to the model
 
 A drag, a resize and a selection preview through engine view state (`engine.get("drag-preview")`,
@@ -266,6 +393,13 @@ rows that call their two changed days again (in Angular, each slot cell is a vie
 96 cells of the two days are checked). Angular tells the engine a render committed
 (`committed()`) only after a render that touched the calendar: a render of the app's other
 state measures nothing.
+
+The examples hold time budgets in the browser, with the CPU slowed four times (about a
+mid-range phone): a week or a month drag of `drag-and-resize` runs at 60 fps (a frame's p95 at
+most 20 ms, no long task over 50 ms), the dropped event is on screen within 50 ms of the release,
+and `recurring-events`' scope dialog within 100 ms of the drop (150 ms in a host page that
+promotes the frame over its page). Each framework's end-to-end suite checks them
+(`examples/shared/e2e/perf.spec.ts`).
 
 ## Other costs that are yours
 

@@ -682,6 +682,42 @@ drag and ranges; RFC 5545 for recurrence; FullCalendar's documented default for 
   101 views (101: each slot cell of the two days is a view), and 0 `committed()` on an app render
   outside the calendar (1). The core's `week-of-year` brute-force test compares in plain code and
   asserts once (about 1.1 s to 0.25 s: it timed out once under the full suite).
+- **Issue #26, examples and embed (Epic #27).** State lives in the leaf that shows it: the scope
+  dialog of `recurring-events` and `team-planner` owns its pending edit and installs its own
+  middleware (React `useEffect(() => model.use(...))` with `useCalendar`, Vue
+  `onBeforeUnmount(model.use(...))` with `useCalendar`, Angular an `effect` whose cleanup removes it,
+  with `injectCalendar`); `drag-and-resize`'s status line (`DropStatus`) and `keyboard`'s live
+  region (`LiveRegion`) keep their text and are told through a handle (React `useImperativeHandle`,
+  Vue `defineExpose` + `useTemplateRef`, Angular `viewChild.required`). React's children functions
+  of those examples are declared outside the components (React's drop commit: 475 renders to 88 in
+  drag-and-resize, 558 to 67 in recurring-events). `_kit/format.ts` keeps one
+  `Intl.DateTimeFormat` per locale and options (`dateTimeFormat`, used by every example's own text:
+  `announce.ts`, the preview time, `when`); `examples/react/tests/format.test.ts` fails on a
+  formatter built twice. The scope dialog enters through example classes (`styles.dialog`,
+  `styles.dialogBackdrop`): a 150 ms tw-animate-css keyframe (`animate-in fade-in-25 zoom-in-95`)
+  that plays from the first frame it is in, its starting style its resting one (no transition under
+  it), the kit's exit kept; the kit's 200 ms transition starts only once `data-starting-style` is
+  gone, two to three frames after the mount. **Overlay promotion of a code-opened dialog**
+  (`src/embed/overlay-promotion.ts`, the same module in the three apps): when its portal mounts
+  (before its first paint) it asks and is held unseen where its opening starts (the portal
+  transparent, each `data-starting-style` the component removes put back, each CSS animation in it
+  paused) until the frame has its promoted size (the frame's `resize` to the armed viewport, or
+  `promoted`, whichever comes first; 300 ms without either: in place). The examples know nothing
+  of it. Proposed for `../ui`'s reference in the PR notes.
+- **Issue #26, the perf spec.** `examples/shared/e2e/perf.spec.ts` runs in its own Playwright
+  project (`perf`, Chromium, `dependencies: ["chromium", "mobile"]`, serial: alone once every
+  other spec is done; `--project perf --no-deps` runs it alone). The CPU slowed 4x through CDP
+  (`Emulation.setCPUThrottlingRate`, after the page is idle); a drag is 30 moves 16 ms apart
+  (timed in the test). Week and month drags of `drag-and-resize`: no long task over 50 ms from the
+  press, a frame's p95 ≤ 20 ms from the third move (the drag's start, which measures the grid, is
+  the long-task check's), the dropped event seen ≤ 50 ms after the release; a drop of
+  `recurring-events`' standup: its scope dialog seen ≤ 100 ms, ≤ 150 ms in the e2e host page that
+  promotes (`promote=1`), where it must first show in the promoted frame (its width the page's).
+  "Seen": a box and an opacity > 0.05 through its ancestors, in a frame callback. Each measure is
+  the median of 3 runs on fresh loads; **in CI every budget is doubled** (`process.env.CI`: 100 ms
+  long task, 40 ms p95, 100 ms drop, 200 ms dialog, 300 ms hosted). Each test prints its medians
+  (`perf (<framework>) <test>: {...}`) and annotates them. Measured locally (medians): week drop
+  35–44 ms, month 19–28 ms, p95 17 ms, no long task; dialog 33–63 ms, hosted 81–127 ms.
 
 - **Issue #12, the Vue examples.** `examples/vue` (`examples-vue`) follows Tree's Vue app: every
   example id as `src/examples/<id>/index.vue` with sibling SFCs (one per React component,
@@ -789,7 +825,7 @@ drag and ranges; RFC 5545 for recurrence; FullCalendar's documented default for 
 | `pnpm changeset` | adds a changeset: every PR that changes what a package ships (`changedFilePatterns` in `.changeset/config.json`) carries one; every package is in one `fixed` group (`@fragiola/*`) |
 | `pnpm release:version` | `changeset version`: only a release workflow runs it (none yet: releasing comes after the user validates the library) |
 | `pnpm dev` | the playground (`apps/playground`, port 5173, `PLAYGROUND_PORT`): the examples, the scenarios with the Inspector, the fixtures |
-| `pnpm e2e` | the Playwright suites, one after the other: the playground's (`apps/playground/e2e`, against `pnpm dev`) and each examples app's (`examples/shared/e2e`, against a production build of the embed under `/calendar/embed/<framework>/`, built against the packages' `dist`: run `pnpm build` first) |
+| `pnpm e2e` | the Playwright suites, one after the other: the playground's (`apps/playground/e2e`, against `pnpm dev`) and each examples app's (`examples/shared/e2e`, against a production build of the embed under `/calendar/embed/<framework>/`, built against the packages' `dist`: run `pnpm build` first; each ends with its throttled perf budgets, `perf.spec.ts`, alone) |
 | `pnpm --filter examples-react dev` | the embed alone (port 5192, `PORT`; `?id=<slug>&theme=<name>`) |
 | `pnpm --filter examples-react vendor` | re-vendors Fragiola UI (`FRAGIOLA_REGISTRY`) |
 | `pnpm --filter examples-vue dev` | the Vue embed alone (port 5192, `PORT`; `?id=<slug>&theme=<name>`) |
