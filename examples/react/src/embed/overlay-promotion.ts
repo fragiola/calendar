@@ -226,7 +226,7 @@ export function promoteOverlays(id: string) {
         if (asked) {
             if (promotedSize && holding && held === holding) {
                 held = null;
-                holding();
+                letGo(holding);
             }
             return;
         }
@@ -245,6 +245,13 @@ export function promoteOverlays(id: string) {
         holdResize(false);
     };
 
+    // what was held is let go; an overlay opened from code that closed meanwhile (Escape while
+    // it was held) leaves nothing open: the frame goes back, never promoted over nothing
+    const letGo = (release: () => void) => {
+        release();
+        if (asked && !held && !settling && !modalOpen()) close();
+    };
+
     const ask = (release: () => void) => {
         asked = true;
         held = release;
@@ -253,7 +260,7 @@ export function promoteOverlays(id: string) {
         setTimeout(() => {
             if (held !== release) return;
             held = null;
-            release();
+            letGo(release);
         }, HOLD_TIMEOUT_MS);
     };
 
@@ -287,7 +294,7 @@ export function promoteOverlays(id: string) {
             arm(data);
             const release = held;
             held = null;
-            release?.();
+            if (release) letGo(release);
         }
     });
 

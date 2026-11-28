@@ -11,6 +11,8 @@
 //                                   overlay is open, as fragiola.com does (contract §5.4):
 //                                   `host` after ready, `promote` on `overlay` open, `promoted`
 //                                   on `armed`, back in place on `overlay` closed
+//   …&promote=mute                  a host that says it can promote and never does (no
+//                                   `promote`, no `promoted`): the embed's hold times out
 
 import { createReadStream } from "node:fs";
 import { stat } from "node:fs/promises";
@@ -37,6 +39,7 @@ const TYPES: Record<string, string> = {
 
 function host(params: URLSearchParams): string {
     const promote = params.get("promote") === "1";
+    const mute = params.get("promote") === "mute";
     params.delete("promote");
     const query = params.toString();
     return `<!doctype html>
@@ -56,6 +59,7 @@ function host(params: URLSearchParams): string {
             window.messages = [];
             const frame = document.querySelector("iframe");
             const promote = ${promote};
+            const mute = ${mute};
             const send = (message) =>
                 frame.contentWindow.postMessage(message, location.origin);
             let inline;
@@ -70,7 +74,9 @@ function host(params: URLSearchParams): string {
                 window.messages.push(data);
                 if (data.type === "fragiola:example:ready") {
                     frame.style.opacity = "1";
-                    if (promote) send({ type: "fragiola:example:host", overlay: true });
+                    if (promote || mute) {
+                        send({ type: "fragiola:example:host", overlay: true });
+                    }
                 }
                 if (!promote) return;
                 if (data.type === "fragiola:example:overlay" && data.open) {
