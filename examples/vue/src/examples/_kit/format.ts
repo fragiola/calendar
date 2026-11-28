@@ -2,6 +2,26 @@
 // never renders them; these helpers are the app's own formatting. No calendar assembly.
 import type { CalendarModel, CalendarTypes } from "@fragiola/calendar-vue";
 
+/** Every formatter built so far, by locale and options: building one costs far more than using it. */
+const FORMATTERS = new Map<string, Intl.DateTimeFormat>();
+
+/**
+ * An `Intl.DateTimeFormat` for a locale and options, built once and kept: an event's times are
+ * formatted on every render of every event, and a drop renders several.
+ */
+export function dateTimeFormat(
+    locale: string | undefined,
+    options: Intl.DateTimeFormatOptions,
+): Intl.DateTimeFormat {
+    const key = `${locale ?? ""} ${JSON.stringify(options)}`;
+    let format = FORMATTERS.get(key);
+    if (!format) {
+        format = new Intl.DateTimeFormat(locale, options);
+        FORMATTERS.set(key, format);
+    }
+    return format;
+}
+
 /** `Intl` parts as one string. */
 export function text(parts: readonly { value: string }[]): string {
     return parts.map((part) => part.value).join("");
@@ -27,7 +47,7 @@ export function timesOf<T extends CalendarTypes>(
     const occurrence = model.get("occurrence-by", { id: occurrenceId });
     if (!occurrence || occurrence.allDay) return "";
     const { locale, timeZone } = model.state.settings;
-    const format = new Intl.DateTimeFormat(locale, {
+    const format = dateTimeFormat(locale, {
         hour: "numeric",
         minute: "2-digit",
         timeZone: timeZone === "local" ? undefined : timeZone,
@@ -41,7 +61,7 @@ export function timesOf<T extends CalendarTypes>(
 /** A day (`YYYY-MM-DD`) in words, for a screen reader's label or a popover's heading. */
 export function dayText(date: string, locale: string): string {
     const [year, month, dayOfMonth] = date.split("-").map(Number);
-    return new Intl.DateTimeFormat(locale, {
+    return dateTimeFormat(locale, {
         weekday: "long",
         month: "long",
         day: "numeric",

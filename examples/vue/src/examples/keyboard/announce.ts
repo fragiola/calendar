@@ -5,7 +5,7 @@ import type {
     CalendarModel,
     CalendarTypes,
 } from "@fragiola/calendar-vue";
-import { titleOf } from "../_kit/format";
+import { dateTimeFormat, titleOf } from "../_kit/format";
 
 function when<T extends CalendarTypes>(
     model: CalendarModel<T>,
@@ -14,14 +14,14 @@ function when<T extends CalendarTypes>(
     const { locale, timeZone } = model.state.settings;
     const zone = timeZone === "local" ? undefined : timeZone;
     if (times.allDay) {
-        return new Intl.DateTimeFormat(locale, {
+        return dateTimeFormat(locale, {
             weekday: "long",
             day: "numeric",
             month: "long",
             timeZone: "UTC",
         }).format(Date.parse(`${times.start}T00:00:00Z`));
     }
-    return new Intl.DateTimeFormat(locale, {
+    return dateTimeFormat(locale, {
         weekday: "long",
         hour: "numeric",
         minute: "2-digit",

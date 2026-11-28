@@ -11,6 +11,7 @@ import { Input } from "#/components/atoms/fields";
 import { Dialog } from "#/components/ui/dialog";
 import { Field } from "#/components/ui/field";
 import { CALENDARS, day, type Types, teamWeek } from "../_kit/data";
+import { dateTimeFormat } from "../_kit/format";
 import * as styles from "./styles";
 import Toolbar from "./toolbar.vue";
 import WeekGrid from "./week-grid.vue";
@@ -64,7 +65,7 @@ function when(range: Range): string {
     if (range.allDay) {
         return `All day, from ${range.start} to before ${range.end}`;
     }
-    const format = new Intl.DateTimeFormat("en-US", {
+    const format = dateTimeFormat("en-US", {
         weekday: "long",
         hour: "numeric",
         minute: "2-digit",
