@@ -237,7 +237,11 @@ command on the drop. Hit-testing reads boxes measured once per press.
 
 The engine tells the adapter what each change reaches (a `ViewChange`: `focus`, `gesture`,
 `preview`, `selection`, `layout`), once per pointer move or key, and keeps each part's attributes
-as the same object while they are the same: a preview moving reads no part again. The core builds
+as the same object while they are the same: a preview moving reads no part again. Each adapter
+reads a part again only for the changes that may reach it (`engine.adapter.affects`): React's
+store skips the part's snapshot, Vue and Angular bump only the revision the part's `computed`
+reads. A preview moving re-renders the preview where it is and the one where it was, not the
+other days' previews, the slots or the events. The core builds
 no `Intl` formatter while the pointer moves: the host's zone (`timeZone: "local"`) is read once and
 again at the engine's midnight refresh, and every formatter, "today" and zone check is kept.
 
@@ -247,6 +251,21 @@ The playground's stress fixture holds 2 000 events with every feature installed,
 and column functions and a counter in each. Moving one event in the month view re-renders the two
 week rows it leaves and enters; in the week view, the two columns. No other row or column renders
 again, and the end-to-end tests check those counts.
+
+Each adapter's tests hold budgets on a busy week with the drag-and-resize example's parts and
+stable children functions (`tests/render-counts.test.*`):
+
+| | React | Vue | Angular |
+| --- | --- | --- | --- |
+| 30 preview changes: renders (views checked) | 92 | 62 | 2 |
+| 30 preview changes: attribute reads | 90 | 30 | 30 |
+| the drop: renders (views checked) | 84 | 76 | 101 |
+
+The drop renders the two columns, their events and previews, the grid's collections and the slot
+rows that call their two changed days again (in Angular, each slot cell is a view of its own: the
+96 cells of the two days are checked). Angular tells the engine a render committed
+(`committed()`) only after a render that touched the calendar: a render of the app's other
+state measures nothing.
 
 ## Other costs that are yours
 

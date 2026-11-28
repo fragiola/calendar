@@ -656,6 +656,32 @@ drag and ranges; RFC 5545 for recurrence; FullCalendar's documented default for 
   it) holds median budgets about twice a developer machine's: `model.get("time-grid")` and
   `model.get("day-grid")` from a new state 0.2 ms, a 30-move drag in a busy week with an adapter
   reading every part after each change 25 ms, a drop 12 ms.
+- **Issue #25, adapters re-render only what a change touches (Epic #27).** Each adapter keeps one
+  subscription per root and reads a part again only for the changes `engine.adapter.affects` names
+  for it (no adapter decides scopes itself): React's store (`utils/calendar-store.ts`) keeps the
+  last 32 changes and `changedSince(version, part)`, so `useCalendarValue(context, read, { part })`
+  skips the snapshot's read; Vue's and Angular's roots keep a revision per part name (bumped on a
+  model commit, a new engine, and the view changes that reach it), which the part's
+  `computed` reads instead of `version`. Every `usePart` / `bindPart` passes its part; a hook that
+  reads a model or engine value names the part it serves (`time-grid`, `day-grid`, `root`,
+  `drag-preview`, `selection`, `now-indicator`, …); no part (the root's committed-after-render
+  subscription) is every change. `DragPreview` (all three) reads only the preview where it is
+  (null elsewhere), so a move renders the preview it enters and leaves. React's `Calendar.Slot` is
+  `React.memo` and `Calendar.Slots` calls its function through `useEntityCalls` (the `MemoCall`
+  contract without a component per cell); Vue's `Calendar.Slots` calls its slot in its own render
+  (no `MemoCall`: a row's 7 calls run again when the row renders, its reactive reads tracked
+  there). Angular's root calls `committed()` only after a render that touched the calendar: a
+  change of the calendar, an element registered or gone (`context.touched()`), or a mutation of
+  the root's subtree (a `MutationObserver` read with `takeRecords()` in `afterEveryRender`; the
+  engine's own writes during `committed()` are dropped). `tests/render-counts.test.*` per adapter
+  (React counts components through the DevTools hook, `tests/render-counter.ts`, installed by
+  `tests/setup.ts` before React DOM loads; Vue a global mixin's `beforeMount`/`beforeUpdate`;
+  Angular probes in each template) on a busy week with stable children, 30 preview changes and a
+  drop: React 92 renders / 90 attribute reads per 30 changes (300 / 15,210 before) and 84 on the
+  drop (378); Vue 62 / 30 (270 / 15,150) and 76 (179); Angular 2 views / 30 reads (2 / 15,150) and
+  101 views (101: each slot cell of the two days is a view), and 0 `committed()` on an app render
+  outside the calendar (1). The core's `week-of-year` brute-force test compares in plain code and
+  asserts once (about 1.1 s to 0.25 s: it timed out once under the full suite).
 
 - **Issue #12, the Vue examples.** `examples/vue` (`examples-vue`) follows Tree's Vue app: every
   example id as `src/examples/<id>/index.vue` with sibling SFCs (one per React component,
