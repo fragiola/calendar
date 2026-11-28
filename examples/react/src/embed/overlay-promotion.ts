@@ -28,8 +28,13 @@ import { holdResize, post } from "examples-shared/embed/messages";
 //             goes back only after the overlay has fully closed.
 //
 // An overlay opened from code, with no trigger (the event editor opened by a
-// selection or a click on an event), is caught when its portal mounts and
-// asks then: its first frames may play in place.
+// selection, the scope prompt opened by a drop), is caught when its portal
+// mounts, before its first paint, and asks then. Until `promoted` it is held
+// transparent where its opening starts: every `data-starting-style` the
+// component removes is put back and every enter keyframe is paused, so the
+// overlay stays unseen while the frame grows and its opening plays in the
+// viewport it ends in (never cut by the resize). No `promoted` in time → it is let go in
+// place.
 //
 // Everything here keys off the registry's `data-slot` names; the examples
 // readers copy stay untouched.
@@ -108,6 +113,75 @@ export function isHostMessage(data: unknown): data is HostMessage {
 
 const modalOpen = () => document.querySelector(MODAL_PORTALS) !== null;
 
+const STARTING_STYLE = "data-starting-style";
+
+/**
+ * Keeps the open modal portals unseen, where their opening starts: each portal is transparent,
+ * each `data-starting-style` removed under it is put back (before the next paint: a mutation
+ * record is handled in a microtask), and each CSS animation that runs in it (an enter keyframe) is
+ * paused at its start. Returns the release, which shows the portals, removes the attributes it put
+ * back and plays the animations, so the opening starts then.
+ */
+function holdOpening(): () => void {
+    const portals = [...document.querySelectorAll<HTMLElement>(MODAL_PORTALS)];
+    // transparent, not hidden: the dialog keeps the focus it took as it mounted
+    const opacities = portals.map((portal) => portal.style.opacity);
+    for (const portal of portals) portal.style.opacity = "0";
+    const kept = new Set<Element>();
+    const observer = new MutationObserver((records) => {
+        for (const record of records) {
+            const target = record.target;
+            if (!(target instanceof Element)) continue;
+            if (
+                record.oldValue === null ||
+                target.hasAttribute(STARTING_STYLE)
+            ) {
+                continue;
+            }
+            target.setAttribute(STARTING_STYLE, record.oldValue);
+            kept.add(target);
+        }
+    });
+    const paused = new Set<Animation>();
+    const pause = (animation: Animation) => {
+        if (paused.has(animation) || animation.playState !== "running") return;
+        animation.pause();
+        paused.add(animation);
+    };
+    // an animation of an element the component adds later starts after this
+    const onStart = (event: Event) => {
+        if (!(event.target instanceof Element)) return;
+        for (const animation of event.target.getAnimations()) pause(animation);
+    };
+    for (const portal of portals) {
+        observer.observe(portal, {
+            subtree: true,
+            attributeFilter: [STARTING_STYLE],
+            attributeOldValue: true,
+        });
+        portal.addEventListener("animationstart", onStart, true);
+        for (const animation of portal.getAnimations({ subtree: true })) {
+            pause(animation);
+        }
+    }
+    let released = false;
+    return () => {
+        if (released) return;
+        released = true;
+        // what is still queued was removed by the component: it stays removed
+        observer.takeRecords();
+        observer.disconnect();
+        for (const portal of portals) {
+            portal.removeEventListener("animationstart", onStart, true);
+        }
+        portals.forEach((portal, index) => {
+            portal.style.opacity = opacities[index] ?? "";
+        });
+        for (const element of kept) element.removeAttribute(STARTING_STYLE);
+        for (const animation of paused) animation.play();
+    };
+}
+
 /** Starts overlay promotion for the example `id`; a no-op outside a frame. */
 export function promoteOverlays(id: string) {
     if (window.parent === window) return;
@@ -121,6 +195,8 @@ export function promoteOverlays(id: string) {
     /** a played click whose portal may not have mounted yet */
     let settling = false;
     let armed: HTMLStyleElement | undefined;
+    /** releases an overlay opened from code, held in its starting style */
+    let holding: (() => void) | null = null;
 
     /** the viewport the rule was armed for */
     let armedFor: PromotionGeometry["viewport"] | undefined;
@@ -137,14 +213,24 @@ export function promoteOverlays(id: string) {
     // happens to have that very size (a fullscreen stage) is never pinned
     // to a stale `rect`. The resize event runs in the same rendering update
     // as the new size, after the media query stopped matching: invisible.
+    //
+    // Promoted, the frame has the armed size: an overlay opened from code
+    // and held is let go there, in the rendering update that first paints
+    // the promoted frame (its animations start in it). `promoted` comes a
+    // task after that update; it releases what is still held.
     window.addEventListener("resize", () => {
-        if (!armed || !armedFor || asked) return;
-        if (
+        if (!armed || !armedFor) return;
+        const promotedSize =
             window.innerWidth === armedFor.width &&
-            window.innerHeight === armedFor.height
-        ) {
+            window.innerHeight === armedFor.height;
+        if (asked) {
+            if (promotedSize && holding && held === holding) {
+                held = null;
+                holding();
+            }
             return;
         }
+        if (promotedSize) return;
         armed.textContent = "";
         armedFor = undefined;
     });
@@ -153,6 +239,8 @@ export function promoteOverlays(id: string) {
         if (!asked) return;
         asked = false;
         held = null;
+        holding?.();
+        holding = null;
         post({ type: "fragiola:example:overlay", id, open: false });
         holdResize(false);
     };
@@ -235,7 +323,10 @@ export function promoteOverlays(id: string) {
         if (!hosted) return;
         const open = modalOpen();
         if (open) settling = false;
-        if (open && !asked) ask(() => {});
-        else if (!open && asked && !held && !settling) close();
+        if (open && !asked) {
+            const release = holdOpening();
+            holding = release;
+            ask(release);
+        } else if (!open && asked && !held && !settling) close();
     }).observe(document.body, { childList: true });
 }
