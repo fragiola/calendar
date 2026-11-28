@@ -2,7 +2,6 @@ import {
     afterNextRender,
     Component,
     type ElementRef,
-    signal,
     viewChild,
 } from "@angular/core";
 import {
@@ -20,8 +19,9 @@ import {
     resize,
 } from "@fragiola/calendar-angular/resize";
 import { CALENDARS, day, type Types, teamWeek } from "../_kit/data";
-import { text, timesOf, titleOf } from "../_kit/format";
+import { dateTimeFormat, text, timesOf, titleOf } from "../_kit/format";
 import { DayHeader } from "./day-header";
+import { DropStatus } from "./drop-status";
 import * as styles from "./styles";
 import { Toolbar } from "./toolbar";
 import { Weekday } from "./weekday";
@@ -40,6 +40,7 @@ const FEATURES = [dragAndDrop(), resize()] as const;
         CalendarDragPreviewDirective,
         CalendarResizeHandleDirective,
         DayHeader,
+        DropStatus,
         Toolbar,
         Weekday,
     ],
@@ -53,7 +54,7 @@ const FEATURES = [dragAndDrop(), resize()] as const;
             (eventDrop)="dropped($event)"
         >
             <div dragAndResizeToolbar [class]="styles.toolbar"></div>
-            <p role="status" [class]="styles.status">{{ status() }}</p>
+            <example-drag-and-resize-drop-status />
             @if (calendar.state().view === "month") {
                 <div calendarDayGrid aria-label="Month" [class]="styles.grid">
                     <div calendarColumnHeaders [class]="styles.monthHeaders">
@@ -178,7 +179,8 @@ export default class DragAndResize {
         },
         { features: FEATURES },
     );
-    protected readonly status = signal("");
+    // the status line keeps its own text: a drop re-renders the line, not the calendar
+    private readonly status = viewChild.required(DropStatus);
     private readonly scroller = viewChild<ElementRef<HTMLElement>>("scroller");
 
     constructor() {
@@ -190,7 +192,7 @@ export default class DragAndResize {
 
     protected dropped(event: CalendarEngineEventOf<"drop">) {
         const title = titleOf(this.model, event.occurrenceId, event.eventId);
-        this.status.set(
+        this.status().show(
             `${event.kind === "move" ? "Moved" : "Resized"} “${title}”: ${
                 event.allDay
                     ? "all day"
@@ -201,7 +203,7 @@ export default class DragAndResize {
 
     /** The preview's start as a wall-clock time (the app's formatting). */
     protected previewTime(start: string): string {
-        return new Intl.DateTimeFormat("en-US", {
+        return dateTimeFormat("en-US", {
             hour: "numeric",
             minute: "2-digit",
         }).format(Date.parse(start));

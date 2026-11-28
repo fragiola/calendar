@@ -1,22 +1,16 @@
 <script setup lang="ts">
 import {
     createCalendarModel,
-    type EditScope,
     type SelectionRange,
     typedCalendar,
 } from "@fragiola/calendar-vue";
-import { onBeforeUnmount, ref } from "vue";
+import { ref } from "vue";
 import { CALENDARS, day, type Types } from "../_kit/data";
+import { dateTimeFormat } from "../_kit/format";
 import CalendarsPanel from "./calendars-panel.vue";
 import EventEditor, { type NewEvent } from "./event-editor.vue";
 import MiniMonth from "./mini-month.vue";
-import {
-    askForScope,
-    features,
-    type PendingEdit,
-    plannerEvents,
-    runWithScope,
-} from "./planner";
+import { features, plannerEvents } from "./planner";
 import PlannerGrid from "./planner-grid.vue";
 import ScopeDialog from "./scope-dialog.vue";
 import * as styles from "./styles";
@@ -46,16 +40,6 @@ const model = createCalendarModel<Types, typeof features>(
     { features },
 );
 const range = ref<SelectionRange | null>(null);
-const pending = ref<PendingEdit | null>(null);
-
-// an edit of a recurring event waits for its scope (planner.ts)
-onBeforeUnmount(
-    model.use(
-        askForScope((edit) => {
-            pending.value = edit;
-        }),
-    ),
-);
 
 function closeEditor() {
     range.value = null;
@@ -74,15 +58,10 @@ function save({ title, calendarId, range }: NewEvent) {
     closeEditor();
 }
 
-function pick(scope: EditScope) {
-    if (pending.value) runWithScope(model, pending.value, scope);
-    pending.value = null;
-}
-
 /** A selected range in words, for the editor's description. */
 function when(range: SelectionRange, locale: string): string {
     if (range.allDay) return `All day from ${range.start}`;
-    return new Intl.DateTimeFormat(locale, {
+    return dateTimeFormat(locale, {
         weekday: "long",
         hour: "numeric",
         minute: "2-digit",
@@ -110,10 +89,6 @@ function when(range: SelectionRange, locale: string): string {
             @save="save"
             @close="closeEditor"
         />
-        <ScopeDialog
-            :open="pending !== null"
-            @pick="pick"
-            @cancel="pending = null"
-        />
+        <ScopeDialog />
     </Calendar.Root>
 </template>

@@ -6,9 +6,10 @@ import {
 } from "@fragiola/calendar-vue";
 import { dragAndDrop } from "@fragiola/calendar-vue/drag-and-drop";
 import { resize } from "@fragiola/calendar-vue/resize";
-import { ref } from "vue";
+import { useTemplateRef } from "vue";
 import { CALENDARS, day, type Types, teamWeek } from "../_kit/data";
 import { timesOf, titleOf } from "../_kit/format";
+import DropStatus from "./drop-status.vue";
 import * as styles from "./styles";
 import Toolbar from "./toolbar.vue";
 import View from "./view.vue";
@@ -29,20 +30,23 @@ const model = createCalendarModel<Types, typeof FEATURES>(
     },
     { features: FEATURES },
 );
-const status = ref("");
+// the status line keeps its own text: a drop re-renders the line, not the calendar
+const status = useTemplateRef("status");
 
 function dropped(event: CalendarEngineEventOf<"drop">) {
     const title = titleOf(model, event.occurrenceId, event.eventId);
-    status.value = `${event.kind === "move" ? "Moved" : "Resized"} “${title}”: ${
-        event.allDay ? "all day" : timesOf(model, event.occurrenceId)
-    }`;
+    status.value?.show(
+        `${event.kind === "move" ? "Moved" : "Resized"} “${title}”: ${
+            event.allDay ? "all day" : timesOf(model, event.occurrenceId)
+        }`,
+    );
 }
 </script>
 
 <template>
     <Calendar.Root :model="model" :class="styles.root" @event-drop="dropped">
         <Toolbar />
-        <p role="status" :class="styles.status">{{ status }}</p>
+        <DropStatus ref="status" />
         <View />
     </Calendar.Root>
 </template>

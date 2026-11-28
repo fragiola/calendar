@@ -2,7 +2,6 @@ import {
     afterNextRender,
     Component,
     type ElementRef,
-    signal,
     viewChild,
 } from "@angular/core";
 import {
@@ -23,6 +22,7 @@ import { CALENDARS, day, type Types, teamWeek } from "../_kit/data";
 import { text, timesOf, titleOf } from "../_kit/format";
 import { announcementText } from "./announce";
 import { DayHeader } from "./day-header";
+import { LiveRegion } from "./live-region";
 import * as styles from "./styles";
 import { Toolbar } from "./toolbar";
 
@@ -50,6 +50,7 @@ const KEYS = [
         CalendarDragPreviewDirective,
         CalendarSelectionDirective,
         DayHeader,
+        LiveRegion,
         Toolbar,
     ],
     host: { class: "contents" },
@@ -61,7 +62,7 @@ const KEYS = [
                     <li><kbd [class]="styles.key">{{ key[0] }}</kbd> {{ key[1] }}</li>
                 }
             </ul>
-            <div role="status" aria-live="polite" data-testid="announcer" [class]="styles.status">{{ message() }}</div>
+            <example-keyboard-live-region />
             <div calendarTimeGrid aria-label="Week" [class]="styles.grid">
                 <div calendarColumnHeaders [class]="styles.headers">
                     <ng-template calendarColumnHeadersItem let-date>
@@ -144,7 +145,8 @@ export default class Keyboard {
         },
         { features: FEATURES },
     );
-    protected readonly message = signal("");
+    // the live region keeps its own text: an announcement re-renders the region, not the calendar
+    private readonly announcer = viewChild.required(LiveRegion);
     private readonly scroller =
         viewChild.required<ElementRef<HTMLElement>>("scroller");
 
@@ -153,7 +155,7 @@ export default class Keyboard {
     }
 
     protected announce({ announcement }: CalendarEngineEventOf<"announce">) {
-        this.message.set(announcementText(this.model, announcement));
+        this.announcer().say(announcementText(this.model, announcement));
     }
 
     /** An hour's label, `9 AM` in the calendar's locale. */

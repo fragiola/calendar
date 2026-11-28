@@ -8,19 +8,13 @@ import {
     useCalendarTitle,
 } from "@fragiola/calendar-react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { CALENDARS, day, type Types } from "../_kit/data";
-import { text } from "../_kit/format";
+import { dateTimeFormat, text } from "../_kit/format";
 import { CalendarsPanel } from "./calendars-panel";
 import { EventEditor, type NewEvent } from "./event-editor";
 import { MiniMonth } from "./mini-month";
-import {
-    askForScope,
-    features,
-    type PendingEdit,
-    plannerEvents,
-    runWithScope,
-} from "./planner";
+import { features, plannerEvents } from "./planner";
 import { PlannerGrid } from "./planner-grid";
 import { ScopeDialog } from "./scope-dialog";
 import * as styles from "./styles";
@@ -50,10 +44,6 @@ export default function TeamPlanner() {
         ),
     );
     const [range, setRange] = useState<SelectionRange | null>(null);
-    const [pending, setPending] = useState<PendingEdit | null>(null);
-
-    // an edit of a recurring event waits for its scope (planner.ts)
-    useEffect(() => model.use(askForScope(setPending)), [model]);
 
     const closeEditor = () => {
         setRange(null);
@@ -93,14 +83,7 @@ export default function TeamPlanner() {
                 onSave={save}
                 onClose={closeEditor}
             />
-            <ScopeDialog
-                open={pending !== null}
-                onPick={(scope) => {
-                    if (pending) runWithScope(model, pending, scope);
-                    setPending(null);
-                }}
-                onCancel={() => setPending(null)}
-            />
+            <ScopeDialog />
         </Calendar.Root>
     );
 }
@@ -108,7 +91,7 @@ export default function TeamPlanner() {
 /** A selected range in words, for the editor's description. */
 function when(range: SelectionRange, locale: string): string {
     if (range.allDay) return `All day from ${range.start}`;
-    return new Intl.DateTimeFormat(locale, {
+    return dateTimeFormat(locale, {
         weekday: "long",
         hour: "numeric",
         minute: "2-digit",

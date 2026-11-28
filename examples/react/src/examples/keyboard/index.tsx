@@ -3,6 +3,7 @@
 import {
     Calendar,
     createCalendarModel,
+    type DayCell,
     type Segment,
     type TimeGridColumn,
     type TimeSegment,
@@ -18,7 +19,7 @@ import {
 import { resize } from "@fragiola/calendar-react/resize";
 import { Selection, selection } from "@fragiola/calendar-react/selection";
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import { useState } from "react";
+import { type Ref, useImperativeHandle, useRef, useState } from "react";
 import { CALENDARS, day, type Types, teamWeek } from "../_kit/data";
 import { text, timesOf, titleOf } from "../_kit/format";
 import { announcementText } from "./announce";
@@ -43,47 +44,28 @@ export default function Keyboard() {
             { features: FEATURES },
         ),
     );
-    const [message, setMessage] = useState("");
+    // the live region keeps its own text: an announcement re-renders the region, not the calendar
+    const announcer = useRef<Announcer>(null);
     return (
         <Calendar.Root
             model={model}
             className={styles.root}
             onAnnounce={({ announcement }) =>
-                setMessage(announcementText(model, announcement))
+                announcer.current?.say(announcementText(model, announcement))
             }
         >
             <Toolbar />
             <Keys />
-            <div
-                role="status"
-                aria-live="polite"
-                data-testid="announcer"
-                className={styles.status}
-            >
-                {message}
-            </div>
+            <LiveRegion ref={announcer} />
             <Calendar.TimeGrid aria-label="Week" className={styles.grid}>
                 <Calendar.ColumnHeaders className={styles.headers}>
-                    {(date) => <DayHeader date={date} />}
+                    {dayHeader}
                 </Calendar.ColumnHeaders>
                 <Calendar.AllDayRow className={styles.allDayRow}>
                     <div aria-hidden className={styles.allDayLabel}>
                         all-day
                     </div>
-                    <Calendar.Days>
-                        {(day) => (
-                            <Calendar.Day
-                                day={day}
-                                className={styles.allDayCell}
-                            >
-                                <Calendar.DayEvents>
-                                    {(segment) => (
-                                        <AllDayEvent segment={segment} />
-                                    )}
-                                </Calendar.DayEvents>
-                            </Calendar.Day>
-                        )}
-                    </Calendar.Days>
+                    <Calendar.Days>{allDayCell}</Calendar.Days>
                     <DragPreview className={styles.preview} />
                 </Calendar.AllDayRow>
                 <Calendar.Scroller
@@ -104,9 +86,46 @@ export default function Keyboard() {
 
 const FEATURES = [selection(), dragAndDrop(), resize()] as const;
 
-// The rows' and the columns' children functions read only their arguments, so they live outside
-// the component: stable, they are called again only for a row or a column whose layout changed,
-// not on every re-render of the app (an announcement, a keystroke in a field).
+/** What the live region is told. */
+interface Announcer {
+    say(text: string): void;
+}
+
+/** The engine's announcements in words: the region's text is its own state. */
+function LiveRegion({ ref }: { ref: Ref<Announcer> }) {
+    const [message, setMessage] = useState("");
+    useImperativeHandle(ref, () => ({ say: setMessage }), []);
+    return (
+        <div
+            role="status"
+            aria-live="polite"
+            data-testid="announcer"
+            className={styles.status}
+        >
+            {message}
+        </div>
+    );
+}
+
+// The children functions read only their arguments, so they live outside the component: stable,
+// they are called again only for a row, a day or a column whose layout changed, not on every
+// re-render of the app.
+function dayHeader(date: string) {
+    return <DayHeader date={date} />;
+}
+
+function allDayCell(day: DayCell) {
+    return (
+        <Calendar.Day day={day} className={styles.allDayCell}>
+            <Calendar.DayEvents>{allDayEvent}</Calendar.DayEvents>
+        </Calendar.Day>
+    );
+}
+
+function allDayEvent(segment: Segment) {
+    return <AllDayEvent segment={segment} />;
+}
+
 function slotRow(slot: TimeSlot) {
     return (
         <Calendar.SlotRow slot={slot} className={styles.slotRow}>

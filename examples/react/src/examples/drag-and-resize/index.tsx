@@ -4,8 +4,12 @@ import {
     Calendar,
     type CalendarEngineEventOf,
     createCalendarModel,
+    type DayCell,
+    type DayGridWeek,
     type Segment,
+    type TimeGridColumn,
     type TimeSegment,
+    type TimeSlot,
     useCalendar,
     useCalendarTitle,
     useCalendarView,
@@ -13,13 +17,14 @@ import {
 } from "@fragiola/calendar-react";
 import {
     DragPreview,
+    type DragPreviewState,
     dragAndDrop,
 } from "@fragiola/calendar-react/drag-and-drop";
 import { ResizeHandle, resize } from "@fragiola/calendar-react/resize";
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import { useState } from "react";
+import { type Ref, useImperativeHandle, useRef, useState } from "react";
 import { CALENDARS, day, type Types, teamWeek } from "../_kit/data";
-import { text, timesOf, titleOf } from "../_kit/format";
+import { dateTimeFormat, text, timesOf, titleOf } from "../_kit/format";
 import * as styles from "./styles";
 
 const FEATURES = [dragAndDrop(), resize()] as const;
@@ -40,14 +45,15 @@ export default function DragAndResize() {
             { features: FEATURES },
         ),
     );
-    const [status, setStatus] = useState("");
+    // the status line keeps its own text: a drop re-renders the line, not the calendar
+    const status = useRef<StatusLine>(null);
     return (
         <Calendar.Root
             model={model}
             className={styles.root}
             onEventDrop={(event: CalendarEngineEventOf<"drop">) => {
                 const title = titleOf(model, event.occurrenceId, event.eventId);
-                setStatus(
+                status.current?.show(
                     `${event.kind === "move" ? "Moved" : "Resized"} “${title}”: ${
                         event.allDay
                             ? "all day"
@@ -57,11 +63,25 @@ export default function DragAndResize() {
             }}
         >
             <Toolbar />
-            <p role="status" className={styles.status}>
-                {status}
-            </p>
+            <DropStatus ref={status} />
             <View />
         </Calendar.Root>
+    );
+}
+
+/** What the status line is told. */
+interface StatusLine {
+    show(text: string): void;
+}
+
+/** The last drop in words, for a screen reader: its text is its own state. */
+function DropStatus({ ref }: { ref: Ref<StatusLine> }) {
+    const [text, setText] = useState("");
+    useImperativeHandle(ref, () => ({ show: setText }), []);
+    return (
+        <p role="status" className={styles.status}>
+            {text}
+        </p>
     );
 }
 
@@ -74,34 +94,9 @@ function MonthGrid() {
     return (
         <Calendar.DayGrid aria-label="Month" className={styles.grid}>
             <Calendar.ColumnHeaders className={styles.monthHeaders}>
-                {(date) => <Weekday date={date} />}
+                {weekday}
             </Calendar.ColumnHeaders>
-            <Calendar.Weeks>
-                {(week) => (
-                    <Calendar.Week week={week} className={styles.monthWeek}>
-                        <Calendar.Days>
-                            {(day) => (
-                                <Calendar.Day
-                                    day={day}
-                                    className={styles.monthDay}
-                                >
-                                    <span className={styles.dayNumber}>
-                                        {Number(day.date.slice(8))}
-                                    </span>
-                                    <Calendar.DayEvents
-                                        className={styles.dayEvents}
-                                    >
-                                        {(segment) => (
-                                            <AllDayEvent segment={segment} />
-                                        )}
-                                    </Calendar.DayEvents>
-                                </Calendar.Day>
-                            )}
-                        </Calendar.Days>
-                        <DragPreview className={styles.rowPreview} />
-                    </Calendar.Week>
-                )}
-            </Calendar.Weeks>
+            <Calendar.Weeks>{monthWeek}</Calendar.Weeks>
         </Calendar.DayGrid>
     );
 }
@@ -110,21 +105,13 @@ function WeekGrid() {
     return (
         <Calendar.TimeGrid aria-label="Week" className={styles.grid}>
             <Calendar.ColumnHeaders className={styles.headers}>
-                {(date) => <DayHeader date={date} />}
+                {dayHeader}
             </Calendar.ColumnHeaders>
             <Calendar.AllDayRow className={styles.allDayRow}>
                 <div aria-hidden className={styles.allDayLabel}>
                     all-day
                 </div>
-                <Calendar.Days>
-                    {(day) => (
-                        <Calendar.Day day={day} className={styles.allDayCell}>
-                            <Calendar.DayEvents>
-                                {(segment) => <AllDayEvent segment={segment} />}
-                            </Calendar.DayEvents>
-                        </Calendar.Day>
-                    )}
-                </Calendar.Days>
+                <Calendar.Days>{allDayCell}</Calendar.Days>
                 <DragPreview className={styles.rowPreview} />
             </Calendar.AllDayRow>
             <Calendar.Scroller
@@ -132,49 +119,9 @@ function WeekGrid() {
                 ref={scrollToMorning}
             >
                 <div className={styles.body}>
-                    <Calendar.SlotRows>
-                        {(slot) => (
-                            <Calendar.SlotRow
-                                slot={slot}
-                                className={styles.slotRow}
-                            >
-                                <Calendar.SlotLabel
-                                    className={styles.slotLabel}
-                                >
-                                    {slot.time.endsWith(":00") ? (
-                                        <SlotTime time={slot.time} />
-                                    ) : null}
-                                </Calendar.SlotLabel>
-                                <Calendar.Slots>
-                                    {(column) => (
-                                        <Calendar.Slot
-                                            date={column.date}
-                                            className={styles.slot}
-                                        />
-                                    )}
-                                </Calendar.Slots>
-                            </Calendar.SlotRow>
-                        )}
-                    </Calendar.SlotRows>
+                    <Calendar.SlotRows>{slotRow}</Calendar.SlotRows>
                     <Calendar.Columns className={styles.columns}>
-                        {(column) => (
-                            <Calendar.Column
-                                column={column}
-                                className={styles.column}
-                            >
-                                <Calendar.ColumnEvents>
-                                    {(segment) => (
-                                        <TimedEvent segment={segment} />
-                                    )}
-                                </Calendar.ColumnEvents>
-                                {/* where the dragged or resized event would land */}
-                                <DragPreview className={styles.preview}>
-                                    {({ preview }) => (
-                                        <PreviewTimes start={preview.start} />
-                                    )}
-                                </DragPreview>
-                            </Calendar.Column>
-                        )}
+                        {dayColumn}
                     </Calendar.Columns>
                 </div>
             </Calendar.Scroller>
@@ -182,9 +129,88 @@ function WeekGrid() {
     );
 }
 
+// The children functions read only their arguments, so they live outside the components: stable,
+// each is called again only for a row, a day or an event whose layout changed.
+function weekday(date: string) {
+    return <Weekday date={date} />;
+}
+
+function monthWeek(week: DayGridWeek) {
+    return (
+        <Calendar.Week week={week} className={styles.monthWeek}>
+            <Calendar.Days>{monthDay}</Calendar.Days>
+            <DragPreview className={styles.rowPreview} />
+        </Calendar.Week>
+    );
+}
+
+function monthDay(day: DayCell) {
+    return (
+        <Calendar.Day day={day} className={styles.monthDay}>
+            <span className={styles.dayNumber}>
+                {Number(day.date.slice(8))}
+            </span>
+            <Calendar.DayEvents className={styles.dayEvents}>
+                {allDayEvent}
+            </Calendar.DayEvents>
+        </Calendar.Day>
+    );
+}
+
+function dayHeader(date: string) {
+    return <DayHeader date={date} />;
+}
+
+function allDayCell(day: DayCell) {
+    return (
+        <Calendar.Day day={day} className={styles.allDayCell}>
+            <Calendar.DayEvents>{allDayEvent}</Calendar.DayEvents>
+        </Calendar.Day>
+    );
+}
+
+function allDayEvent(segment: Segment) {
+    return <AllDayEvent segment={segment} />;
+}
+
+function slotRow(slot: TimeSlot) {
+    return (
+        <Calendar.SlotRow slot={slot} className={styles.slotRow}>
+            <Calendar.SlotLabel className={styles.slotLabel}>
+                {slot.time.endsWith(":00") ? (
+                    <SlotTime time={slot.time} />
+                ) : null}
+            </Calendar.SlotLabel>
+            <Calendar.Slots>{slotCell}</Calendar.Slots>
+        </Calendar.SlotRow>
+    );
+}
+
+function slotCell(column: TimeGridColumn) {
+    return <Calendar.Slot date={column.date} className={styles.slot} />;
+}
+
+function dayColumn(column: TimeGridColumn) {
+    return (
+        <Calendar.Column column={column} className={styles.column}>
+            <Calendar.ColumnEvents>{timedEvent}</Calendar.ColumnEvents>
+            {/* where the dragged or resized event would land */}
+            <DragPreview className={styles.preview}>{previewTimes}</DragPreview>
+        </Calendar.Column>
+    );
+}
+
+function timedEvent(segment: TimeSegment) {
+    return <TimedEvent segment={segment} />;
+}
+
+function previewTimes({ preview }: DragPreviewState) {
+    return <PreviewTimes start={preview.start} />;
+}
+
 /** The preview's start as a wall-clock time (the app's formatting). */
 function PreviewTimes({ start }: { start: string }) {
-    const time = new Intl.DateTimeFormat("en-US", {
+    const time = dateTimeFormat("en-US", {
         hour: "numeric",
         minute: "2-digit",
     }).format(Date.parse(start));

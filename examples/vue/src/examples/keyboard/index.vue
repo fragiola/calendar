@@ -7,12 +7,13 @@ import {
 import { DragPreview, dragAndDrop } from "@fragiola/calendar-vue/drag-and-drop";
 import { resize } from "@fragiola/calendar-vue/resize";
 import { Selection, selection } from "@fragiola/calendar-vue/selection";
-import { onMounted, ref } from "vue";
+import { onMounted, ref, useTemplateRef } from "vue";
 import { CALENDARS, day, type Types, teamWeek } from "../_kit/data";
 import AllDayEvent from "./all-day-event.vue";
 import { announcementText } from "./announce";
 import DayHeader from "./day-header.vue";
 import Keys from "./keys.vue";
+import LiveRegion from "./live-region.vue";
 import SlotTime from "./slot-time.vue";
 import * as styles from "./styles";
 import TimedEvent from "./timed-event.vue";
@@ -36,10 +37,11 @@ const model = createCalendarModel<Types, typeof FEATURES>(
     },
     { features: FEATURES },
 );
-const message = ref("");
+// the live region keeps its own text: an announcement re-renders the region, not the calendar
+const announcer = useTemplateRef("announcer");
 
 function announce({ announcement }: { announcement: Announcement }) {
-    message.value = announcementText(model, announcement);
+    announcer.value?.say(announcementText(model, announcement));
 }
 
 /** Opens the time grid at 08:00 (app code: the scroll position is yours). */
@@ -55,12 +57,7 @@ onMounted(() => {
     <Calendar.Root :model="model" :class="styles.root" @announce="announce">
         <Toolbar />
         <Keys />
-        <div
-            role="status"
-            aria-live="polite"
-            data-testid="announcer"
-            :class="styles.status"
-        >{{ message }}</div>
+        <LiveRegion ref="announcer" />
         <Calendar.TimeGrid aria-label="Week" :class="styles.grid">
             <Calendar.ColumnHeaders v-slot="{ date }" :class="styles.headers">
                 <DayHeader :date="date" />
