@@ -26,7 +26,8 @@ describe("dateTimeFormat", () => {
 
     it("tells an undefined zone from a named one", () => {
         // A named zone other than the host's: with no zone, the key is the host's own (CI runs in UTC).
-        const named = resolveTimeZone("local") === "Asia/Tokyo" ? "UTC" : "Asia/Tokyo";
+        const named =
+            resolveTimeZone("local") === "Asia/Tokyo" ? "UTC" : "Asia/Tokyo";
         const local = dateTimeFormat("en-US", { hour: "numeric" });
         const other = dateTimeFormat("en-US", {
             hour: "numeric",
