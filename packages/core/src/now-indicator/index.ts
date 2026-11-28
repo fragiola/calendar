@@ -71,7 +71,7 @@ export function nowIndicator(
                 const delay = interval - (Math.floor(host.now()) % interval);
                 timer = host.setTimeout(() => {
                     timer = undefined;
-                    host.changed();
+                    host.changed("layout");
                     schedule();
                 }, delay);
             };

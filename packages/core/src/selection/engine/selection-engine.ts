@@ -66,7 +66,7 @@ export function selectionEngine(
     const show = (range: SelectionRange | null) => {
         if (range === pending) return;
         pending = range;
-        host.changed();
+        host.changed("selection");
     };
     const allowed = (range: SelectionRange | null) =>
         range && host.model.can("selection.set", range) ? range : null;

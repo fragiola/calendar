@@ -30,6 +30,7 @@ describe("the engine's surface", () => {
         expect(Object.isFrozen(engine)).toBe(true);
         expect(Object.keys(engine.adapter).sort()).toEqual(
             [
+                "affects",
                 "attachRoot",
                 "attributes",
                 "committed",

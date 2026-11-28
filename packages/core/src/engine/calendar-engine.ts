@@ -34,10 +34,18 @@ import { clockOf } from "../model/model-clock";
 import type { QueryArgs } from "../state/queries";
 import { fromEpochDay } from "../time/epoch-day";
 import { formatPlainDate } from "../time/format-plain-date";
-import { resolveTimeZone } from "../time-zone/resolve-time-zone";
+import {
+    refreshHostTimeZone,
+    resolveTimeZone,
+} from "../time-zone/resolve-time-zone";
 import { startOfDay } from "../time-zone/start-of-day";
 import { todayOf } from "../view/today";
-import type { CalendarEngineAdapter, PartName, ViewChange } from "./adapter";
+import type {
+    CalendarEngineAdapter,
+    PartName,
+    ViewChange,
+    ViewScope,
+} from "./adapter";
 import { type EngineHost, resolveHost } from "./engine-host";
 import type { CalendarEngineEvent } from "./events";
 import type { CellPosition, FocusPosition, GridPoint } from "./grid-point";
@@ -49,7 +57,8 @@ import {
     timePoint,
 } from "./hit-test";
 import { type GridCells, keyTarget } from "./keyboard";
-import { attributesOf, type PartAttributeOptions } from "./part-attributes";
+import { PartAttributeCache } from "./part-attribute-cache";
+import type { PartAttributeOptions } from "./part-attributes";
 import {
     cellOfOccurrence,
     defaultTabStop,
@@ -74,6 +83,7 @@ import type {
     EngineRunMap,
     FocusTarget,
 } from "./verbs";
+import { affects, viewChangeOf } from "./view-change";
 
 /** Options of {@link createCalendarEngine}. */
 export interface CalendarEngineOptions {
@@ -251,8 +261,14 @@ class Engine<T extends CalendarTypes, F extends CalendarFeatures> {
     private midnight: number | undefined;
     private midnightHost: EngineHost | undefined;
     private today: number;
+    /** the display zone "today" was read in (the host's may change: `refreshHostTimeZone`) */
+    private zone: string;
     private scrollFrame: { host: EngineHost; id: number } | undefined;
     private snapshot = 0;
+    /** the input events under way (`batched`): their view changes are told once, at the end */
+    private batchDepth = 0;
+    private pendingScopes = new Set<ViewScope>();
+    private readonly attributeCache: PartAttributeCache;
     private destroyed = false;
     private readonly unsubscribeModel: () => void;
 
@@ -262,13 +278,23 @@ class Engine<T extends CalendarTypes, F extends CalendarFeatures> {
         this.features = featuresOf(model);
         this.now = clockOf(model);
         this.options = options;
+        // a new engine reads the host's zone again (a remount after the host moved)
+        refreshHostTimeZone();
         this.today = this.todayNow();
+        this.zone = this.timeZone();
         this.adapter = Object.freeze(this.adapterOf());
         const kit = this.kit();
         this.parts = this.features.list.flatMap((feature) =>
             feature.engine ? [feature.engine(kit)] : [],
         );
         this.dragsEvents = this.parts.some((part) => part.dragsEvents === true);
+        this.attributeCache = new PartAttributeCache({
+            model: this.erased(),
+            features: this.parts.filter((part) => part.attributes),
+            today: () => this.todayNow(),
+            focusPosition: () => this.focusPosition,
+            focusView: () => this.focusView(),
+        });
         this.coreKeys();
         for (const part of this.parts) {
             this.merge("action", part.run ?? {}, this.actions as never);
@@ -277,12 +303,13 @@ class Engine<T extends CalendarTypes, F extends CalendarFeatures> {
         }
         this.unsubscribeModel = model.subscribe((event) => {
             if (event.before.settings !== event.after.settings) {
+                this.zone = this.timeZone();
                 this.scheduleMidnight();
                 this.geometry = undefined;
             }
             if (this.keyGesture?.active?.() === false) {
                 this.keyGesture = undefined;
-                this.notify({ gesture: true });
+                this.notify("gesture");
             }
         });
         this.scheduleMidnight();
@@ -386,10 +413,14 @@ class Engine<T extends CalendarTypes, F extends CalendarFeatures> {
         ) {
             return fail("invalid_payload", "must be an object", "");
         }
-        return handler(
-            (payload ?? {}) as Readonly<Record<string, unknown>>,
-            dryRun,
-        );
+        let result: CommandResult<unknown> = ok(undefined);
+        this.batched(() => {
+            result = handler(
+                (payload ?? {}) as Readonly<Record<string, unknown>>,
+                dryRun,
+            );
+        });
+        return result;
     }
 
     get(key: string, payload?: unknown): never {
@@ -423,15 +454,34 @@ class Engine<T extends CalendarTypes, F extends CalendarFeatures> {
         for (const listener of [...this.eventListeners]) listener(event);
     }
 
-    private notify(change: Partial<ViewChange>): void {
+    /** Tells the adapters the view changed in these scopes (once, after a batch under way). */
+    private notify(...scopes: ViewScope[]): void {
         if (this.destroyed) return;
+        for (const scope of scopes) this.pendingScopes.add(scope);
+        if (this.batchDepth === 0) this.flush();
+    }
+
+    /** Runs an input event's handling, its view changes told once, together, at its end. */
+    private batched(run: () => void): void {
+        this.batchDepth++;
+        try {
+            run();
+        } finally {
+            this.batchDepth--;
+            if (this.batchDepth === 0) this.flush();
+        }
+    }
+
+    private flush(): void {
+        if (this.pendingScopes.size === 0 || this.destroyed) {
+            this.pendingScopes.clear();
+            return;
+        }
+        const change = viewChangeOf(this.pendingScopes);
+        this.pendingScopes = new Set();
+        this.attributeCache.viewChanged(change);
         this.snapshot++;
-        const full: ViewChange = {
-            focus: change.focus === true,
-            gesture: change.gesture === true,
-            layout: change.layout === true,
-        };
-        for (const listener of [...this.viewListeners]) listener(full);
+        for (const listener of [...this.viewListeners]) listener(change);
     }
 
     // ---------------------------------------------------------------------------------------------
@@ -642,7 +692,7 @@ class Engine<T extends CalendarTypes, F extends CalendarFeatures> {
             !before ||
             this.keyOfPosition(before) !== this.keyOfPosition(position)
         ) {
-            this.notify({ focus: true });
+            this.notify("focus");
         }
     }
 
@@ -788,13 +838,13 @@ class Engine<T extends CalendarTypes, F extends CalendarFeatures> {
             if (event.key === "Escape") {
                 this.keyGesture = undefined;
                 grab.cancel();
-                this.notify({ gesture: true });
+                this.notify("gesture");
                 return true;
             }
             const taken = grab.keydown?.(event) ?? false;
             if (grab.active?.() === false) {
                 this.keyGesture = undefined;
-                this.notify({ gesture: true });
+                this.notify("gesture");
             }
             if (taken) return true;
         }
@@ -805,7 +855,7 @@ class Engine<T extends CalendarTypes, F extends CalendarFeatures> {
             if (typeof result === "object") {
                 this.keyGesture?.cancel();
                 this.keyGesture = result;
-                this.notify({ gesture: true });
+                this.notify("gesture");
                 return true;
             }
         }
@@ -970,7 +1020,7 @@ class Engine<T extends CalendarTypes, F extends CalendarFeatures> {
             !before ||
             this.keyOfPosition(before) !== this.keyOfPosition(position)
         ) {
-            this.notify({ focus: true });
+            this.notify("focus");
         }
     }
 
@@ -982,7 +1032,7 @@ class Engine<T extends CalendarTypes, F extends CalendarFeatures> {
             const grab = this.keyGesture;
             this.keyGesture = undefined;
             grab.cancel();
-            this.notify({ gesture: true });
+            this.notify("gesture");
         }
     }
 
@@ -1131,12 +1181,23 @@ class Engine<T extends CalendarTypes, F extends CalendarFeatures> {
                 (event) => this.nativeDrag(event as DragEvent),
             ]);
         }
-        for (const [target, type, listener, capture] of listeners) {
-            target.addEventListener(type, listener, capture === true);
+        // each event's view changes are told once, at its end (a drag's first move activates,
+        // begins and previews: one change)
+        const bound = listeners.map(
+            ([target, type, listener, capture]) =>
+                [
+                    target,
+                    type,
+                    (event: Event) => this.batched(() => listener(event)),
+                    capture === true,
+                ] as const,
+        );
+        for (const [target, type, listener, capture] of bound) {
+            target.addEventListener(type, listener, capture);
         }
         this.removeRootListeners = () => {
-            for (const [target, type, listener, capture] of listeners) {
-                target.removeEventListener(type, listener, capture === true);
+            for (const [target, type, listener, capture] of bound) {
+                target.removeEventListener(type, listener, capture);
             }
         };
         const host = this.host();
@@ -1185,7 +1246,7 @@ class Engine<T extends CalendarTypes, F extends CalendarFeatures> {
             const grab = this.keyGesture;
             this.keyGesture = undefined;
             grab.cancel();
-            this.notify({ gesture: true });
+            this.notify("gesture");
         }
     }
 
@@ -1312,7 +1373,7 @@ class Engine<T extends CalendarTypes, F extends CalendarFeatures> {
                 this.maxLanes = full <= fit ? null : Math.max(fit - 1, 0);
             }
         }
-        if (this.maxLanes !== before) this.notify({ layout: true });
+        if (this.maxLanes !== before) this.notify("layout");
     }
 
     // ---------------------------------------------------------------------------------------------
@@ -1340,6 +1401,8 @@ class Engine<T extends CalendarTypes, F extends CalendarFeatures> {
         this.midnightHost = host;
         this.midnight = host.setTimeout(() => {
             this.midnight = undefined;
+            // the refresh reads the host's zone again: a `"local"` display zone follows it
+            refreshHostTimeZone();
             this.dayPassed();
             this.scheduleMidnight();
         }, delay);
@@ -1347,13 +1410,18 @@ class Engine<T extends CalendarTypes, F extends CalendarFeatures> {
 
     private dayPassed(): void {
         const today = this.todayNow();
-        if (today === this.today) return;
-        this.today = today;
-        this.emit({
-            type: "today-change",
-            today: formatPlainDate(fromEpochDay(today)),
-        });
-        this.notify({ layout: true });
+        const zone = this.timeZone();
+        const moved = zone !== this.zone;
+        this.zone = zone;
+        if (today === this.today && !moved) return;
+        if (today !== this.today) {
+            this.today = today;
+            this.emit({
+                type: "today-change",
+                today: formatPlainDate(fromEpochDay(today)),
+            });
+        }
+        this.notify("layout");
     }
 
     // ---------------------------------------------------------------------------------------------
@@ -1465,13 +1533,17 @@ class Engine<T extends CalendarTypes, F extends CalendarFeatures> {
             this.capture(event.pointerId);
             if (!immediate) {
                 const host = this.host();
-                press.longPress = host?.setTimeout(() => {
-                    press.longPress = undefined;
-                    if (this.press === press && press.gesture) {
-                        press.held = true;
-                        this.activate(press);
-                    }
-                }, this.options.longPressDelay ?? 500);
+                press.longPress = host?.setTimeout(
+                    () =>
+                        this.batched(() => {
+                            press.longPress = undefined;
+                            if (this.press === press && press.gesture) {
+                                press.held = true;
+                                this.activate(press);
+                            }
+                        }),
+                    this.options.longPressDelay ?? 500,
+                );
             } else if ((gesture.threshold ?? this.dragThreshold()) === 0) {
                 this.activate(press);
             }
@@ -1490,7 +1562,7 @@ class Engine<T extends CalendarTypes, F extends CalendarFeatures> {
         press.activated = true;
         this.geometry = undefined;
         press.gesture?.move(press.last);
-        this.notify({ gesture: true });
+        this.notify("gesture");
     }
 
     private pointerMove(event: PointerEvent): void {
@@ -1554,7 +1626,7 @@ class Engine<T extends CalendarTypes, F extends CalendarFeatures> {
             else gesture.cancel();
         }
         this.geometry = undefined;
-        if (gesture) this.notify({ gesture: true });
+        if (gesture) this.notify("gesture");
         if (press.travel <= TAP_TOLERANCE && !active && !press.held) {
             this.tap(event, press.target);
         }
@@ -1651,7 +1723,7 @@ class Engine<T extends CalendarTypes, F extends CalendarFeatures> {
         this.release(press.pointerId);
         press.gesture?.cancel();
         this.geometry = undefined;
-        if (press.gesture) this.notify({ gesture: true });
+        if (press.gesture) this.notify("gesture");
     }
 
     // ---------------------------------------------------------------------------------------------
@@ -1694,20 +1766,25 @@ class Engine<T extends CalendarTypes, F extends CalendarFeatures> {
         if (this.scrollFrame || this.scrollStep() === 0) return;
         const host = this.host();
         if (!host) return;
-        const id = host.requestAnimationFrame(() => {
-            this.scrollFrame = undefined;
-            const step = this.scrollStep();
-            const scroller = this.scroller();
-            const press = this.press;
-            if (step === 0 || !scroller || !press) return;
-            const before = scroller.scrollTop;
-            scroller.scrollTop = before + step;
-            if (scroller.scrollTop === before) return;
-            this.geometry = undefined;
-            press.gesture?.move(press.last);
-            this.autoScroll();
-        });
+        const id = host.requestAnimationFrame(() =>
+            this.batched(() => this.scrollFrameRan()),
+        );
         this.scrollFrame = { host, id };
+    }
+
+    /** An autoscroll frame: the scroller moves a step and the gesture follows the pointer. */
+    private scrollFrameRan(): void {
+        this.scrollFrame = undefined;
+        const step = this.scrollStep();
+        const scroller = this.scroller();
+        const press = this.press;
+        if (step === 0 || !scroller || !press) return;
+        const before = scroller.scrollTop;
+        scroller.scrollTop = before + step;
+        if (scroller.scrollTop === before) return;
+        this.geometry = undefined;
+        press.gesture?.move(press.last);
+        this.autoScroll();
     }
 
     private stopAutoScroll(): void {
@@ -1726,21 +1803,19 @@ class Engine<T extends CalendarTypes, F extends CalendarFeatures> {
         payload: Readonly<Record<string, unknown>>,
         options: PartAttributeOptions | undefined,
     ): PartAttributes {
-        return attributesOf(
-            this.erased(),
-            part,
-            payload,
-            {
-                // as the elements are registered: a multi-day segment is focused from any of its days
-                tabStop: () => {
-                    const stop = this.tabStop();
-                    return stop && this.shownAt(stop);
-                },
-                focused: this.focusPosition && this.shownAt(this.focusPosition),
+        return this.attributeCache.read(part, payload, options);
+    }
+
+    /** The focus as the attributes read it (`attributeCache`). */
+    private focusView() {
+        return {
+            // as the elements are registered: a multi-day segment is focused from any of its days
+            tabStop: () => {
+                const stop = this.tabStop();
+                return stop && this.shownAt(stop);
             },
-            this.parts,
-            options,
-        );
+            focused: this.focusPosition && this.shownAt(this.focusPosition),
+        };
     }
 
     // ---------------------------------------------------------------------------------------------
@@ -1782,6 +1857,7 @@ class Engine<T extends CalendarTypes, F extends CalendarFeatures> {
                 };
             },
             getSnapshot: () => this.snapshot,
+            affects,
         };
     }
 
@@ -1823,10 +1899,14 @@ class Engine<T extends CalendarTypes, F extends CalendarFeatures> {
             setTimeout: (callback, ms) => {
                 const host = this.host();
                 if (!host) return undefined;
-                const id = host.setTimeout(() => {
-                    this.timerHosts.delete(id);
-                    callback();
-                }, ms);
+                const id = host.setTimeout(
+                    () =>
+                        this.batched(() => {
+                            this.timerHosts.delete(id);
+                            callback();
+                        }),
+                    ms,
+                );
                 this.timerHosts.set(id, host);
                 return id;
             },
@@ -1836,7 +1916,10 @@ class Engine<T extends CalendarTypes, F extends CalendarFeatures> {
                 this.timerHosts.get(id)?.clearTimeout(id);
                 this.timerHosts.delete(id);
             },
-            changed: () => this.notify({ gesture: true }),
+            changed: (...scopes) =>
+                scopes.length === 0
+                    ? this.notify("gesture", "preview", "selection")
+                    : this.notify(...scopes),
             emit: (event) => this.emit(event),
         };
     }

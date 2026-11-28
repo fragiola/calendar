@@ -227,10 +227,21 @@ injects its own timers.
 | `attachRoot` | attaches the root element: the engine listens to its pointers, keys, focus and native drags |
 | `detachRoot` | detaches it, cancelling a gesture under way |
 | `register` | `register(part, payload, element)` registers (or, with `null`, unregisters) a part's element: measured, hit-tested, focused |
-| `attributes` | `attributes(part, payload, options?)`: a part's `PartAttributes`: `data-calendar-part`, the model's, the engine's and the features'; `options` (`PartAttributeOptions`) say how the app renders the parts: `weekNumberColumn`, a month's rows render a week number |
+| `attributes` | `attributes(part, payload, options?)`: a part's `PartAttributes`: `data-calendar-part`, the model's, the engine's and the features'; `options` (`PartAttributeOptions`) say how the app renders the parts: `weekNumberColumn`, a month's rows render a week number. Memoised per part: the same object while the part's attributes are the same, so compare by identity |
 | `committed` | the adapter committed a render: the engine measures and gives focus to an element it waited for |
-| `subscribe` | calls a listener with a `ViewChange` (`focus`, `gesture`, `layout`) when the view changes; returns its remover |
+| `subscribe` | calls a listener with a `ViewChange` when the view changes, once per input event (a pointer move, a key); returns its remover |
 | `getSnapshot` | a number that changes whenever the view changes |
+| `affects` | `affects(change, part)`: whether a `ViewChange` may change what a part shows (its attributes, or a decoration's preview), so a part re-reads only then |
+
+A `ViewChange` names its scopes (`ViewScope`), each a boolean:
+
+| scope | what it may change |
+| --- | --- |
+| `focus` | the focusable parts' `tabindex` and `data-focused` (`day`, `slot`, `event`), `get("focused")`, `get("tab-stop")` |
+| `gesture` | a gesture started or ended: the features' state on any part (`data-dragging`, `data-grabbed`, `data-resizing`), the `is` keys of gestures, the previews |
+| `preview` | a gesture's preview moved (`get("drag-preview")`, `get("resize-preview")`): no part's attributes, only the `drag-preview` decoration |
+| `selection` | the selection a press is making: the date cells' `data-selected`, `get("selection-preview")`, `get("selection-segments")` and the `selection` decoration |
+| `layout` | a measurement (`dayMaxEvents: "auto"`), the clock ("today", `get("now-position")`) or the host's zone: every part |
 
 `PartName` names a registered part and `PartPayloadMap` its payload (`{ date }` for a day,
 `{ occurrenceId, date }` for an event). Before an engine exists (a server render, the first

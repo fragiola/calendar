@@ -11,6 +11,7 @@ import type {
     RunOptions,
 } from "../commands/types";
 import type { CalendarSettings } from "../document/calendar-settings";
+import type { ViewScope } from "../engine/adapter";
 import type { CalendarEngineEvent } from "../engine/events";
 import type {
     CellPosition,
@@ -144,8 +145,12 @@ export interface FeatureEngineHost {
     /** a timer of the engine's host (`undefined` without one: no root attached, none injected) */
     setTimeout: (callback: () => void, ms: number) => number | undefined;
     clearTimeout: (id: number | undefined) => void;
-    /** the view changed (a preview, a gesture's state): adapters re-render */
-    changed(): void;
+    /**
+     * the view changed: adapters re-render what the scopes reach (`preview`: only a preview moved,
+     * no part's attributes; `selection`: the date cells' `data-selected`; `gesture`: any part's
+     * state). Without a scope, every gesture scope (`gesture`, `preview`, `selection`)
+     */
+    changed(...scopes: ViewScope[]): void;
     /** tells the app something happened (`engine.subscribe`) */
     emit(event: CalendarEngineEvent): void;
 }

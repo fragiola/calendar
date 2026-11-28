@@ -79,13 +79,44 @@ export interface PartPayloadMap {
 /** A part's name. */
 export type PartName = keyof PartPayloadMap;
 
-/** What changed in the view, for an adapter to re-render only what depends on it. */
+/**
+ * A view change's scope: what it may change (Issue #24). A change names every scope it touches;
+ * `engine.adapter.affects(change, part)` says whether a part's attributes may have changed.
+ */
+export type ViewScope =
+    | "layout"
+    | "focus"
+    | "gesture"
+    | "preview"
+    | "selection";
+
+/** What changed in the view, by scope, for an adapter to re-render only what depends on it. */
 export interface ViewChange {
-    /** the roving focus moved (tab stops, `data-focused`) */
+    /**
+     * the roving focus moved: the focusable parts' `tabindex` and `data-focused` (`day`, `slot`,
+     * `event`), `get("focused")`, `get("tab-stop")`
+     */
     readonly focus: boolean;
-    /** a gesture's state changed (previews, `data-dragging`, `data-grabbed`, a selection's) */
+    /**
+     * a gesture started or ended: the features' state on any part (`data-dragging`,
+     * `data-grabbed`, `data-resizing`), `is("gesture-active")`, `is("event-dragging")`, …, and the
+     * previews
+     */
     readonly gesture: boolean;
-    /** a measurement changed what the layout shows (`dayMaxEvents: "auto"`), or the clock moved */
+    /**
+     * a gesture's preview moved (`get("drag-preview")`, `get("resize-preview")`): no part's
+     * attributes change, only the preview's parts
+     */
+    readonly preview: boolean;
+    /**
+     * the selection a press is making changed: the date cells' `data-selected` (`day`, `slot`)
+     * and `get("selection-preview")`, `get("selection-segments")`
+     */
+    readonly selection: boolean;
+    /**
+     * a measurement changed what the layout shows (`dayMaxEvents: "auto"`: `get("day-grid")`), the
+     * clock moved ("today", `get("now-position")`) or the host's zone changed: every part
+     */
     readonly layout: boolean;
 }
 
@@ -114,7 +145,10 @@ export interface CalendarEngineAdapter {
      * `time-event` or `list-event`), the model's (`data-date`, `data-today`, …), the engine's
      * (`role`, `tabindex`, `data-focused`) and the features' (`data-selected`, `data-dragging`,
      * `data-grabbed`, `data-resizing`); before an engine exists, `partAttributes` gives the same.
-     * `options` say how the app renders the parts (`weekNumberColumn`: a month's week numbers)
+     * `options` say how the app renders the parts (`weekNumberColumn`: a month's week numbers).
+     * Memoised per part: the same record (by identity) while the part's attributes are the same,
+     * read again only when what it reads changed (the model's state, today, the focus, the
+     * features' gesture state)
      */
     attributes<P extends PartName>(
         part: P,
@@ -126,8 +160,19 @@ export interface CalendarEngineAdapter {
      * to an element it was waiting for (an event moved by the keyboard)
      */
     committed(): void;
-    /** calls `listener` when the view changes (not the model: adapters subscribe to it); returns its remover */
+    /**
+     * calls `listener` when the view changes (not the model: adapters subscribe to it), once per
+     * input event (a pointer move, a key) with every scope it touched; returns its remover
+     */
     subscribe(listener: (change: ViewChange) => void): () => void;
     /** a number that changes whenever the view changes */
     getSnapshot(): number;
+    /**
+     * whether a view change may change what a part shows: its attributes (`attributes` gives the
+     * same record, by identity, while they are the same) or, for a decoration, its preview.
+     * `layout` and `gesture` reach every part, `focus` the focusable ones (`day`, `slot`,
+     * `event`), `selection` the date cells and the `selection` decoration, `preview` only the
+     * `drag-preview` decoration
+     */
+    affects(change: ViewChange, part: PartName): boolean;
 }

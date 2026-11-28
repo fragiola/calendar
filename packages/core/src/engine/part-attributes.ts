@@ -135,45 +135,57 @@ function monthColumnIndex(
     return undefined;
 }
 
-/** The ARIA a date cell's `data-*` state says (`day`, `slot`), once the features wrote theirs. */
+/** The ARIA a date cell's day state says (`day`, `slot`): `aria-current`, `aria-disabled`. */
 function cellStates(
     model: CalendarModel,
     part: PartName,
     date: string | undefined,
+    head: MutablePartAttributes,
     into: MutablePartAttributes,
-    options: PartAttributeOptions,
 ): void {
     if (part === "day") {
-        if (into["data-today"] === "") into["aria-current"] = "date";
-        if (into["data-disabled"] === "") into["aria-disabled"] = "true";
+        if (head["data-today"] === "") into["aria-current"] = "date";
+        if (head["data-disabled"] === "") into["aria-disabled"] = "true";
     } else if (date !== undefined) {
         // a slot holds no day state of its own: its day's says whether it is outside the range
         const day = model.get("day-attributes-by", { date });
         if (day?.["data-disabled"] === "") into["aria-disabled"] = "true";
     }
-    if (selectable(model)) {
-        into["aria-selected"] = into["data-selected"] === "" ? "true" : "false";
-    }
-    const column =
-        part === "day" && numberedMonth(model, options)
-            ? monthColumnIndex(model, date)
-            : columnIndex(model, date);
-    if (column !== undefined) into["aria-colindex"] = column;
 }
 
-/** A part's attributes with a focus and the features' engine parts (the engine's). */
-export function attributesOf(
+/**
+ * A part's attributes from the model alone, in layers: `head` (the part, the model's `data-*`, the
+ * role), then the focus's (`tabindex`, `data-focused`, on a `focusable` part) and the features'
+ * state (`data-selected`, `data-dragging`) come, then a date cell's ARIA (`states`,
+ * `aria-selected` when `selectable`, `aria-colindex`).
+ */
+export interface BaseAttributes {
+    readonly head: PartAttributes;
+    /** a date cell's `aria-current` and `aria-disabled` */
+    readonly states: PartAttributes;
+    /** `aria-colindex` */
+    readonly column: string | undefined;
+    /** the part holds the grid's roving tab stop (a day, a slot, an event outside a list) */
+    readonly focusable: boolean;
+    /** a date cell with `selection()` installed: `aria-selected` from `data-selected` */
+    readonly selectable: boolean;
+}
+
+/** What {@link baseAttributes} gives a part that is no date cell. */
+const NO_STATES: PartAttributes = Object.freeze({});
+
+/** A part's attributes from the model alone (no focus, no features' engine state). */
+export function baseAttributes(
     model: CalendarModel,
     part: PartName,
     payload: Readonly<Record<string, unknown>>,
-    focus: FocusView,
-    features: readonly FeatureEngine[],
     options: PartAttributeOptions = {},
-): PartAttributes {
+): BaseAttributes {
     const into: MutablePartAttributes = { "data-calendar-part": part };
     const date = typeof payload.date === "string" ? payload.date : undefined;
     const dayAttributes = () =>
         date === undefined ? {} : model.get("day-attributes-by", { date });
+    let focusable = false;
     switch (part) {
         case "root":
             Object.assign(into, model.get("root-attributes"));
@@ -212,7 +224,7 @@ export function attributesOf(
                       }),
             );
             into.role = "gridcell";
-            focusAttributes(model, part, payload, focus, into);
+            focusable = true;
             break;
         case "week-number":
             into.role = "rowheader";
@@ -270,7 +282,7 @@ export function attributesOf(
             into["data-calendar-part"] = eventPart(model, occurrenceId);
             into.role = "listitem";
             if (model.state.view.type === "list") into.tabindex = "0";
-            else focusAttributes(model, part, payload, focus, into);
+            else focusable = true;
             break;
         }
         case "resize-handle":
@@ -324,13 +336,87 @@ export function attributesOf(
         default:
             break;
     }
+    if (part !== "day" && part !== "slot") {
+        return {
+            head: into,
+            states: NO_STATES,
+            column: undefined,
+            focusable,
+            selectable: false,
+        };
+    }
+    const states: MutablePartAttributes = {};
+    cellStates(model, part, date, into, states);
+    return {
+        head: into,
+        states,
+        column:
+            part === "day" && numberedMonth(model, options)
+                ? monthColumnIndex(model, date)
+                : columnIndex(model, date),
+        focusable,
+        selectable: selectable(model),
+    };
+}
+
+/** The focus's attributes of a focusable part: `tabindex` and `data-focused`. */
+export function focusAttributesOf(
+    model: CalendarModel,
+    part: PartName,
+    payload: Readonly<Record<string, unknown>>,
+    focus: FocusView,
+): PartAttributes {
+    const into: MutablePartAttributes = {};
+    focusAttributes(model, part, payload, focus, into);
+    return into;
+}
+
+/**
+ * A part's attributes from its layers: the model's, the focus's (`undefined`: not focusable) and
+ * the features' engine state, written in the order the features expect.
+ */
+export function composeAttributes(
+    base: BaseAttributes,
+    focus: PartAttributes | undefined,
+    part: PartName,
+    payload: Readonly<Record<string, unknown>>,
+    features: readonly FeatureEngine[],
+): PartAttributes {
+    const into: MutablePartAttributes = { ...base.head };
+    if (focus) Object.assign(into, focus);
     for (const feature of features) {
         feature.attributes?.(part, payload, into);
     }
     if (part === "day" || part === "slot") {
-        cellStates(model, part, date, into, options);
+        Object.assign(into, base.states);
+        if (base.selectable) {
+            into["aria-selected"] =
+                into["data-selected"] === "" ? "true" : "false";
+        }
+        if (base.column !== undefined) into["aria-colindex"] = base.column;
     }
     return into;
+}
+
+/** A part's attributes with a focus and the features' engine parts (the engine's). */
+export function attributesOf(
+    model: CalendarModel,
+    part: PartName,
+    payload: Readonly<Record<string, unknown>>,
+    focus: FocusView,
+    features: readonly FeatureEngine[],
+    options: PartAttributeOptions = {},
+): PartAttributes {
+    const base = baseAttributes(model, part, payload, options);
+    return composeAttributes(
+        base,
+        base.focusable
+            ? focusAttributesOf(model, part, payload, focus)
+            : undefined,
+        part,
+        payload,
+        features,
+    );
 }
 
 /**
