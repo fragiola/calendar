@@ -22,7 +22,8 @@ const CI = Boolean(process.env.CI);
  * The zone, the locale and the clock are fixed: the browser runs in America/New_York
  * (`timezoneId`, the zone of the examples' DST week), the build and the server too (`TZ`), and
  * every spec opens an example on a fixed clock (helpers.ts, `fixClock`). Chromium runs every spec;
- * a phone's emulation runs the `*.touch.spec.ts` ones (a long press starts a drag).
+ * a phone's emulation runs the `*.touch.spec.ts` ones (a long press starts a drag); `perf.spec.ts`
+ * (the timing budgets, on a throttled CPU) runs in Chromium after both, one test at a time.
  */
 export function examplesE2eConfig(framework: Framework): PlaywrightTestConfig {
     // read by the specs (helpers.ts) in the runner and in every worker, which load this config too
@@ -51,12 +52,20 @@ export function examplesE2eConfig(framework: Framework): PlaywrightTestConfig {
             {
                 name: "chromium",
                 use: { ...devices["Desktop Chrome"] },
-                testIgnore: /\.touch\.spec\.ts$/,
+                testIgnore: [/\.touch\.spec\.ts$/, /perf\.spec\.ts$/],
             },
             {
                 name: "mobile",
                 use: { ...devices["Pixel 7"] },
                 testMatch: /\.touch\.spec\.ts$/,
+            },
+            // the timing budgets (perf.spec.ts) run alone, once every other spec is done: no
+            // other worker competes for the CPU they measure
+            {
+                name: "perf",
+                use: { ...devices["Desktop Chrome"] },
+                testMatch: /perf\.spec\.ts$/,
+                dependencies: ["chromium", "mobile"],
             },
         ],
         webServer: {
