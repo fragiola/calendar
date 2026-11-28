@@ -16,19 +16,35 @@ const cells = (container: HTMLElement) =>
         ),
     ] as HTMLElement[];
 
-function week(onSelect?: (event: unknown) => void) {
+function week(
+    onSelect?: (event: unknown) => void,
+    onAnnounce?: (event: unknown) => void,
+) {
     const model = modelOf([allDay("a", "2026-11-26", "2026-11-27")], {
         view: { type: "week", anchorDate: "2026-11-26" },
         features: [selection()],
     });
     const view = render(
-        <Calendar.Root model={model} onSelect={onSelect}>
+        <Calendar.Root
+            model={model}
+            onSelect={onSelect}
+            onAnnounce={onAnnounce}
+        >
             <Toolbar />
             <TimeGridView />
         </Calendar.Root>,
     );
     return { model, ...view };
 }
+
+const ANNOUNCEMENT = {
+    type: "announce",
+    announcement: {
+        kind: "range",
+        range: { start: "2026-11-29", end: "2026-12-06" },
+        focused: { kind: "slot", date: "2026-12-03", time: "00:00" },
+    },
+};
 
 describe("Next in a time grid", () => {
     it("keeps the cells' elements, each with its new date", () => {
@@ -74,6 +90,30 @@ describe("Next in a time grid", () => {
         key("ArrowLeft");
         expect(focused()).toBe("slot 2026-11-26 00:00");
         expect(container.querySelectorAll('[tabindex="0"]')).toHaveLength(1);
+    });
+
+    it("announces the range PageDown shows, the focus kept on the same element", () => {
+        const onAnnounce = vi.fn();
+        const { container } = week(undefined, onAnnounce);
+        act(() => {
+            fireEvent.click(
+                container.querySelector(
+                    '[data-calendar-part="next"]',
+                ) as Element,
+            );
+            fireEvent.click(
+                container.querySelector(
+                    '[data-calendar-part="previous"]',
+                ) as Element,
+            );
+        });
+        // the toolbar's buttons are the app's: no announcement
+        expect(onAnnounce).not.toHaveBeenCalled();
+        const cell = container.querySelector('[tabindex="0"]') as HTMLElement;
+        act(() => cell.focus());
+        key("PageDown");
+        expect(document.activeElement).toBe(cell);
+        expect(onAnnounce).toHaveBeenCalledExactlyOnceWith(ANNOUNCEMENT);
     });
 
     it("selects from a reused slot at its new date", () => {

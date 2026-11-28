@@ -17,14 +17,17 @@ const cells = (container: Element) => [
     ),
 ];
 
-async function week(onSelect?: (event: unknown) => void) {
+async function week(
+    onSelect?: (event: unknown) => void,
+    onAnnounce?: (event: unknown) => void,
+) {
     const model = modelOf([allDay("a", "2026-11-26", "2026-11-27")], {
         view: { type: "week", anchorDate: "2026-11-26" },
         features: [selection()],
     });
     const wrapper = mount(
         () =>
-            h(Calendar.Root, { model, onSelect }, () => [
+            h(Calendar.Root, { model, onSelect, onAnnounce }, () => [
                 h(Toolbar),
                 h(TimeGridView),
             ]),
@@ -40,6 +43,15 @@ async function next(container: Element) {
     );
     await flush();
 }
+
+const ANNOUNCEMENT = {
+    type: "announce",
+    announcement: {
+        kind: "range",
+        range: { start: "2026-11-29", end: "2026-12-06" },
+        focused: { kind: "slot", date: "2026-12-03", time: "00:00" },
+    },
+};
 
 describe("Next in a time grid", () => {
     it("keeps the cells' elements, each with its new date", async () => {
@@ -63,6 +75,25 @@ describe("Next in a time grid", () => {
         const stops = container.querySelectorAll('[tabindex="0"]');
         expect(stops).toHaveLength(1);
         expect(stops[0]?.getAttribute("data-date")).toBe("2026-11-29");
+    });
+
+    it("announces the range PageDown shows (`@announce`), the focus kept on the same element", async () => {
+        const onAnnounce = vi.fn();
+        const container = await week(undefined, onAnnounce);
+        await next(container);
+        fireEvent.click(
+            container.querySelector(
+                '[data-calendar-part="previous"]',
+            ) as Element,
+        );
+        await flush();
+        // the toolbar's buttons are the app's: no announcement
+        expect(onAnnounce).not.toHaveBeenCalled();
+        const cell = container.querySelector('[tabindex="0"]') as HTMLElement;
+        cell.focus();
+        await key("PageDown");
+        expect(document.activeElement).toBe(cell);
+        expect(onAnnounce).toHaveBeenCalledExactlyOnceWith(ANNOUNCEMENT);
     });
 
     it("moves the keyboard focus over the reused cells", async () => {
