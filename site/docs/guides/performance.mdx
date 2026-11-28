@@ -31,6 +31,10 @@ changed, with the new date. State of your own in a cell's component stays with i
 start it over with each date, key your element by the date (`key={date}`, `:key="date"`, in
 Angular `@for (one of [date]; track one)`).
 
+A reused cell keeps DOM focus too: PageDown in a time grid moves no focus, so no `focus` event
+tells a screen reader that the date changed. The engine's `announce` event (`kind: "range"`) does;
+render it in a polite live region ([Keyboard](/docs/guides/keyboard#announcing-in-a-live-region)).
+
 ## When a children function is called again
 
 <Framework name="react">

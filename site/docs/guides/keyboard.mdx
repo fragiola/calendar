@@ -24,7 +24,10 @@ again leaves the grid.
 | PageUp / PageDown | the previous / next month | the previous / next range (`view.previous`, `view.next`), same column |
 | Shift + PageUp / PageDown | the previous / next year | the previous / next week |
 
-A move past the dates shown navigates there (`view.go-to`). Keys with Ctrl, Alt or Meta stay the
+A move past the dates shown navigates there (`view.go-to`). The cells are keyed by their position,
+so PageUp and PageDown often keep DOM focus on the same element, with a new date: no `focus` event
+tells a screen reader. The engine announces each range a key shows instead (`range`, below): feed it
+to your live region, as the date picker does. Keys with Ctrl, Alt or Meta stay the
 browser's. Letters are not bound. A press on a day or a slot moves the roving focus to it too.
 
 ## Into a day's events
@@ -70,9 +73,12 @@ Escape drops it. See [Selecting ranges](/docs/guides/selecting-ranges).
 
 ## Announcing in a live region
 
-The engine announces each step of a keyboard gesture as data (`onAnnounce`, `@announce`): a grab, a target
-(`drag-over`, with the preview's times or `null` when refused), a drop, a cancel, a selection
-being extended. You word it, in your language, in a live region you render:
+The engine announces each step of a keyboard gesture as data (`onAnnounce`, `@announce`,
+`(announce)`): a grab, a target (`drag-over`, with the preview's times or `null` when refused), a
+drop, a cancel, a selection being extended, and a range a key showed (`range`: PageUp, PageDown,
+Shift with them, or an arrow past the grid, with the view's `current-range` and the `focused` cell).
+A toolbar's buttons are yours and announce nothing: their names say where they go. You word it, in
+your language, in a polite live region you render (`role="status"`):
 
 <Framework name="react">
 
@@ -101,6 +107,8 @@ function words(announcement: Announcement): string {
             return "Left where it was.";
         case "select-extend":
             return announcement.range ? "Range selected." : "Not selectable.";
+        case "range":
+            return `${announcement.range.start} to ${announcement.range.end}, on ${announcement.focused.date}.`;
     }
 }
 
@@ -157,6 +165,8 @@ function words(announcement: Announcement): string {
             return "Left where it was.";
         case "select-extend":
             return announcement.range ? "Range selected." : "Not selectable.";
+        case "range":
+            return `${announcement.range.start} to ${announcement.range.end}, on ${announcement.focused.date}.`;
     }
 }
 
@@ -208,6 +218,8 @@ function words(announcement: Announcement): string {
             return "Left where it was.";
         case "select-extend":
             return announcement.range ? "Range selected." : "Not selectable.";
+        case "range":
+            return `${announcement.range.start} to ${announcement.range.end}, on ${announcement.focused.date}.`;
     }
 }
 
@@ -234,7 +246,7 @@ export class KeyboardWeek {
 </Framework>
 
 The example's `announce.ts` words each announcement with the event's title and its new times
-from `Intl`. A live region renders again on every key: keep the grid's per-row calls stable so
+from `Intl`, and a range with its days and the focused slot (`range.end` is exclusive). A live region renders again on every key: keep the grid's per-row calls stable so
 the rows do not render again too (in React, children functions declared outside the component; in
 Vue, slots that read only their scope, which Vue compiles stable; in Angular, the templates, which
 render again only for the layout objects that changed; see

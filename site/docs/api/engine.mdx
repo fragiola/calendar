@@ -182,8 +182,11 @@ Angular, an output of the root (`(eventClick)`), a feature's of its directive on
 | `"announce"` | `onAnnounce` | `announcement`: an `Announcement` your live region words |
 
 An `Announcement` is data, never text: its `kind` is `"grab"`, `"drag-over"`, `"drop"`,
-`"drag-cancel"` or `"select-extend"`, with the occurrence and the times or range
-([Keyboard](/docs/guides/keyboard)).
+`"drag-cancel"` or `"select-extend"`, with the occurrence and the times or range, or `"range"`
+when a key showed another range (PageUp, PageDown, Shift with them, an arrow past the grid):
+`range` (the view's `current-range`, `end` exclusive) and `focused` (the cell, a day or a slot),
+since the focused element may be the one reused for the new date and no `focus` event says it
+([Keyboard](/docs/guides/keyboard)). Navigation by your own controls announces nothing.
 
 ```ts
 import type { Announcement } from "@fragiola/calendar";

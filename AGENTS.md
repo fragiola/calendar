@@ -747,7 +747,26 @@ drag and ranges; RFC 5545 for recurrence; FullCalendar's documented default for 
   `requestAnimationFrame` and `setTimeout`, kept by the probe before the fixed clock replaces
   them (the fixed clock runs frame callbacks on a 16 ms grid and makes `Date.now` a script);
   budget 50 ms, 100 ms in CI. Reusing the focused cell's element means PageDown in a time grid
-  moves no DOM focus (the same element, a new date): no `focus` event for a screen reader.
+  moves no DOM focus (the same element, a new date): no `focus` event for a screen reader; the
+  next decision announces it.
+- **Epic #27, a range a key showed is announced (D12, D13, D19).** The date picker's way: a key
+  that shows another range (PageUp/PageDown, Shift with them, an arrow past the grid,
+  whichever cell keeps focus) emits `announce` with `{ kind: "range", range, focused }`: `range`
+  the model's `current-range` after it (`DateRangeJson`, `end` exclusive: a month view's month, a
+  time grid's days), `focused` the `CellPosition` now focused (an event's cell when the tab stop
+  fallback lands on one). Emitted after the focus moves, only when `current-range` changed (a
+  refused step, `validRange`, says nothing); navigation that is not a grid key (the toolbar's
+  buttons, `view.*` commands, the `focus` action) announces nothing: the app's controls carry their
+  own names, and an app that wants those announced words them itself. Data only, like the drags'
+  announcements; the adapters already pass every `announce` (`onAnnounce`, `@announce`,
+  `(announce)`). The core's harness gains `positionKeys` (cells keyed by position, as the
+  adapters) for the test of the reused focus target; `tests/next-range.test.*` per adapter check
+  the event on the same element and none for Next/Previous; the `keyboard` example's
+  `announce.ts` words it (the days, a whole month as its month, and the focused slot) and
+  `keyboard.spec.ts` checks the `status` region after PageDown and PageUp in every framework
+  (`team-planner` has no live region). The guidelines' `event-calendar-a11y` row is proposed the
+  rule in the PR notes (not edited here): reused cells keep focus, so a range change by a key is an announcement the
+  app feeds into a polite live region.
 
 - **Issue #12, the Vue examples.** `examples/vue` (`examples-vue`) follows Tree's Vue app: every
   example id as `src/examples/<id>/index.vue` with sibling SFCs (one per React component,
