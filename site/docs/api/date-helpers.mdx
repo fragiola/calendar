@@ -93,7 +93,7 @@ formatPlainDate(addDays(thursday, 7)); // "2026-12-03"
 | `addDaysInZone(at, days, zone)` | whole days on the zone's wall clock: 09:00 stays 09:00 across DST |
 | `formatInstant(at, zone)` | an instant as RFC 3339 with the zone's offset at it |
 | `timedDayRange(start, end, nextDayThreshold?)` | the days a timed occurrence covers, from its wall clocks |
-| `resolveTimeZone(zone)` | a zone setting as an IANA name: `LOCAL_TIME_ZONE` (`"local"`) is the host's |
+| `resolveTimeZone(zone)` | a zone setting as an IANA name: `LOCAL_TIME_ZONE` (`"local"`) is the host's, read once and again at each engine's midnight refresh |
 | `validateTimeZone(value)` | an IANA name or `"local"`, or an issue |
 
 ## Locales and weeks

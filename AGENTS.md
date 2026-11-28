@@ -347,8 +347,9 @@ drag and ranges; RFC 5545 for recurrence; FullCalendar's documented default for 
   `drag-preview`, …), `attributes(part, payload)` (`data-calendar-part`, the model's attributes,
   the engine's `role`, `tabindex`, `data-focused`, the features' `data-selected`,
   `data-dragging`, `data-grabbed`, `data-resizing`), `committed()` (measure, pending focus),
-  `subscribe` / `getSnapshot` (view changes). The engine writes `tabIndex` on the roving elements
-  it focuses (Tree's) and `touch-action: none` on events while a drag feature is installed.
+  `subscribe` / `getSnapshot` (view changes; scoped since Issue #24, with `affects`). The engine
+  writes `tabIndex` on the roving elements it focuses (Tree's) and `touch-action: none` on events
+  while a drag feature is installed.
 - **Issue #5, roles.** Day grid: `grid` > `row` (week) > `gridcell` (day) > `list` (`day-events`) >
   `listitem` (events). (The time grid's first, column-major roles were replaced by Issue #7.)
 - **Issue #5, focus.** One tab stop: the focus position if shown, else today, else the current
@@ -618,6 +619,43 @@ drag and ranges; RFC 5545 for recurrence; FullCalendar's documented default for 
   and declares none. CI gains `push: branches: [main]` for the `Trigger www build` job only
   (Flow's shape: a `project-updated` `repository_dispatch` to `fragiola/www` with the
   `WWW_DISPATCH_TOKEN` secret, the step skipped without it); every other job skips a push.
+- **Issue #24, core performance (Epic #27).** Caching rules: no `Intl` object is built on a hot
+  path. Only five modules build one, each keeping what it builds
+  (`tests/perf/intl-constructions.test.ts` lists them and fails on a new one): `locale/date-time-format.ts`
+  (per locale, zone and options), `locale/week-info.ts` (per locale), `time-zone/time-zone-offset.ts`
+  (per zone), `time-zone/validate-time-zone.ts` (one answer per name), `time-zone/resolve-time-zone.ts`
+  (the host's zone, read once; `refreshHostTimeZone()` reads it again: at each engine's midnight
+  refresh, on the injected host's timer, and when an engine is created; a changed zone is a
+  `layout` notify, with `today-change` when the day changed). `todayOf` keeps each zone's day with
+  the instants it spans (exact, no minute rounding); `validateLocale` keeps each name's canonical
+  form; the model's layout memo is keyed by state, today and the resolved zone. The same test
+  allows at most 10 `Intl.DateTimeFormat` constructions for a drag of 30 previews and its drop
+  (26,690 before). Notify scopes: a `ViewChange` is `{ focus, gesture, preview, selection, layout }`
+  (`ViewScope`): `preview` a preview moved (no part's attributes), `selection` a selection in the
+  making (the date cells' `data-selected`), `gesture` a gesture started or ended (any part),
+  `focus` the focusable parts (`day`, `slot`, `event`), `layout` a measurement, the clock or the
+  host's zone (every part). A feature names its scope: `host.changed(...scopes)` (the drag session:
+  `begin`/`finish` `gesture`, `show` `preview`; selection `selection`; the now indicator `layout`);
+  no scope (an app's feature) is `gesture`, `preview` and `selection`. Each input event (every root
+  and document listener, the long press, the autoscroll frame, a feature's timer, an engine
+  action) is one batch, its scopes told once at its end: a drag's first move (activate, begin,
+  show) notifies once. For the adapters (Issue #25), `engine.adapter`: `attributes(part, payload,
+  options?)` is memoised per part (`engine/part-attribute-cache.ts`, three layers: the model's,
+  `baseAttributes`, read again when the state, today or the host's zone changed; the focus's, when
+  the tab stop or the focused position did; the features', written again on `gesture`,
+  `selection` or `layout`) and returns the same frozen record while the part's attributes are the
+  same (a commit keeps the records it did not change); `affects(change, part)` says whether a
+  change may change what a part shows (`engine/view-change.ts`: `layout` and `gesture` every part,
+  `focus` `day`/`slot`/`event`, `selection` `day`/`slot`/`selection`, `preview` `drag-preview`).
+  So an adapter subscribes once per root and, per part, re-reads only when `affects` says so and
+  re-renders only when the record is a new object; model commits still reach every part (the
+  record identity keeps the unchanged ones still). `tests/perf/attribute-recomputes.test.ts`
+  counts `baseAttributes` calls and new records: none on a preview move, the cells entered or
+  left on a selection move and a focus move. `pnpm bench` (Vitest 5's `bench` fixture,
+  `packages/core/bench/core.bench.ts`, the `core (TZ=UTC) (bench)` project; CI's Checks job runs
+  it) holds median budgets about twice a developer machine's: `model.get("time-grid")` and
+  `model.get("day-grid")` from a new state 0.2 ms, a 30-move drag in a busy week with an adapter
+  reading every part after each change 25 ms, a drop 12 ms.
 
 - **Issue #12, the Vue examples.** `examples/vue` (`examples-vue`) follows Tree's Vue app: every
   example id as `src/examples/<id>/index.vue` with sibling SFCs (one per React component,
@@ -718,6 +756,7 @@ drag and ranges; RFC 5545 for recurrence; FullCalendar's documented default for 
 | `pnpm check:fix` | Biome check with auto-fix |
 | `pnpm typecheck` | `pnpm -r typecheck` (TypeScript 7, no emit; `packages/vue`: `vue-tsc` on TypeScript 6.0.3, its `.vue` type fixtures included; `packages/angular`: `ngc` strict templates on TypeScript 6.0.3, its tests included; `examples/angular`: `ngc` strict templates on TypeScript 6.0.3, the adapter's sources included) |
 | `pnpm test` | Vitest projects: `core (TZ=UTC)` and `core (TZ=America/Sao_Paulo)` (the core's suite twice, host zone forced, same expectations; node, jsdom per file with a docblock), `react` (jsdom + Testing Library over a fake layout, `TZ=UTC`; a server render in node), `vue` (jsdom + `@vue/test-utils` over the same fake layout, templates compiled at runtime by Vue's full build; a server render in node), `playground` (its catalog and scenarios), `examples-shared` (metadata, themes, manifest, loaders), `examples-react` (copyable imports, styles, kit, themes), `angular` (jsdom + a zoneless TestBed with Analog's plugin over the same fake layout, `TZ=UTC`; a server render through `@angular/platform-server` in node), `examples-vue` (the same contract for the Vue examples, styles and kit equal to React's, the copied theme, the Vue kit in jsdom), `examples-angular` (the same contract for the Angular examples, styles equal to Vue's, kit and theme equal to React's, the Angular kit in a zoneless TestBed), `site` (the export's contract, the docs reference, frameworks, the dev proxy, and the repository's script tests) |
+| `pnpm bench` | the core's bench budgets (`packages/core/bench/`, Vitest's `bench` fixture, the `core (TZ=UTC) (bench)` project): fails when a median passes its budget (Issue #24) |
 | `pnpm build` | `pnpm -r build` (tsdown), then `scripts/check-dts.ts` (no `any` in the built declarations) and `scripts/check-features.ts` (the bundle guard) |
 | `pnpm size` | the bundle size of every entry point (raw, gzip, min + gzip): a report, after `pnpm build` |
 | `pnpm check:package` | builds the packages, packs them with pnpm, checks the packed `exports` are the repo's without the source condition (only `types`/`import`/`default`, targets in `dist`), runs `publint --strict` and `attw --profile esm-only` on the tarballs, fails on a package neither the core nor in `ADAPTERS`, and runs each adapter's pin check and smoke app (`scripts/check-package.ts`) |
@@ -740,7 +779,7 @@ manual run; a push to `main` runs no tests (main is what its PR tested), only th
 `repository_dispatch` of type `project-updated`, with the `WWW_DISPATCH_TOKEN` secret: a
 fine-grained token with Contents: read & write on `fragiola/www`; without it the step is skipped,
 not failed). Every other job is `if: github.event_name != 'push'` (Changesets: pull requests
-only), or needs one that is. Jobs: **Checks** (`pnpm check`, `typecheck`, `test`, `build`, `size`), **Package**
+only), or needs one that is. Jobs: **Checks** (`pnpm check`, `typecheck`, `test`, `bench`, `build`, `size`), **Package**
 (`pnpm check:package`), **Changesets** (`pnpm changeset status --since=origin/<base>`, skipped for
 `changeset-release/*`), **Changes** (`fetch-depth: 2`, `node scripts/e2e-suites.ts`, tested by
 `site/tests/e2e-suites.test.ts`): none for docs only (`site/docs/**`, `*.md`, `AGENTS.md`);
@@ -768,7 +807,8 @@ packages/angular/   @fragiola/calendar-angular  src/public-api.ts, src/lib/{dire
                                          tests/ by behaviour
 packages/core/      @fragiola/calendar   src/<domain>/ (schema, document, time, time-zone, locale, state, commands, model,
                                          view, layout, attributes, features, engine) and one folder per feature;
-                                         tests/ mirroring src/, tests/types/ (type fixtures), tests/guard.test.ts;
+                                         tests/ mirroring src/, tests/types/ (type fixtures), tests/guard.test.ts,
+                                         tests/perf/ (the Intl and recompute guards); bench/ (`pnpm bench`);
                                          scripts/generate-command-docs.ts
 site/               site                 export.ts, contract.ts, dev.ts, dev-proxy.ts, sources.ts, project.json,
                                          examples.json; docs/ (config.json, index.mdx, getting-started/,

@@ -235,6 +235,12 @@ A drag, a resize and a selection preview through engine view state (`engine.get(
 parts that show the preview (`DragPreview`, `Selection`) re-render. The model receives one
 command on the drop. Hit-testing reads boxes measured once per press.
 
+The engine tells the adapter what each change reaches (a `ViewChange`: `focus`, `gesture`,
+`preview`, `selection`, `layout`), once per pointer move or key, and keeps each part's attributes
+as the same object while they are the same: a preview moving reads no part again. The core builds
+no `Intl` formatter while the pointer moves: the host's zone (`timeZone: "local"`) is read once and
+again at the engine's midnight refresh, and every formatter, "today" and zone check is kept.
+
 ## Measured
 
 The playground's stress fixture holds 2 000 events with every feature installed, with stable row
