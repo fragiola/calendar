@@ -45,8 +45,10 @@ export function ColumnHeaders(props: ColumnHeadersProps) {
         ref: part.ref,
         props: {
             ...part.props,
-            children: dates.map((date) => (
-                <MemoCall key={date} render={render} args={[date]} />
+            // keyed by position: the next range's headers reuse these elements (Epic #27)
+            children: dates.map((date, index) => (
+                // biome-ignore lint/suspicious/noArrayIndexKey: a column is its position
+                <MemoCall key={index} render={render} args={[date]} />
             )),
         },
     });

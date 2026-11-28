@@ -30,9 +30,10 @@ export const Days: CalendarComponent<DaysProps, DaysSlots> = definePrimitive<
     const render = memoSlot(slots);
     return () => {
         const { week } = row.value;
-        return week.days.map((day) =>
+        // keyed by position: the next range's days reuse these elements (Epic #27)
+        return week.days.map((day, index) =>
             h(MemoCall, {
-                key: day.date,
+                key: index,
                 render: render(),
                 names: NAMES,
                 a: day,

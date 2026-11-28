@@ -29,8 +29,10 @@ export function Columns(props: ColumnsProps) {
         ref: part.ref,
         props: {
             ...part.props,
-            children: (grid?.columns ?? []).map((column) => (
-                <React.Fragment key={column.date}>
+            // keyed by position: the next range's columns reuse these elements (Epic #27)
+            children: (grid?.columns ?? []).map((column, index) => (
+                // biome-ignore lint/suspicious/noArrayIndexKey: a column is its position
+                <React.Fragment key={index}>
                     <MemoCall render={render} args={[column]} />
                 </React.Fragment>
             )),

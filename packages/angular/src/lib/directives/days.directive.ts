@@ -35,8 +35,9 @@ export class CalendarDaysDirective implements DoCheck {
     );
     private readonly views: SlotViews<DaysContext> = bindCollection(() => {
         const week = this.row.week();
-        return (week?.days ?? []).map((day) => ({
-            key: day.date,
+        // keyed by position: the next range's days reuse these views (Epic #27)
+        return (week?.days ?? []).map((day, index) => ({
+            key: String(index),
             context: { $implicit: day, day, week: week as DayGridWeek },
         }));
     });

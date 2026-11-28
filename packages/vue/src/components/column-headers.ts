@@ -66,10 +66,11 @@ export const ColumnHeaders: CalendarComponent<
                 state: { dates: dates.value },
                 props: part.props.value,
                 ref: part.ref,
+                // keyed by position: the next range's headers reuse these elements (Epic #27)
                 children: () =>
-                    dates.value.map((date) =>
+                    dates.value.map((date, index) =>
                         h(MemoCall, {
-                            key: date,
+                            key: index,
                             render: render(),
                             names: NAMES,
                             a: date,

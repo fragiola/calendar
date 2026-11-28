@@ -78,8 +78,9 @@ export class CalendarColumnHeadersItemDirective implements DoCheck {
     );
     private readonly views: SlotViews<ColumnHeadersItemContext> =
         bindCollection(() =>
-            this.headers.dates().map((date) => ({
-                key: date,
+            // keyed by position: the next range's headers reuse these views (Epic #27)
+            this.headers.dates().map((date, index) => ({
+                key: String(index),
                 context: { $implicit: date, date },
             })),
         );

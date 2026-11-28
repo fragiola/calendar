@@ -27,11 +27,12 @@ export const Slots: CalendarComponent<SlotsProps, SlotsSlots> = definePrimitive<
 >("Slots", [], (_props, { slots }) => {
     const grid = useTimeGrid();
     return () =>
-        (grid.value?.columns ?? []).map((column) => {
+        // keyed by position: the next range's slots reuse these elements (Epic #27)
+        (grid.value?.columns ?? []).map((column, index) => {
             const cell = slots.default?.({ column });
             return h(
                 Fragment,
-                { key: column.date },
+                { key: index },
                 Array.isArray(cell) ? cell : [cell],
             );
         });

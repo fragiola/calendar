@@ -38,7 +38,7 @@ export const MemoCall = React.memo(function MemoCall(props: MemoCallProps) {
 export function useEntityCalls<E>(
     render: (entity: E) => React.ReactNode,
     entities: readonly E[],
-    keyOf: (entity: E) => string,
+    keyOf: (entity: E, index: number) => string,
 ): React.ReactNode[] {
     const cache = React.useRef(
         new Map<
@@ -58,8 +58,8 @@ export function useEntityCalls<E>(
             node: React.ReactNode;
         }
     >();
-    const nodes = entities.map((entity) => {
-        const key = keyOf(entity);
+    const nodes = entities.map((entity, index) => {
+        const key = keyOf(entity, index);
         const previous = cache.current.get(key);
         const call =
             previous?.render === render && Object.is(previous.entity, entity)

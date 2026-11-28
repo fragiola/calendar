@@ -22,10 +22,11 @@ export function Slots(props: SlotsProps) {
         { part: "time-grid" },
     );
     // a slot row calls it per day: no component per call (a time grid has hundreds of slots)
-    const cells = useEntityCalls(render, grid?.columns ?? [], dateOf);
+    // keyed by position: the next range's slots reuse these elements (Epic #27)
+    const cells = useEntityCalls(render, grid?.columns ?? [], positionOf);
     return <>{cells}</>;
 }
 
-function dateOf(column: TimeGridColumn): string {
-    return column.date;
+function positionOf(_column: TimeGridColumn, index: number): string {
+    return String(index);
 }
