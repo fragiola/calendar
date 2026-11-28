@@ -26,8 +26,9 @@ export class CalendarSlotsDirective implements DoCheck {
 
     private readonly grid = injectTimeGrid();
     private readonly views: SlotViews<SlotsContext> = bindCollection(() =>
-        (this.grid()?.columns ?? []).map((column) => ({
-            key: column.date,
+        // keyed by position: the next range's slots reuse these views (Epic #27)
+        (this.grid()?.columns ?? []).map((column, index) => ({
+            key: String(index),
             context: { $implicit: column, column },
         })),
     );

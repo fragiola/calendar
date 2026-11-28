@@ -1,7 +1,6 @@
 import type { TimeGridColumn } from "@fragiola/calendar";
-import { h } from "vue";
+import { Fragment, h } from "vue";
 import { useTimeGrid } from "../composables/use-time-grid";
-import { MemoCall, memoSlot, type ScopeNames } from "../utils/memo-call";
 import {
     type CalendarComponent,
     definePrimitive,
@@ -15,25 +14,26 @@ export interface SlotsSlots {
     default?: SlotFunction<{ column: TimeGridColumn }>;
 }
 
-const NAMES: ScopeNames = ["column"];
-
 /**
  * The days of the enclosing `Calendar.SlotRow`: calls its slot per column, after a
- * `Calendar.SlotLabel` (it renders no element of its own).
+ * `Calendar.SlotLabel` (it renders no element of its own). The calls are this component's render,
+ * not a `MemoCall` each (a time grid has hundreds of slots, and a drop changes two columns): it
+ * renders again when the time grid or what its slot reads changes, and a `Calendar.Slot` whose
+ * props are the same is not rendered again.
  */
 export const Slots: CalendarComponent<SlotsProps, SlotsSlots> = definePrimitive<
     SlotsProps,
     SlotsSlots
 >("Slots", [], (_props, { slots }) => {
     const grid = useTimeGrid();
-    const render = memoSlot(slots);
     return () =>
-        (grid.value?.columns ?? []).map((column) =>
-            h(MemoCall, {
-                key: column.date,
-                render: render(),
-                names: NAMES,
-                a: column,
-            }),
-        );
+        // keyed by position: the next range's slots reuse these elements (Epic #27)
+        (grid.value?.columns ?? []).map((column, index) => {
+            const cell = slots.default?.({ column });
+            return h(
+                Fragment,
+                { key: index },
+                Array.isArray(cell) ? cell : [cell],
+            );
+        });
 });

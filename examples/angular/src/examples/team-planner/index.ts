@@ -1,16 +1,13 @@
 import {
     afterNextRender,
     Component,
-    DestroyRef,
     type ElementRef,
-    inject,
     signal,
     viewChild,
 } from "@angular/core";
 import {
     CALENDAR,
     createCalendarModel,
-    type EditScope,
     type SelectionRange,
 } from "@fragiola/calendar-angular";
 import { CalendarBusinessHoursDirective } from "@fragiola/calendar-angular/constraints";
@@ -23,18 +20,12 @@ import {
 } from "@fragiola/calendar-angular/selection";
 import { LucideRepeat } from "@lucide/angular";
 import { CALENDARS, day, type Types } from "../_kit/data";
-import { text, timesOf, titleOf } from "../_kit/format";
+import { dateTimeFormat, text, timesOf, titleOf } from "../_kit/format";
 import { CalendarToggle } from "./calendar-toggle";
 import { DayHeader } from "./day-header";
 import { EventEditor, type NewEvent } from "./event-editor";
 import { MiniMonth } from "./mini-month";
-import {
-    askForScope,
-    features,
-    type PendingEdit,
-    plannerEvents,
-    runWithScope,
-} from "./planner";
+import { features, plannerEvents } from "./planner";
 import { ScopeDialog } from "./scope-dialog";
 import * as styles from "./styles";
 import { Toolbar } from "./toolbar";
@@ -166,11 +157,7 @@ import { Toolbar } from "./toolbar";
                 (save)="save($event)"
                 (closed)="closeEditor()"
             />
-            <example-team-planner-scope-dialog
-                [open]="pending() !== null"
-                (pick)="pick($event)"
-                (cancel)="pending.set(null)"
-            />
+            <example-team-planner-scope-dialog />
         </div>
     `,
 })
@@ -198,15 +185,10 @@ export default class TeamPlanner {
         { features },
     );
     protected readonly range = signal<SelectionRange | null>(null);
-    protected readonly pending = signal<PendingEdit | null>(null);
     private readonly scroller =
         viewChild.required<ElementRef<HTMLElement>>("scroller");
 
     constructor() {
-        // an edit of a recurring event waits for its scope (planner.ts)
-        inject(DestroyRef).onDestroy(
-            this.model.use(askForScope((edit) => this.pending.set(edit))),
-        );
         afterNextRender(() => scrollToMorning(this.scroller().nativeElement));
     }
 
@@ -227,12 +209,6 @@ export default class TeamPlanner {
         this.closeEditor();
     }
 
-    protected pick(scope: EditScope) {
-        const pending = this.pending();
-        if (pending) runWithScope(this.model, pending, scope);
-        this.pending.set(null);
-    }
-
     /** A repeat mark on an occurrence of a series. */
     protected repeats(eventId: string): boolean {
         return this.model.is("event-recurring", { eventId });
@@ -242,7 +218,7 @@ export default class TeamPlanner {
     protected when(range: SelectionRange | null): string {
         if (!range) return "";
         if (range.allDay) return `All day from ${range.start}`;
-        return new Intl.DateTimeFormat(this.model.state.settings.locale, {
+        return dateTimeFormat(this.model.state.settings.locale, {
             weekday: "long",
             hour: "numeric",
             minute: "2-digit",

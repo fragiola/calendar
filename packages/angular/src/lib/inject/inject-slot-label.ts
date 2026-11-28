@@ -16,18 +16,22 @@ export function injectSlotLabel(
     format?: ValueOrSignal<FormatOptions | undefined>,
 ): Signal<readonly Intl.DateTimeFormatPart[]> {
     const context = injectCalendarContext("injectSlotLabel");
-    return calendarValue(context, () => {
-        const at = valueNow(time);
-        const options = format === undefined ? undefined : valueNow(format);
-        return (
-            context
-                .model()
-                .get(
-                    "slot-label-by",
-                    options === undefined
-                        ? { time: at }
-                        : { time: at, format: options },
-                ) ?? []
-        );
-    });
+    return calendarValue(
+        context,
+        () => {
+            const at = valueNow(time);
+            const options = format === undefined ? undefined : valueNow(format);
+            return (
+                context
+                    .model()
+                    .get(
+                        "slot-label-by",
+                        options === undefined
+                            ? { time: at }
+                            : { time: at, format: options },
+                    ) ?? []
+            );
+        },
+        { part: "slot-label" },
+    );
 }

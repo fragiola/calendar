@@ -46,6 +46,7 @@ export const DayEvents: CalendarComponent<DayEventsProps, DayEventsSlots> =
             const auto = useCalendarValue(
                 context,
                 () => context.model.state.settings.dayMaxEvents === "auto",
+                { part: "day-events" },
             );
             const segments = computed(() => {
                 const { week, column } = day.value;

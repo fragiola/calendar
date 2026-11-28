@@ -102,6 +102,11 @@ export interface MountOptions<F extends CalendarFeatures> {
     dayEventsHeight?: number;
     /** the height of a day-grid event, px; default 20 */
     eventHeight?: number;
+    /**
+     * keys the days, columns and slots by their position, as the adapters do (Epic #27): the next
+     * range gives the same elements their new dates (`data-key` still names the date)
+     */
+    positionKeys?: boolean;
 }
 
 function box(left: number, top: number, width: number, height: number) {
@@ -185,18 +190,32 @@ export function mount<const F extends CalendarFeatures = readonly []>(
         parent: HTMLElement,
         layout: () => DOMRect,
         seen: Set<string>,
+        position?: string,
     ) => {
-        seen.add(key);
-        let element = elements.get(key);
+        const id = options.positionKeys && position ? position : key;
+        seen.add(id);
+        let element = elements.get(id);
         if (!element) {
             element = document.createElement("div");
-            elements.set(key, element);
+            elements.set(id, element);
         }
         element.getBoundingClientRect = layout;
         element.dataset.key = key;
         if (element.parentElement !== parent) parent.append(element);
-        registered.set(key, { part, payload });
+        const before = registered.get(id);
+        registered.set(id, { part, payload });
         engine.adapter.register(part as never, payload as never, element);
+        // a reused element: its new key first, then its old one goes (as the adapters do)
+        if (
+            before &&
+            JSON.stringify(before.payload) !== JSON.stringify(payload)
+        ) {
+            engine.adapter.register(
+                before.part as never,
+                before.payload as never,
+                null,
+            );
+        }
         return element;
     };
 
@@ -222,6 +241,7 @@ export function mount<const F extends CalendarFeatures = readonly []>(
                     root,
                     () => box(left, top, 100, height),
                     seen,
+                    `day #${row}/${column}`,
                 );
                 use(
                     `day-events ${day.date}`,
@@ -231,6 +251,7 @@ export function mount<const F extends CalendarFeatures = readonly []>(
                     () =>
                         box(left, top + 20, 100, options.dayEventsHeight ?? 80),
                     seen,
+                    `day-events #${row}/${column}`,
                 );
             });
             for (const segment of week.segments) {
@@ -277,6 +298,7 @@ export function mount<const F extends CalendarFeatures = readonly []>(
                     scroller,
                     () => box(left, 100 - scrollTop, 100, 1440),
                     seen,
+                    `column #${index}`,
                 );
                 for (const slot of timeGrid.slots) {
                     use(
@@ -292,6 +314,7 @@ export function mount<const F extends CalendarFeatures = readonly []>(
                                 slot.height * 1440,
                             ),
                         seen,
+                        `slot #${index} ${slot.time}`,
                     );
                 }
                 for (const segment of column.segments) {
@@ -441,6 +464,16 @@ export function mount<const F extends CalendarFeatures = readonly []>(
         events,
         element,
         has: (key: string) => elements.has(key),
+        /** every registered part, keyed as its element */
+        parts: () => new Map(registered),
+        /** every registered part's attributes, as an adapter reads them after a change */
+        attributesOfAll: () =>
+            new Map(
+                [...registered].map(([key, { part, payload }]) => [
+                    key,
+                    engine.adapter.attributes(part as never, payload as never),
+                ]),
+            ),
         center,
         pointer,
         drag,

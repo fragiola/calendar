@@ -18,8 +18,10 @@ export function Days(props: DaysProps) {
     );
     return (
         <>
-            {week.days.map((day) => (
-                <React.Fragment key={day.date}>
+            {/* keyed by position: the next range's days reuse these elements (Epic #27) */}
+            {week.days.map((day, index) => (
+                // biome-ignore lint/suspicious/noArrayIndexKey: a day cell is its position in its row
+                <React.Fragment key={index}>
                     <MemoCall render={render} args={[day, week]} />
                 </React.Fragment>
             ))}

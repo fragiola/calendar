@@ -1,5 +1,4 @@
-import { splitRef } from "../composables/internal";
-import { type SlotState, useSlot } from "../composables/use-slot";
+import { type SlotState, useSlotPart } from "../composables/use-slot";
 import { SlotRowKey, useRequired } from "../context";
 import {
     type CalendarComponent,
@@ -28,21 +27,23 @@ export const Slot: CalendarComponent<SlotProps, SlotSlots> = definePrimitive<
     SlotSlots
 >("Slot", ["date", "as"], (props, { attrs, slots }) => {
     const row = useRequired(SlotRowKey, "Slot", "Calendar.SlotRow");
-    const { state, props: own } = useSlot(() => ({
+    const {
+        state,
+        props: own,
+        ref,
+    } = useSlotPart(() => ({
         date: props.date,
         time: row.value.slot.time,
     }));
-    return () => {
-        const { ref, props: elementProps } = splitRef(own.value);
-        return renderElement({
+    return () =>
+        renderElement({
             tag: "div",
             as: props.as,
             attrs,
             render: slots.render,
             state: state.value,
-            props: elementProps,
+            props: own.value,
             ref,
             children: () => slots.default?.(state.value),
         });
-    };
 });

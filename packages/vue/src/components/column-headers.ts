@@ -38,11 +38,19 @@ export const ColumnHeaders: CalendarComponent<
         const context = useCalendarContext("ColumnHeaders");
         const { model } = context;
         const part = usePart(context, "column-headers", () => ({}));
-        const columns = useCalendarValue(context, () => model.get("time-grid"));
-        const grid = useCalendarValue(context, () => {
-            const engine = context.engine.value;
-            return engine ? engine.get("day-grid") : model.get("day-grid");
-        });
+        const columns = useCalendarValue(
+            context,
+            () => model.get("time-grid"),
+            { part: "column-headers" },
+        );
+        const grid = useCalendarValue(
+            context,
+            () => {
+                const engine = context.engine.value;
+                return engine ? engine.get("day-grid") : model.get("day-grid");
+            },
+            { part: "column-headers" },
+        );
         const dates = computed(() =>
             columns.value
                 ? columns.value.columns.map((column) => column.date)
@@ -58,10 +66,11 @@ export const ColumnHeaders: CalendarComponent<
                 state: { dates: dates.value },
                 props: part.props.value,
                 ref: part.ref,
+                // keyed by position: the next range's headers reuse these elements (Epic #27)
                 children: () =>
-                    dates.value.map((date) =>
+                    dates.value.map((date, index) =>
                         h(MemoCall, {
-                            key: date,
+                            key: index,
                             render: render(),
                             names: NAMES,
                             a: date,

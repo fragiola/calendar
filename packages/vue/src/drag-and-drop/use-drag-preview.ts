@@ -1,7 +1,14 @@
 import type { DragPreview } from "@fragiola/calendar";
 import type { ComputedRef } from "vue";
 import { useCalendarValue } from "../composables/internal";
-import { useCalendarContext } from "../context";
+import { type AnyCalendarEngine, useCalendarContext } from "../context";
+
+/** @internal the engine's drag or resize preview (null: none, or no engine) */
+export function previewOf(
+    engine: AnyCalendarEngine | null,
+): DragPreview | null {
+    return engine?.get("drag-preview") ?? engine?.get("resize-preview") ?? null;
+}
 
 /**
  * The occurrence being dragged (`dragAndDrop()`, an outside drag with `externalDrop()`) or
@@ -10,10 +17,7 @@ import { useCalendarContext } from "../context";
  */
 export function useDragPreview(): ComputedRef<DragPreview | null> {
     const context = useCalendarContext("useDragPreview");
-    return useCalendarValue(context, () => {
-        const engine = context.engine.value;
-        return (
-            engine?.get("drag-preview") ?? engine?.get("resize-preview") ?? null
-        );
+    return useCalendarValue(context, () => previewOf(context.engine.value), {
+        part: "drag-preview",
     });
 }

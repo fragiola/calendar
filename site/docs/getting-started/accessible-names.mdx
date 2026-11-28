@@ -225,7 +225,7 @@ focusable items.
 | --- | --- | --- |
 | Arrows | move a day (Up and Down: a week in a month, a slot in a time grid) | Up and Down: the day's previous or next event |
 | Home, End | the first or last day of the week | |
-| PageUp, PageDown | the previous or next range (`view.previous`, `view.next`) | |
+| PageUp, PageDown | the previous or next range (`view.previous`, `view.next`), announced (`range`) | |
 | Shift + PageUp, PageDown | a year (month), a week (time grids) | |
 | Enter (or F2 on a date) | into the date's events (a slot: the events starting in it) | Enter: `event-click` |
 | Escape | | back to its date |
@@ -241,9 +241,13 @@ The keys follow the reading direction: in a right-to-left calendar, Left moves t
 
 ## Word the announcements
 
-A drag by the keyboard, or a selection grown with Shift, is announced as data: `onAnnounce`
-(`@announce` in Vue, `(announce)` in Angular) receives what happened (`grab`, `drag-over`, `drop`, `drag-cancel`, `select-extend`) with the
-occurrence and its times. Write the words into a live region of your own:
+A drag by the keyboard, a selection grown with Shift, or a range a key showed is announced as
+data: `onAnnounce` (`@announce` in Vue, `(announce)` in Angular) receives what happened (`grab`,
+`drag-over`, `drop`, `drag-cancel`, `select-extend`, `range`) with the occurrence and its times, or
+the range and the focused cell. The cells are keyed by position, so PageUp and PageDown may keep
+focus on the same element with a new date, and no focus event tells a screen reader: the `range`
+announcement does, once your polite live region says it. Write the words into a live region of
+your own:
 
 <Framework name="react">
 
@@ -255,6 +259,7 @@ const [message, setMessage] = useState("");
     onAnnounce={({ announcement }) => {
         if (announcement.kind === "grab") setMessage("Grabbed. Arrows move it, Enter drops it.");
         if (announcement.kind === "drag-cancel") setMessage("Left where it was.");
+        if (announcement.kind === "range") setMessage(`From ${announcement.range.start}, on ${announcement.focused.date}.`);
     }}
 >
     <div role="status" aria-live="polite">{message}</div>
@@ -276,6 +281,7 @@ const message = ref("");
 function announce({ announcement }: { announcement: Announcement }) {
     if (announcement.kind === "grab") message.value = "Grabbed. Arrows move it, Enter drops it.";
     if (announcement.kind === "drag-cancel") message.value = "Left where it was.";
+    if (announcement.kind === "range") message.value = `From ${announcement.range.start}, on ${announcement.focused.date}.`;
 }
 </script>
 
@@ -304,6 +310,7 @@ readonly message = signal("");
 announce({ announcement }: CalendarEngineEventOf<"announce">) {
     if (announcement.kind === "grab") this.message.set("Grabbed. Arrows move it, Enter drops it.");
     if (announcement.kind === "drag-cancel") this.message.set("Left where it was.");
+    if (announcement.kind === "range") this.message.set(`From ${announcement.range.start}, on ${announcement.focused.date}.`);
 }
 ```
 

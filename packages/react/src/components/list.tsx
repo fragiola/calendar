@@ -18,8 +18,10 @@ export function List(props: ListProps) {
     const { children, ...rest } = props;
     const context = useCalendarContext("List");
     const part = usePart(context, "list", {});
-    const empty = useCalendarValue(context, () =>
-        context.model.is("list-empty"),
+    const empty = useCalendarValue(
+        context,
+        () => context.model.is("list-empty"),
+        { part: "list" },
     );
     const state = { empty };
     return useRenderElement("div", rest, {

@@ -15,5 +15,6 @@ export function injectNowPosition(): Signal<NowPosition | null> {
     return calendarValue(
         context,
         () => context.engine()?.get("now-position") ?? null,
+        { part: "now-indicator" },
     );
 }

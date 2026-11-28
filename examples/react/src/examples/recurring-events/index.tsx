@@ -3,9 +3,12 @@
 import {
     Calendar,
     createCalendarModel,
+    type DayCell,
     type EditScope,
     type Segment,
+    type TimeGridColumn,
     type TimeSegment,
+    type TimeSlot,
     useCalendar,
     useCalendarTitle,
     useDayHeader,
@@ -18,7 +21,7 @@ import {
 import { recurrence } from "@fragiola/calendar-react/recurrence";
 import { ResizeHandle, resize } from "@fragiola/calendar-react/resize";
 import { ChevronLeft, ChevronRight, Repeat } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Clickable } from "#/components/atoms/clickable";
 import { Dialog } from "#/components/ui/dialog";
 import {
@@ -55,9 +58,8 @@ const SCOPES: { scope: EditScope; label: string }[] = [
 // asks: here a middleware holds the command, a dialog asks, and the command runs again with the
 // scope chosen: `this` overrides the occurrence, `following` splits the series, `all` changes it).
 export default function RecurringEvents() {
-    const [pending, setPending] = useState<Pending | null>(null);
-    const [model] = useState(() => {
-        const model = createCalendarModel<Types, typeof FEATURES>(
+    const [model] = useState(() =>
+        createCalendarModel<Types, typeof FEATURES>(
             {
                 version: 1,
                 events: [
@@ -89,29 +91,50 @@ export default function RecurringEvents() {
                 view: { type: "week", anchorDate: day() },
             },
             { features: FEATURES },
-        );
-        model.use((ctx, next) => {
-            if (
-                ctx.dryRun ||
-                ctx.meta?.scoped === true ||
-                (ctx.command !== "event.move" && ctx.command !== "event.resize")
-            ) {
-                return next();
-            }
-            const { eventId, occurrenceId } = ctx.payload;
-            const event = ctx.get("event-by", { id: eventId });
-            if (occurrenceId === undefined || event?.recurrence === undefined) {
-                return next();
-            }
-            setPending({
-                command: ctx.command,
-                payload: { ...ctx.payload },
-                title: event.title,
-            });
-            return veto("waiting for the user's scope");
-        });
-        return model;
-    });
+        ),
+    );
+    return (
+        <Calendar.Root model={model} className={styles.root}>
+            <Toolbar />
+            <WeekGrid />
+            <ScopeDialog />
+        </Calendar.Root>
+    );
+}
+
+// The dialog holds the edit waiting for its scope: asking re-renders the dialog, not the calendar.
+function ScopeDialog() {
+    const { model } = useCalendar<Types, typeof FEATURES>();
+    const [pending, setPending] = useState<Pending | null>(null);
+
+    useEffect(
+        () =>
+            model.use((ctx, next) => {
+                if (
+                    ctx.dryRun ||
+                    ctx.meta?.scoped === true ||
+                    (ctx.command !== "event.move" &&
+                        ctx.command !== "event.resize")
+                ) {
+                    return next();
+                }
+                const { eventId, occurrenceId } = ctx.payload;
+                const event = ctx.get("event-by", { id: eventId });
+                if (
+                    occurrenceId === undefined ||
+                    event?.recurrence === undefined
+                ) {
+                    return next();
+                }
+                setPending({
+                    command: ctx.command,
+                    payload: { ...ctx.payload },
+                    title: event.title,
+                });
+                return veto("waiting for the user's scope");
+            }),
+        [model],
+    );
 
     const choose = (scope: EditScope) => {
         if (!pending) return;
@@ -122,47 +145,43 @@ export default function RecurringEvents() {
     };
 
     return (
-        <Calendar.Root model={model} className={styles.root}>
-            <Toolbar />
-            <WeekGrid />
-            <Dialog.Root
-                open={pending !== null}
-                onOpenChange={(open) => {
-                    if (!open) setPending(null);
-                }}
-            >
-                <Dialog.Portal>
-                    <Dialog.Backdrop />
-                    <Dialog.Content>
-                        <Dialog.Header>
-                            <Dialog.Title>Edit recurring event</Dialog.Title>
-                            <Dialog.Description>
-                                {`“${pending?.title ?? ""}” repeats. Change which events?`}
-                            </Dialog.Description>
-                        </Dialog.Header>
-                        <Dialog.Body className={styles.scopes}>
-                            {SCOPES.map(({ scope, label }) => (
-                                <Clickable.Button
-                                    key={scope}
-                                    variant="outline"
-                                    className={styles.scope}
-                                    onClick={() => choose(scope)}
-                                >
-                                    {label}
-                                </Clickable.Button>
-                            ))}
-                        </Dialog.Body>
-                        <Dialog.Footer>
-                            <Dialog.Close
-                                render={<Clickable.Button variant="ghost" />}
+        <Dialog.Root
+            open={pending !== null}
+            onOpenChange={(open) => {
+                if (!open) setPending(null);
+            }}
+        >
+            <Dialog.Portal>
+                <Dialog.Backdrop className={styles.dialogBackdrop} />
+                <Dialog.Content className={styles.dialog}>
+                    <Dialog.Header>
+                        <Dialog.Title>Edit recurring event</Dialog.Title>
+                        <Dialog.Description>
+                            {`“${pending?.title ?? ""}” repeats. Change which events?`}
+                        </Dialog.Description>
+                    </Dialog.Header>
+                    <Dialog.Body className={styles.scopes}>
+                        {SCOPES.map(({ scope, label }) => (
+                            <Clickable.Button
+                                key={scope}
+                                variant="outline"
+                                className={styles.scope}
+                                onClick={() => choose(scope)}
                             >
-                                Cancel
-                            </Dialog.Close>
-                        </Dialog.Footer>
-                    </Dialog.Content>
-                </Dialog.Portal>
-            </Dialog.Root>
-        </Calendar.Root>
+                                {label}
+                            </Clickable.Button>
+                        ))}
+                    </Dialog.Body>
+                    <Dialog.Footer>
+                        <Dialog.Close
+                            render={<Clickable.Button variant="ghost" />}
+                        >
+                            Cancel
+                        </Dialog.Close>
+                    </Dialog.Footer>
+                </Dialog.Content>
+            </Dialog.Portal>
+        </Dialog.Root>
     );
 }
 
@@ -170,21 +189,13 @@ function WeekGrid() {
     return (
         <Calendar.TimeGrid aria-label="Week" className={styles.grid}>
             <Calendar.ColumnHeaders className={styles.headers}>
-                {(date) => <DayHeader date={date} />}
+                {dayHeader}
             </Calendar.ColumnHeaders>
             <Calendar.AllDayRow className={styles.allDayRow}>
                 <div aria-hidden className={styles.allDayLabel}>
                     all-day
                 </div>
-                <Calendar.Days>
-                    {(day) => (
-                        <Calendar.Day day={day} className={styles.allDayCell}>
-                            <Calendar.DayEvents>
-                                {(segment) => <AllDayEvent segment={segment} />}
-                            </Calendar.DayEvents>
-                        </Calendar.Day>
-                    )}
-                </Calendar.Days>
+                <Calendar.Days>{allDayCell}</Calendar.Days>
                 <DragPreview className={styles.rowPreview} />
             </Calendar.AllDayRow>
             <Calendar.Scroller
@@ -192,49 +203,62 @@ function WeekGrid() {
                 ref={scrollToMorning}
             >
                 <div className={styles.body}>
-                    <Calendar.SlotRows>
-                        {(slot) => (
-                            <Calendar.SlotRow
-                                slot={slot}
-                                className={styles.slotRow}
-                            >
-                                <Calendar.SlotLabel
-                                    className={styles.slotLabel}
-                                >
-                                    {slot.time.endsWith(":00") ? (
-                                        <SlotTime time={slot.time} />
-                                    ) : null}
-                                </Calendar.SlotLabel>
-                                <Calendar.Slots>
-                                    {(column) => (
-                                        <Calendar.Slot
-                                            date={column.date}
-                                            className={styles.slot}
-                                        />
-                                    )}
-                                </Calendar.Slots>
-                            </Calendar.SlotRow>
-                        )}
-                    </Calendar.SlotRows>
+                    <Calendar.SlotRows>{slotRow}</Calendar.SlotRows>
                     <Calendar.Columns className={styles.columns}>
-                        {(column) => (
-                            <Calendar.Column
-                                column={column}
-                                className={styles.column}
-                            >
-                                <Calendar.ColumnEvents>
-                                    {(segment) => (
-                                        <TimedEvent segment={segment} />
-                                    )}
-                                </Calendar.ColumnEvents>
-                                <DragPreview className={styles.preview} />
-                            </Calendar.Column>
-                        )}
+                        {dayColumn}
                     </Calendar.Columns>
                 </div>
             </Calendar.Scroller>
         </Calendar.TimeGrid>
     );
+}
+
+// The children functions read only their arguments, so they live outside the components: stable,
+// each is called again only for a row, a day or an event whose layout changed.
+function dayHeader(date: string) {
+    return <DayHeader date={date} />;
+}
+
+function allDayCell(day: DayCell) {
+    return (
+        <Calendar.Day day={day} className={styles.allDayCell}>
+            <Calendar.DayEvents>{allDayEvent}</Calendar.DayEvents>
+        </Calendar.Day>
+    );
+}
+
+function allDayEvent(segment: Segment) {
+    return <AllDayEvent segment={segment} />;
+}
+
+function slotRow(slot: TimeSlot) {
+    return (
+        <Calendar.SlotRow slot={slot} className={styles.slotRow}>
+            <Calendar.SlotLabel className={styles.slotLabel}>
+                {slot.time.endsWith(":00") ? (
+                    <SlotTime time={slot.time} />
+                ) : null}
+            </Calendar.SlotLabel>
+            <Calendar.Slots>{slotCell}</Calendar.Slots>
+        </Calendar.SlotRow>
+    );
+}
+
+function slotCell(column: TimeGridColumn) {
+    return <Calendar.Slot date={column.date} className={styles.slot} />;
+}
+
+function dayColumn(column: TimeGridColumn) {
+    return (
+        <Calendar.Column column={column} className={styles.column}>
+            <Calendar.ColumnEvents>{timedEvent}</Calendar.ColumnEvents>
+            <DragPreview className={styles.preview} />
+        </Calendar.Column>
+    );
+}
+
+function timedEvent(segment: TimeSegment) {
+    return <TimedEvent segment={segment} />;
 }
 
 /** Opens the time grid at 08:00 (app code: the scroll position is yours). */

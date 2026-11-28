@@ -20,7 +20,7 @@ import { Input } from "#/components/atoms/fields";
 import { Dialog } from "#/components/ui/dialog";
 import { Field } from "#/components/ui/field";
 import { CALENDARS, day, type Types, teamWeek } from "../_kit/data";
-import { text, timesOf, titleOf } from "../_kit/format";
+import { dateTimeFormat, text, timesOf, titleOf } from "../_kit/format";
 import * as styles from "./styles";
 
 const FEATURES = [selection()] as const;
@@ -138,7 +138,7 @@ function when(range: Range): string {
     if (range.allDay) {
         return `All day, from ${range.start} to before ${range.end}`;
     }
-    const format = new Intl.DateTimeFormat("en-US", {
+    const format = dateTimeFormat("en-US", {
         weekday: "long",
         hour: "numeric",
         minute: "2-digit",

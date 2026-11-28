@@ -19,12 +19,18 @@ export interface CalendarView {
 export function useCalendarView(): CalendarView {
     const context = useCalendarContext("useCalendarView");
     const { model } = context;
-    const view = useCalendarValue(context, () => model.state.view);
-    const visibleRange = useCalendarValue(context, () =>
-        model.get("visible-range"),
+    const view = useCalendarValue(context, () => model.state.view, {
+        part: "root",
+    });
+    const visibleRange = useCalendarValue(
+        context,
+        () => model.get("visible-range"),
+        { part: "root" },
     );
-    const currentRange = useCalendarValue(context, () =>
-        model.get("current-range"),
+    const currentRange = useCalendarValue(
+        context,
+        () => model.get("current-range"),
+        { part: "root" },
     );
     return {
         type: view.type,

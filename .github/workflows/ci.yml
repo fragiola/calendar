@@ -5,9 +5,9 @@
 # (Changesets: pull requests only), or needs one that is.
 #
 #   Checks            Biome, the source layout and the generated command reference (`pnpm check`),
-#                     TypeScript, the unit tests and the build (with the .d.ts check and the
-#                     features' bundle guard), then the bundle size report (`pnpm size`, a report
-#                     in the job summary, never a gate).
+#                     TypeScript, the unit tests, the core's bench budgets (`pnpm bench`), the
+#                     build (with the .d.ts check and the features' bundle guard), then the bundle
+#                     size report (`pnpm size`, a report in the job summary, never a gate).
 #   Package           `pnpm check:package`: builds and packs every package with pnpm, lints the
 #                     tarballs (dist-only exports, publint, attw), and fails on a package that is
 #                     neither the core nor a listed adapter. Each adapter (from the React, Vue and
@@ -73,6 +73,8 @@ jobs:
       - run: pnpm typecheck
 
       - run: pnpm test
+
+      - run: pnpm bench
 
       - run: pnpm build
 

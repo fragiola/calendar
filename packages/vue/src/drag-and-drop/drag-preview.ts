@@ -3,10 +3,11 @@ import type {
     Segment,
     TimeSegment,
 } from "@fragiola/calendar";
-import { computed, h } from "vue";
+import { h } from "vue";
 import {
     previewSegmentsIn,
     previewStyle,
+    useCalendarValue,
     usePart,
     useWhere,
     type Where,
@@ -19,7 +20,7 @@ import {
     type SlotFunction,
 } from "../utils/primitive";
 import { type RenderSlot, renderElement } from "../utils/render";
-import { useDragPreview } from "./use-drag-preview";
+import { previewOf } from "./use-drag-preview";
 
 export interface DragPreviewState {
     /** the moved, resized or dropped-in occurrence where it would land: its times */
@@ -84,15 +85,24 @@ export const DragPreview: CalendarComponent<
     "DragPreview",
     ["as"],
     (props, { attrs, slots }) => {
-        const preview = useDragPreview();
+        const context = useCalendarContext("DragPreview");
         const where = useWhere();
-        const segments = computed(() =>
-            previewSegmentsIn(preview.value, where.value),
+        // the preview where this one is: a move elsewhere keeps it null (no render here)
+        const shown = useCalendarValue(
+            context,
+            () => {
+                const preview = previewOf(context.engine.value);
+                const segments = previewSegmentsIn(preview, where.value);
+                return preview && segments.length > 0
+                    ? { preview, segments }
+                    : null;
+            },
+            { part: "drag-preview" },
         );
         return () => {
-            const current = preview.value;
-            if (!current) return null;
-            return segments.value.map((segment, index) =>
+            if (!shown.value) return null;
+            const { preview: current, segments } = shown.value;
+            return segments.map((segment, index) =>
                 h(
                     DragPreviewElement,
                     {

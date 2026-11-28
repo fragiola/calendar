@@ -47,10 +47,11 @@ export const Columns: CalendarComponent<ColumnsProps, ColumnsSlots> =
                     props: part.props.value,
                     ref: part.ref,
                     style: { pointerEvents: "none" },
+                    // keyed by position: the next range's columns reuse these elements
                     children: () =>
-                        (grid.value?.columns ?? []).map((column) =>
+                        (grid.value?.columns ?? []).map((column, index) =>
                             h(MemoCall, {
-                                key: column.date,
+                                key: index,
                                 render: render(),
                                 names: NAMES,
                                 a: column,

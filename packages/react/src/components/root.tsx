@@ -488,14 +488,18 @@ export function Root<
     // every change re-renders the root (its children are the app's elements, which do not
     // re-render with it): after each commit the engine measures and focuses what it waited for
     React.useSyncExternalStore(store.subscribe, store.version, store.version);
-    const attributes = useCalendarValue(context, () =>
-        live
-            ? live.adapter.attributes("root", {})
-            : partAttributes(model, "root", {}),
+    const attributes = useCalendarValue(
+        context,
+        () =>
+            live
+                ? live.adapter.attributes("root", {})
+                : partAttributes(model, "root", {}),
+        { part: "root" },
     );
     const gestureActive = useCalendarValue(
         context,
         () => live?.is("gesture-active") ?? false,
+        { part: "root" },
     );
     useIsomorphicLayoutEffect(() => {
         live?.adapter.committed();

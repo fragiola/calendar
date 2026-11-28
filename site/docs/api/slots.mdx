@@ -12,7 +12,10 @@ usually returns a `Calendar.Slot`.
 - The days are the time grid's columns (`model.get("time-grid")`), hidden days left out.
 - A day's call runs again only when its column object or the children function changes (the layout keeps
   an unchanged column the same object). A function declared outside the component, or wrapped in
-  `useCallback`, keeps unchanged rows from re-rendering. See
+  `useCallback`, keeps unchanged rows from re-rendering. A time grid has hundreds of slots: in React
+  and Vue the calls are not components of their own, and a `Calendar.Slot` whose props are the
+  same is not rendered again, so a drop renders no slot. In Vue, a row calls its slot for every day
+  when it renders (the time grid changed, or what the slot reads). See
   [Performance](/docs/guides/performance).
 - In a right-to-left calendar the days run from the right: the order of the calls is the same,
   your layout's inline direction flips them.

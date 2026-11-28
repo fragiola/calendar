@@ -36,6 +36,7 @@ export function DayEvents(props: DayEventsProps) {
     const auto = useCalendarValue(
         context,
         () => context.model.state.settings.dayMaxEvents === "auto",
+        { part: "day-events" },
     );
     const segments = React.useMemo(
         () => week.segments.filter((segment) => segment.startColumn === column),

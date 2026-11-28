@@ -17,10 +17,12 @@ export function useSelection(): CalendarSelection {
     const range = useCalendarValue(
         context,
         () => model.get("selected-range") ?? null,
+        { part: "selection" },
     );
     const preview = useCalendarValue(
         context,
         () => engine?.get("selection-preview") ?? null,
+        { part: "selection" },
     );
     return { range, preview };
 }

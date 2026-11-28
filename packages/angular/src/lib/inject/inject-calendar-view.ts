@@ -34,11 +34,14 @@ export function injectCalendarView(): Signal<CalendarView> {
                 currentRange: model.get("current-range"),
             };
         },
-        (a, b) =>
-            a.type === b.type &&
-            a.anchorDate === b.anchorDate &&
-            a.days === b.days &&
-            JSON.stringify([a.visibleRange, a.currentRange]) ===
-                JSON.stringify([b.visibleRange, b.currentRange]),
+        {
+            part: "root",
+            equal: (a, b) =>
+                a.type === b.type &&
+                a.anchorDate === b.anchorDate &&
+                a.days === b.days &&
+                JSON.stringify([a.visibleRange, a.currentRange]) ===
+                    JSON.stringify([b.visibleRange, b.currentRange]),
+        },
     );
 }

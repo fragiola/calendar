@@ -57,6 +57,7 @@ export class CalendarDayEventsDirective {
         const auto = calendarValue(
             this.context,
             () => this.context.model().state.settings.dayMaxEvents === "auto",
+            { part: "day-events" },
         );
         bindStructuralStyle(host, () =>
             auto()

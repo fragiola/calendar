@@ -8,11 +8,12 @@ import { useCalendarContext } from "../context";
 import {
     previewSegmentsIn,
     previewStyle,
+    useCalendarValue,
     usePart,
     useWhere,
 } from "../hooks/internal";
 import { type DivPrimitiveProps, useRenderElement } from "../utils/use-render";
-import { useDragPreview } from "./use-drag-preview";
+import { previewOf } from "./use-drag-preview";
 
 export interface DragPreviewState {
     /** the moved, resized or dropped-in occurrence where it would land: its times */
@@ -34,10 +35,22 @@ export interface DragPreviewProps extends DivPrimitiveProps<DragPreviewState> {
  * Rendered only while there is a target; hidden from assistive technology (`onAnnounce` tells).
  */
 export function DragPreview(props: DragPreviewProps) {
-    const preview = useDragPreview();
+    const context = useCalendarContext("DragPreview");
     const where = useWhere();
-    const segments = previewSegmentsIn(preview, where);
-    if (!preview) return null;
+    // the preview where this one is: a move elsewhere keeps it null (no re-render here)
+    const shown = useCalendarValue(
+        context,
+        () => {
+            const preview = previewOf(context.engine);
+            const segments = previewSegmentsIn(preview, where);
+            return preview && segments.length > 0
+                ? { preview, segments }
+                : null;
+        },
+        { part: "drag-preview" },
+    );
+    if (!shown) return null;
+    const { preview, segments } = shown;
     return (
         <>
             {segments.map((segment, index) => (

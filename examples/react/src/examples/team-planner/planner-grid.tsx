@@ -1,7 +1,10 @@
 import {
     Calendar,
+    type DayCell,
     type Segment,
+    type TimeGridColumn,
     type TimeSegment,
+    type TimeSlot,
     useCalendar,
     useCalendarView,
     useDayHeader,
@@ -30,21 +33,13 @@ export function PlannerGrid() {
             style={{ "--days": days } as CSSProperties}
         >
             <Calendar.ColumnHeaders className={styles.headers}>
-                {(date) => <DayHeader date={date} />}
+                {dayHeader}
             </Calendar.ColumnHeaders>
             <Calendar.AllDayRow className={styles.allDayRow}>
                 <div aria-hidden className={styles.allDayLabel}>
                     all-day
                 </div>
-                <Calendar.Days>
-                    {(day) => (
-                        <Calendar.Day day={day} className={styles.allDayCell}>
-                            <Calendar.DayEvents>
-                                {(segment) => <AllDayEvent segment={segment} />}
-                            </Calendar.DayEvents>
-                        </Calendar.Day>
-                    )}
-                </Calendar.Days>
+                <Calendar.Days>{allDayCell}</Calendar.Days>
                 <Selection className={styles.selection} />
                 <DragPreview className={styles.preview} />
             </Calendar.AllDayRow>
@@ -53,54 +48,65 @@ export function PlannerGrid() {
                 ref={scrollToMorning}
             >
                 <div className={styles.body}>
-                    <Calendar.SlotRows>
-                        {(slot) => (
-                            <Calendar.SlotRow
-                                slot={slot}
-                                className={styles.slotRow}
-                            >
-                                <Calendar.SlotLabel
-                                    className={styles.slotLabel}
-                                >
-                                    {slot.time.endsWith(":00") ? (
-                                        <SlotTime time={slot.time} />
-                                    ) : null}
-                                </Calendar.SlotLabel>
-                                <Calendar.Slots>
-                                    {(column) => (
-                                        <Calendar.Slot
-                                            date={column.date}
-                                            className={styles.slot}
-                                        />
-                                    )}
-                                </Calendar.Slots>
-                            </Calendar.SlotRow>
-                        )}
-                    </Calendar.SlotRows>
+                    <Calendar.SlotRows>{slotRow}</Calendar.SlotRows>
                     <Calendar.Columns className={styles.columns}>
-                        {(column) => (
-                            <Calendar.Column
-                                column={column}
-                                className={styles.column}
-                            >
-                                <BusinessHours
-                                    className={styles.businessHours}
-                                />
-                                <Calendar.ColumnEvents>
-                                    {(segment) => (
-                                        <TimedEvent segment={segment} />
-                                    )}
-                                </Calendar.ColumnEvents>
-                                <Selection className={styles.selection} />
-                                <DragPreview className={styles.preview} />
-                                <NowIndicator className={styles.now} />
-                            </Calendar.Column>
-                        )}
+                        {dayColumn}
                     </Calendar.Columns>
                 </div>
             </Calendar.Scroller>
         </Calendar.TimeGrid>
     );
+}
+
+// The children functions read only their arguments, so they live outside the components: stable,
+// each is called again only for a row, a day or an event whose layout changed.
+function dayHeader(date: string) {
+    return <DayHeader date={date} />;
+}
+
+function allDayCell(day: DayCell) {
+    return (
+        <Calendar.Day day={day} className={styles.allDayCell}>
+            <Calendar.DayEvents>{allDayEvent}</Calendar.DayEvents>
+        </Calendar.Day>
+    );
+}
+
+function allDayEvent(segment: Segment) {
+    return <AllDayEvent segment={segment} />;
+}
+
+function slotRow(slot: TimeSlot) {
+    return (
+        <Calendar.SlotRow slot={slot} className={styles.slotRow}>
+            <Calendar.SlotLabel className={styles.slotLabel}>
+                {slot.time.endsWith(":00") ? (
+                    <SlotTime time={slot.time} />
+                ) : null}
+            </Calendar.SlotLabel>
+            <Calendar.Slots>{slotCell}</Calendar.Slots>
+        </Calendar.SlotRow>
+    );
+}
+
+function slotCell(column: TimeGridColumn) {
+    return <Calendar.Slot date={column.date} className={styles.slot} />;
+}
+
+function dayColumn(column: TimeGridColumn) {
+    return (
+        <Calendar.Column column={column} className={styles.column}>
+            <BusinessHours className={styles.businessHours} />
+            <Calendar.ColumnEvents>{timedEvent}</Calendar.ColumnEvents>
+            <Selection className={styles.selection} />
+            <DragPreview className={styles.preview} />
+            <NowIndicator className={styles.now} />
+        </Calendar.Column>
+    );
+}
+
+function timedEvent(segment: TimeSegment) {
+    return <TimedEvent segment={segment} />;
 }
 
 /** Opens the time grid at 08:00 (app code: the scroll position is yours). */

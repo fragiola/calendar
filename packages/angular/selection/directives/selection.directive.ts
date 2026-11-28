@@ -59,11 +59,13 @@ export class CalendarSelectionDirective {
     private readonly shown = calendarValue(
         this.context,
         () => this.context.engine()?.get("selection-segments") ?? null,
+        { part: "selection" },
     );
     private readonly pending = calendarValue(
         this.context,
         () =>
             (this.context.engine()?.get("selection-preview") ?? null) !== null,
+        { part: "selection" },
     );
     private readonly segments = computed(() =>
         this.installed() ? previewSegmentsIn(this.shown(), this.where()) : [],

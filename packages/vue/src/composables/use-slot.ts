@@ -1,5 +1,11 @@
-import { computed, type MaybeRefOrGetter, toValue } from "vue";
+import {
+    type ComputedRef,
+    computed,
+    type MaybeRefOrGetter,
+    toValue,
+} from "vue";
 import { useCalendarContext } from "../context";
+import type { ElementRef } from "../utils/render";
 import { flag, type PartComposableResult, usePart } from "./internal";
 
 /** What a time-grid slot shows (`Calendar.Slot`, `useSlot`). */
@@ -26,6 +32,21 @@ export interface SlotState {
 export function useSlot(
     slot: MaybeRefOrGetter<{ date: string; time: string }>,
 ): PartComposableResult<SlotState> {
+    const { state, props, ref } = useSlotPart(slot);
+    return { state, props: computed(() => ({ ...props.value, ref })) };
+}
+
+/**
+ * @internal {@link useSlot}'s state, with the part's props and ref apart (`Calendar.Slot` renders
+ * hundreds of them: no copy of its props to put the ref in and take it out again)
+ */
+export function useSlotPart(
+    slot: MaybeRefOrGetter<{ date: string; time: string }>,
+): {
+    state: ComputedRef<SlotState>;
+    props: ComputedRef<Record<string, string | undefined>>;
+    ref: ElementRef;
+} {
     const context = useCalendarContext("useSlot");
     const { attributes, props, ref } = usePart(context, "slot", () => {
         const { date, time } = toValue(slot);
@@ -43,5 +64,5 @@ export function useSlot(
             businessHours: flag(current, "business-hours"),
         };
     });
-    return { state, props: computed(() => ({ ...props.value, ref })) };
+    return { state, props, ref };
 }

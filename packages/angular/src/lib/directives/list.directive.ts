@@ -20,9 +20,13 @@ export class CalendarListDirective {
     private readonly context = injectCalendarContext("[calendarList]");
 
     /** what it shows */
-    readonly state: Signal<ListState> = calendarValue(this.context, () => ({
-        empty: this.context.model().is("list-empty"),
-    }));
+    readonly state: Signal<ListState> = calendarValue(
+        this.context,
+        () => ({
+            empty: this.context.model().is("list-empty"),
+        }),
+        { part: "list" },
+    );
 
     constructor() {
         bindPart(this.context, injectHost(), "list", () => ({}));

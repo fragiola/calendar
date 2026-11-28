@@ -18,5 +18,6 @@ export function useDayHeader(
                 "day-header-by",
                 format === undefined ? { date } : { date, format },
             ) ?? [],
+        { part: "column-header" },
     );
 }

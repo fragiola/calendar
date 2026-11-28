@@ -15,7 +15,9 @@ switcher that changes it, are yours.
 
 The display zone is the `timeZone` setting: an IANA name (`"Europe/London"`) or `"local"`, the
 host's zone (the default). Changing it with `settings.set` moves every event to its wall clock in
-the new zone; the instants stay the same.
+the new zone; the instants stay the same. The host's zone is read once and again at each engine's
+midnight refresh (and when an engine is created), so a computer that changes zone shows the new one
+from the next day on.
 
 <Framework name="react">
 

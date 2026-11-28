@@ -17,18 +17,22 @@ export function injectDayHeader(
     format?: ValueOrSignal<FormatOptions | undefined>,
 ): Signal<readonly Intl.DateTimeFormatPart[]> {
     const context = injectCalendarContext("injectDayHeader");
-    return calendarValue(context, () => {
-        const day = valueNow(date);
-        const options = format === undefined ? undefined : valueNow(format);
-        return (
-            context
-                .model()
-                .get(
-                    "day-header-by",
-                    options === undefined
-                        ? { date: day }
-                        : { date: day, format: options },
-                ) ?? []
-        );
-    });
+    return calendarValue(
+        context,
+        () => {
+            const day = valueNow(date);
+            const options = format === undefined ? undefined : valueNow(format);
+            return (
+                context
+                    .model()
+                    .get(
+                        "day-header-by",
+                        options === undefined
+                            ? { date: day }
+                            : { date: day, format: options },
+                    ) ?? []
+            );
+        },
+        { part: "column-header" },
+    );
 }

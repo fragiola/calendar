@@ -85,12 +85,14 @@ export const Selection: CalendarComponent<SelectionProps, SelectionSlots> =
             const shown = useCalendarValue(
                 context,
                 () => context.engine.value?.get("selection-segments") ?? null,
+                { part: "selection" },
             );
             const pending = useCalendarValue(
                 context,
                 () =>
                     (context.engine.value?.get("selection-preview") ?? null) !==
                     null,
+                { part: "selection" },
             );
             const segments = computed(() =>
                 previewSegmentsIn(shown.value, where.value),

@@ -12,16 +12,20 @@ export function useSlotLabel(
     format?: MaybeRefOrGetter<FormatOptions | undefined>,
 ): ComputedRef<readonly Intl.DateTimeFormatPart[]> {
     const context = useCalendarContext("useSlotLabel");
-    return useCalendarValue(context, () => {
-        const at = toValue(time);
-        const options = toValue(format);
-        return (
-            context.model.get(
-                "slot-label-by",
-                options === undefined
-                    ? { time: at }
-                    : { time: at, format: options },
-            ) ?? []
-        );
-    });
+    return useCalendarValue(
+        context,
+        () => {
+            const at = toValue(time);
+            const options = toValue(format);
+            return (
+                context.model.get(
+                    "slot-label-by",
+                    options === undefined
+                        ? { time: at }
+                        : { time: at, format: options },
+                ) ?? []
+            );
+        },
+        { part: "slot-label" },
+    );
 }

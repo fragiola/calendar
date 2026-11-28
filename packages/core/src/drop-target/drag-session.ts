@@ -50,7 +50,7 @@ export class DragSession {
     begin(activity: DragActivity): void {
         this.activity = activity;
         this.preview = null;
-        this.host.changed();
+        this.host.changed("gesture");
     }
 
     /** Shows (or, `null`, hides) the preview, telling the app's live region when it changed. */
@@ -65,7 +65,7 @@ export class DragSession {
                 before.end === preview.end &&
                 before.allDay === preview.allDay);
         if (same) return;
-        this.host.changed();
+        this.host.changed("preview");
         this.host.emit({
             type: "announce",
             announcement: {
@@ -80,7 +80,7 @@ export class DragSession {
     finish(): void {
         this.activity = null;
         this.preview = null;
-        this.host.changed();
+        this.host.changed("gesture");
     }
 
     /** Ends the drag with nothing committed, telling the app's live region. */

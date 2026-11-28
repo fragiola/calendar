@@ -347,8 +347,9 @@ drag and ranges; RFC 5545 for recurrence; FullCalendar's documented default for 
   `drag-preview`, …), `attributes(part, payload)` (`data-calendar-part`, the model's attributes,
   the engine's `role`, `tabindex`, `data-focused`, the features' `data-selected`,
   `data-dragging`, `data-grabbed`, `data-resizing`), `committed()` (measure, pending focus),
-  `subscribe` / `getSnapshot` (view changes). The engine writes `tabIndex` on the roving elements
-  it focuses (Tree's) and `touch-action: none` on events while a drag feature is installed.
+  `subscribe` / `getSnapshot` (view changes; scoped since Issue #24, with `affects`). The engine
+  writes `tabIndex` on the roving elements it focuses (Tree's) and `touch-action: none` on events
+  while a drag feature is installed.
 - **Issue #5, roles.** Day grid: `grid` > `row` (week) > `gridcell` (day) > `list` (`day-events`) >
   `listitem` (events). (The time grid's first, column-major roles were replaced by Issue #7.)
 - **Issue #5, focus.** One tab stop: the focus position if shown, else today, else the current
@@ -618,6 +619,154 @@ drag and ranges; RFC 5545 for recurrence; FullCalendar's documented default for 
   and declares none. CI gains `push: branches: [main]` for the `Trigger www build` job only
   (Flow's shape: a `project-updated` `repository_dispatch` to `fragiola/www` with the
   `WWW_DISPATCH_TOKEN` secret, the step skipped without it); every other job skips a push.
+- **Issue #24, core performance (Epic #27).** Caching rules: no `Intl` object is built on a hot
+  path. Only five modules build one, each keeping what it builds
+  (`tests/perf/intl-constructions.test.ts` lists them and fails on a new one): `locale/date-time-format.ts`
+  (per locale, zone and options), `locale/week-info.ts` (per locale), `time-zone/time-zone-offset.ts`
+  (per zone), `time-zone/validate-time-zone.ts` (one answer per name), `time-zone/resolve-time-zone.ts`
+  (the host's zone, read once; `refreshHostTimeZone()` reads it again: at each engine's midnight
+  refresh, on the injected host's timer, and when an engine is created; a changed zone is a
+  `layout` notify, with `today-change` when the day changed). `todayOf` keeps each zone's day with
+  the instants it spans (exact, no minute rounding); `validateLocale` keeps each name's canonical
+  form; the model's layout memo is keyed by state, today and the resolved zone. The same test
+  allows at most 10 `Intl.DateTimeFormat` constructions for a drag of 30 previews and its drop
+  (26,690 before). Notify scopes: a `ViewChange` is `{ focus, gesture, preview, selection, layout }`
+  (`ViewScope`): `preview` a preview moved (no part's attributes), `selection` a selection in the
+  making (the date cells' `data-selected`), `gesture` a gesture started or ended (any part),
+  `focus` the focusable parts (`day`, `slot`, `event`), `layout` a measurement, the clock or the
+  host's zone (every part). A feature names its scope: `host.changed(...scopes)` (the drag session:
+  `begin`/`finish` `gesture`, `show` `preview`; selection `selection`; the now indicator `layout`);
+  no scope (an app's feature) is `gesture`, `preview` and `selection`. Each input event (every root
+  and document listener, the long press, the autoscroll frame, a feature's timer, an engine
+  action) is one batch, its scopes told once at its end: a drag's first move (activate, begin,
+  show) notifies once. For the adapters (Issue #25), `engine.adapter`: `attributes(part, payload,
+  options?)` is memoised per part (`engine/part-attribute-cache.ts`, three layers: the model's,
+  `baseAttributes`, read again when the state, today or the host's zone changed; the focus's, when
+  the tab stop or the focused position did; the features', written again on `gesture`,
+  `selection` or `layout`) and returns the same frozen record while the part's attributes are the
+  same (a commit keeps the records it did not change); `affects(change, part)` says whether a
+  change may change what a part shows (`engine/view-change.ts`: `layout` and `gesture` every part,
+  `focus` `day`/`slot`/`event`, `selection` `day`/`slot`/`selection`, `preview` `drag-preview`).
+  So an adapter subscribes once per root and, per part, re-reads only when `affects` says so and
+  re-renders only when the record is a new object; model commits still reach every part (the
+  record identity keeps the unchanged ones still). `tests/perf/attribute-recomputes.test.ts`
+  counts `baseAttributes` calls and new records: none on a preview move, the cells entered or
+  left on a selection move and a focus move. `pnpm bench` (Vitest 5's `bench` fixture,
+  `packages/core/bench/core.bench.ts`, the `core (TZ=UTC) (bench)` project; CI's Checks job runs
+  it) holds median budgets about twice a developer machine's: `model.get("time-grid")` and
+  `model.get("day-grid")` from a new state 0.2 ms, a 30-move drag in a busy week with an adapter
+  reading every part after each change 25 ms, a drop 12 ms.
+- **Issue #25, adapters re-render only what a change touches (Epic #27).** Each adapter keeps one
+  subscription per root and reads a part again only for the changes `engine.adapter.affects` names
+  for it (no adapter decides scopes itself): React's store (`utils/calendar-store.ts`) keeps the
+  last 32 changes and `changedSince(version, part)`, so `useCalendarValue(context, read, { part })`
+  skips the snapshot's read; Vue's and Angular's roots keep a revision per part name (bumped on a
+  model commit, a new engine, and the view changes that reach it), which the part's
+  `computed` reads instead of `version`. Every `usePart` / `bindPart` passes its part; a hook that
+  reads a model or engine value names the part it serves (`time-grid`, `day-grid`, `root`,
+  `drag-preview`, `selection`, `now-indicator`, …); no part (the root's committed-after-render
+  subscription) is every change. `DragPreview` (all three) reads only the preview where it is
+  (null elsewhere), so a move renders the preview it enters and leaves. React's `Calendar.Slot` is
+  `React.memo` and `Calendar.Slots` calls its function through `useEntityCalls` (the `MemoCall`
+  contract without a component per cell); Vue's `Calendar.Slots` calls its slot in its own render
+  (no `MemoCall`: a row's 7 calls run again when the row renders, its reactive reads tracked
+  there). Angular's root calls `committed()` only after a render that touched the calendar: a
+  change of the calendar, an element registered or gone (`context.touched()`), or a mutation of
+  the root's subtree (a `MutationObserver` read with `takeRecords()` in `afterEveryRender`; the
+  engine's own writes during `committed()` are dropped). `tests/render-counts.test.*` per adapter
+  (React counts components through the DevTools hook, `tests/render-counter.ts`, installed by
+  `tests/setup.ts` before React DOM loads; Vue a global mixin's `beforeMount`/`beforeUpdate`;
+  Angular probes in each template) on a busy week with stable children, 30 preview changes and a
+  drop: React 92 renders / 90 attribute reads per 30 changes (300 / 15,210 before) and 84 on the
+  drop (378); Vue 62 / 30 (270 / 15,150) and 76 (179); Angular 2 views / 30 reads (2 / 15,150) and
+  101 views (101: each slot cell of the two days is a view), and 0 `committed()` on an app render
+  outside the calendar (1). The core's `week-of-year` brute-force test compares in plain code and
+  asserts once (about 1.1 s to 0.25 s: it timed out once under the full suite).
+- **Issue #26, examples and embed (Epic #27).** State lives in the leaf that shows it: the scope
+  dialog of `recurring-events` and `team-planner` owns its pending edit and installs its own
+  middleware (React `useEffect(() => model.use(...))` with `useCalendar`, Vue
+  `onBeforeUnmount(model.use(...))` with `useCalendar`, Angular an `effect` whose cleanup removes it,
+  with `injectCalendar`); `drag-and-resize`'s status line (`DropStatus`) and `keyboard`'s live
+  region (`LiveRegion`) keep their text and are told through a handle (React `useImperativeHandle`,
+  Vue `defineExpose` + `useTemplateRef`, Angular `viewChild.required`). React's children functions
+  of those examples are declared outside the components (React's drop commit: 475 renders to 88 in
+  drag-and-resize, 558 to 67 in recurring-events). `_kit/format.ts` keeps one
+  `Intl.DateTimeFormat` per locale and options (`dateTimeFormat`, used by every example's own text:
+  `announce.ts`, the preview time, `when`); `examples/react/tests/format.test.ts` fails on a
+  formatter built twice. The scope dialog enters through example classes (`styles.dialog`,
+  `styles.dialogBackdrop`): a 150 ms tw-animate-css keyframe (`animate-in fade-in-25 zoom-in-95`)
+  that plays from the first frame it is in, its starting style its resting one (no transition under
+  it), the kit's exit kept; the kit's 200 ms transition starts only once `data-starting-style` is
+  gone, two to three frames after the mount. **Overlay promotion of a code-opened dialog**
+  (`src/embed/overlay-promotion.ts`, the same module in the three apps): when its portal mounts
+  (before its first paint) it asks and is held unseen where its opening starts (the portal
+  transparent, each `data-starting-style` the component removes put back, each CSS animation in it
+  paused) until the frame has its promoted size (the frame's `resize` to the armed viewport, or
+  `promoted`, whichever comes first; 300 ms without either: in place). The examples know nothing
+  of it. Proposed for `../ui`'s reference in the PR notes.
+- **Issue #26, the perf spec.** `examples/shared/e2e/perf.spec.ts` runs in its own Playwright
+  project (`perf`, Chromium, `dependencies: ["chromium", "mobile"]`, serial: alone once every
+  other spec is done; `--project perf --no-deps` runs it alone). The CPU slowed 4x through CDP
+  (`Emulation.setCPUThrottlingRate`, after the page is idle); a drag is 30 moves 16 ms apart
+  (timed in the test). Week and month drags of `drag-and-resize`: no long task over 50 ms from the
+  press, a frame's p95 ≤ 20 ms from the third move (the drag's start, which measures the grid, is
+  the long-task check's), the dropped event seen ≤ 50 ms after the release; a drop of
+  `recurring-events`' standup: its scope dialog seen ≤ 100 ms, ≤ 150 ms in the e2e host page that
+  promotes (`promote=1`), where it must first show in the promoted frame (its width the page's).
+  "Seen": a box and an opacity > 0.05 through its ancestors, in a frame callback. Each measure is
+  the median of 3 runs on fresh loads; **in CI every budget is doubled** (`process.env.CI`: 100 ms
+  long task, 40 ms p95, 100 ms drop, 200 ms dialog, 300 ms hosted). Each test prints its medians
+  (`perf (<framework>) <test>: {...}`) and annotates them. Measured locally (medians): week drop
+  35–44 ms, month 19–28 ms, p95 17 ms, no long task; dialog 33–63 ms, hosted 81–127 ms.
+- **Epic #27, week Next.** Next in `week` at 4x painted in 66 ms (React), 92 ms (Vue), 147 ms
+  (Angular). CDP CPU profiles of six clicks per framework found: every column header, all-day
+  day, slot and column keyed by its date, so the next range unmounted and created some 400
+  elements with their effects, refs and registrations (Angular: a view per cell, its `[class]`
+  binding adding each class with `classList.add`, about 23 ms a click; Vue: component instances
+  and DOM moves); each part's base attributes asking the model for the time grid, the column
+  index and the day's attributes (`columnIndex`, `cellStates`: a third of `read`); every focusable
+  registration computing the default tab stop (`gridCellsOf`) again. Fixed: those collections are
+  keyed by **position** in the three adapters (React `key={index}`, `useEntityCalls`'s
+  `keyOf(entity, index)`; Vue `key: index`; Angular `SlotViews` keys `String(index)`), so Next
+  updates the same elements (views) with their new dates; `AttributeLookups`
+  (`engine/part-attributes.ts`) reads the grid, its columns by date, each day's attributes and
+  `selectable` once per base stamp; the engine keeps its tab stop and the key of its element
+  (state, today, zone, focus position, measured lanes) and writes a registered element's
+  `tabindex` only when it differs; an element re-registered under a new key before its old key
+  goes stays in `byElement` (`tests/engine/calendar-engine.test.ts`, "an element reused");
+  Vue's `renderElement` makes one pass over the attributes and `Calendar.Slot` renders
+  `useSlotPart`'s props without copies. No layout read, scroll reset or style recalculation was
+  on the path (26 elements restyled after the fix). An app's own state in a cell's component now
+  stays with its position (the performance guide says how to key it by date). After: 34–43 ms
+  (React), 42–48 ms (Vue, the closest to its budget: about 40% of a click is Vue's per-slot
+  component update, 336 `Calendar.Slot`s, and its `flushPreFlushCbs` scan per child update),
+  35–42 ms (Angular). `tests/next-range.test.*` per adapter: the same elements with their new
+  dates, one tab stop, the keyboard and a press on the reused cells. `pnpm bench`: a week's Next
+  with the range registered and read, budget 12 ms (6 measured). The perf spec's
+  "Next in a week" test times six clicks per run with the browser's own `performance.now`,
+  `requestAnimationFrame` and `setTimeout`, kept by the probe before the fixed clock replaces
+  them (the fixed clock runs frame callbacks on a 16 ms grid and makes `Date.now` a script);
+  budget 50 ms, 100 ms in CI. Reusing the focused cell's element means PageDown in a time grid
+  moves no DOM focus (the same element, a new date): no `focus` event for a screen reader; the
+  next decision announces it.
+- **Epic #27, a range a key showed is announced (D12, D13, D19).** The date picker's way: a key
+  that shows another range (PageUp/PageDown, Shift with them, an arrow past the grid,
+  whichever cell keeps focus) emits `announce` with `{ kind: "range", range, focused }`: `range`
+  the model's `current-range` after it (`DateRangeJson`, `end` exclusive: a month view's month, a
+  time grid's days), `focused` the `CellPosition` now focused (an event's cell when the tab stop
+  fallback lands on one). Emitted after the focus moves, only when `current-range` changed (a
+  refused step, `validRange`, says nothing); navigation that is not a grid key (the toolbar's
+  buttons, `view.*` commands, the `focus` action) announces nothing: the app's controls carry their
+  own names, and an app that wants those announced words them itself. Data only, like the drags'
+  announcements; the adapters already pass every `announce` (`onAnnounce`, `@announce`,
+  `(announce)`). The core's harness gains `positionKeys` (cells keyed by position, as the
+  adapters) for the test of the reused focus target; `tests/next-range.test.*` per adapter check
+  the event on the same element and none for Next/Previous; the `keyboard` example's
+  `announce.ts` words it (the days, a whole month as its month, and the focused slot) and
+  `keyboard.spec.ts` checks the `status` region after PageDown and PageUp in every framework
+  (`team-planner` has no live region). The guidelines' `event-calendar-a11y` row is proposed the
+  rule in the PR notes (not edited here): reused cells keep focus, so a range change by a key is an announcement the
+  app feeds into a polite live region.
 
 - **Issue #12, the Vue examples.** `examples/vue` (`examples-vue`) follows Tree's Vue app: every
   example id as `src/examples/<id>/index.vue` with sibling SFCs (one per React component,
@@ -718,13 +867,14 @@ drag and ranges; RFC 5545 for recurrence; FullCalendar's documented default for 
 | `pnpm check:fix` | Biome check with auto-fix |
 | `pnpm typecheck` | `pnpm -r typecheck` (TypeScript 7, no emit; `packages/vue`: `vue-tsc` on TypeScript 6.0.3, its `.vue` type fixtures included; `packages/angular`: `ngc` strict templates on TypeScript 6.0.3, its tests included; `examples/angular`: `ngc` strict templates on TypeScript 6.0.3, the adapter's sources included) |
 | `pnpm test` | Vitest projects: `core (TZ=UTC)` and `core (TZ=America/Sao_Paulo)` (the core's suite twice, host zone forced, same expectations; node, jsdom per file with a docblock), `react` (jsdom + Testing Library over a fake layout, `TZ=UTC`; a server render in node), `vue` (jsdom + `@vue/test-utils` over the same fake layout, templates compiled at runtime by Vue's full build; a server render in node), `playground` (its catalog and scenarios), `examples-shared` (metadata, themes, manifest, loaders), `examples-react` (copyable imports, styles, kit, themes), `angular` (jsdom + a zoneless TestBed with Analog's plugin over the same fake layout, `TZ=UTC`; a server render through `@angular/platform-server` in node), `examples-vue` (the same contract for the Vue examples, styles and kit equal to React's, the copied theme, the Vue kit in jsdom), `examples-angular` (the same contract for the Angular examples, styles equal to Vue's, kit and theme equal to React's, the Angular kit in a zoneless TestBed), `site` (the export's contract, the docs reference, frameworks, the dev proxy, and the repository's script tests) |
+| `pnpm bench` | the core's bench budgets (`packages/core/bench/`, Vitest's `bench` fixture, the `core (TZ=UTC) (bench)` project): fails when a median passes its budget (Issue #24) |
 | `pnpm build` | `pnpm -r build` (tsdown), then `scripts/check-dts.ts` (no `any` in the built declarations) and `scripts/check-features.ts` (the bundle guard) |
 | `pnpm size` | the bundle size of every entry point (raw, gzip, min + gzip): a report, after `pnpm build` |
 | `pnpm check:package` | builds the packages, packs them with pnpm, checks the packed `exports` are the repo's without the source condition (only `types`/`import`/`default`, targets in `dist`), runs `publint --strict` and `attw --profile esm-only` on the tarballs, fails on a package neither the core nor in `ADAPTERS`, and runs each adapter's pin check and smoke app (`scripts/check-package.ts`) |
 | `pnpm changeset` | adds a changeset: every PR that changes what a package ships (`changedFilePatterns` in `.changeset/config.json`) carries one; every package is in one `fixed` group (`@fragiola/*`) |
 | `pnpm release:version` | `changeset version`: only a release workflow runs it (none yet: releasing comes after the user validates the library) |
 | `pnpm dev` | the playground (`apps/playground`, port 5173, `PLAYGROUND_PORT`): the examples, the scenarios with the Inspector, the fixtures |
-| `pnpm e2e` | the Playwright suites, one after the other: the playground's (`apps/playground/e2e`, against `pnpm dev`) and each examples app's (`examples/shared/e2e`, against a production build of the embed under `/calendar/embed/<framework>/`, built against the packages' `dist`: run `pnpm build` first) |
+| `pnpm e2e` | the Playwright suites, one after the other: the playground's (`apps/playground/e2e`, against `pnpm dev`) and each examples app's (`examples/shared/e2e`, against a production build of the embed under `/calendar/embed/<framework>/`, built against the packages' `dist`: run `pnpm build` first; each ends with its throttled perf budgets, `perf.spec.ts`, alone) |
 | `pnpm --filter examples-react dev` | the embed alone (port 5192, `PORT`; `?id=<slug>&theme=<name>`) |
 | `pnpm --filter examples-react vendor` | re-vendors Fragiola UI (`FRAGIOLA_REGISTRY`) |
 | `pnpm --filter examples-vue dev` | the Vue embed alone (port 5192, `PORT`; `?id=<slug>&theme=<name>`) |
@@ -740,7 +890,7 @@ manual run; a push to `main` runs no tests (main is what its PR tested), only th
 `repository_dispatch` of type `project-updated`, with the `WWW_DISPATCH_TOKEN` secret: a
 fine-grained token with Contents: read & write on `fragiola/www`; without it the step is skipped,
 not failed). Every other job is `if: github.event_name != 'push'` (Changesets: pull requests
-only), or needs one that is. Jobs: **Checks** (`pnpm check`, `typecheck`, `test`, `build`, `size`), **Package**
+only), or needs one that is. Jobs: **Checks** (`pnpm check`, `typecheck`, `test`, `bench`, `build`, `size`), **Package**
 (`pnpm check:package`), **Changesets** (`pnpm changeset status --since=origin/<base>`, skipped for
 `changeset-release/*`), **Changes** (`fetch-depth: 2`, `node scripts/e2e-suites.ts`, tested by
 `site/tests/e2e-suites.test.ts`): none for docs only (`site/docs/**`, `*.md`, `AGENTS.md`);
@@ -768,7 +918,8 @@ packages/angular/   @fragiola/calendar-angular  src/public-api.ts, src/lib/{dire
                                          tests/ by behaviour
 packages/core/      @fragiola/calendar   src/<domain>/ (schema, document, time, time-zone, locale, state, commands, model,
                                          view, layout, attributes, features, engine) and one folder per feature;
-                                         tests/ mirroring src/, tests/types/ (type fixtures), tests/guard.test.ts;
+                                         tests/ mirroring src/, tests/types/ (type fixtures), tests/guard.test.ts,
+                                         tests/perf/ (the Intl and recompute guards); bench/ (`pnpm bench`);
                                          scripts/generate-command-docs.ts
 site/               site                 export.ts, contract.ts, dev.ts, dev-proxy.ts, sources.ts, project.json,
                                          examples.json; docs/ (config.json, index.mdx, getting-started/,

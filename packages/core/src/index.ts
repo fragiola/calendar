@@ -93,6 +93,7 @@ export type {
     PartName,
     PartPayloadMap,
     ViewChange,
+    ViewScope,
 } from "./engine/adapter";
 export {
     type CalendarEngine,

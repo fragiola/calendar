@@ -61,8 +61,9 @@ export class CalendarColumnsItemDirective implements DoCheck {
         "[calendarColumns]",
     );
     private readonly views: SlotViews<ColumnsItemContext> = bindCollection(() =>
-        (this.columns.grid()?.columns ?? []).map((column) => ({
-            key: column.date,
+        // keyed by position: the next range's columns reuse these views (Epic #27)
+        (this.columns.grid()?.columns ?? []).map((column, index) => ({
+            key: String(index),
             context: { $implicit: column, column },
         })),
     );

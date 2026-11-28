@@ -25,9 +25,13 @@ export function ColumnHeaders(props: ColumnHeadersProps) {
     const context = useCalendarContext("ColumnHeaders");
     const { model, engine } = context;
     const part = usePart(context, "column-headers", {});
-    const columns = useCalendarValue(context, () => model.get("time-grid"));
-    const grid = useCalendarValue(context, () =>
-        engine ? engine.get("day-grid") : model.get("day-grid"),
+    const columns = useCalendarValue(context, () => model.get("time-grid"), {
+        part: "column-headers",
+    });
+    const grid = useCalendarValue(
+        context,
+        () => (engine ? engine.get("day-grid") : model.get("day-grid")),
+        { part: "column-headers" },
     );
     const dates = React.useMemo(
         () =>
@@ -41,8 +45,10 @@ export function ColumnHeaders(props: ColumnHeadersProps) {
         ref: part.ref,
         props: {
             ...part.props,
-            children: dates.map((date) => (
-                <MemoCall key={date} render={render} args={[date]} />
+            // keyed by position: the next range's headers reuse these elements (Epic #27)
+            children: dates.map((date, index) => (
+                // biome-ignore lint/suspicious/noArrayIndexKey: a column is its position
+                <MemoCall key={index} render={render} args={[date]} />
             )),
         },
     });

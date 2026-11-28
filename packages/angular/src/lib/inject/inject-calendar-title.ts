@@ -15,13 +15,17 @@ export function injectCalendarTitle(
     format?: ValueOrSignal<FormatOptions | undefined>,
 ): Signal<readonly Intl.DateTimeRangeFormatPart[]> {
     const context = injectCalendarContext("injectCalendarTitle");
-    return calendarValue(context, () => {
-        const options = format === undefined ? undefined : valueNow(format);
-        return context
-            .model()
-            .get(
-                "title-parts",
-                options === undefined ? {} : { format: options },
-            );
-    });
+    return calendarValue(
+        context,
+        () => {
+            const options = format === undefined ? undefined : valueNow(format);
+            return context
+                .model()
+                .get(
+                    "title-parts",
+                    options === undefined ? {} : { format: options },
+                );
+        },
+        { part: "root" },
+    );
 }

@@ -13,16 +13,20 @@ export function useDayHeader(
     format?: MaybeRefOrGetter<FormatOptions | undefined>,
 ): ComputedRef<readonly Intl.DateTimeFormatPart[]> {
     const context = useCalendarContext("useDayHeader");
-    return useCalendarValue(context, () => {
-        const day = toValue(date);
-        const options = toValue(format);
-        return (
-            context.model.get(
-                "day-header-by",
-                options === undefined
-                    ? { date: day }
-                    : { date: day, format: options },
-            ) ?? []
-        );
-    });
+    return useCalendarValue(
+        context,
+        () => {
+            const day = toValue(date);
+            const options = toValue(format);
+            return (
+                context.model.get(
+                    "day-header-by",
+                    options === undefined
+                        ? { date: day }
+                        : { date: day, format: options },
+                ) ?? []
+            );
+        },
+        { part: "column-header" },
+    );
 }

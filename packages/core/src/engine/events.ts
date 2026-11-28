@@ -3,7 +3,8 @@
 // and announcements (D13): data the app turns into its own live region's text (the library has
 // none).
 import type { SelectionRange } from "../features/types";
-import type { GridPoint } from "./grid-point";
+import type { DateRangeJson } from "../state/queries";
+import type { CellPosition, GridPoint } from "./grid-point";
 import type { PreviewTimes } from "./preview";
 
 /** What an announcement is about (the app writes the text). */
@@ -33,6 +34,18 @@ export type Announcement =
           /** a keyboard selection grew or shrank (Shift + arrows): `null` when refused */
           readonly kind: "select-extend";
           readonly range: SelectionRange | null;
+      }
+    | {
+          /**
+           * a key showed another range (PageUp/PageDown, Shift with them, an arrow past the grid):
+           * the days the view is about now (`current-range`) and the cell focused there. The
+           * adapters reuse the cells' elements by position, so the focused element may be the one
+           * focused before, with a new date: no `focus` event tells a screen reader (the date
+           * picker's live region does)
+           */
+          readonly kind: "range";
+          readonly range: DateRangeJson;
+          readonly focused: CellPosition;
       };
 
 /** An engine event. */

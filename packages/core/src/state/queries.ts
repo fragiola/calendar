@@ -51,6 +51,7 @@ import type { FormatOptions } from "../locale/date-time-format";
 import { fromEpochDay, toEpochDay } from "../time/epoch-day";
 import { formatPlainDate } from "../time/format-plain-date";
 import { parsePlainDate } from "../time/parse-plain-date";
+import { resolveTimeZone } from "../time-zone/resolve-time-zone";
 import { todayOf } from "../view/today";
 import { isValidDay } from "../view/valid-days";
 import type { DayRange } from "../view/view-days";
@@ -324,7 +325,9 @@ export function createQueries(
 
     const inputOf = (state: CalendarState): LayoutInput => {
         const today = todayOf(state.settings, now);
-        return input.get([state, today], () =>
+        // the host's zone, for a `"local"` display zone: read again at an engine's refresh
+        const zone = resolveTimeZone(state.settings.timeZone);
+        return input.get([state, today, zone], () =>
             layoutInput(state, features, today),
         );
     };

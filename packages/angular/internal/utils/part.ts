@@ -46,10 +46,12 @@ function registerElement<P extends PartName>(
     const owner = `${part} ${key}`;
     map.set(owner, element);
     engine.adapter.register(part, payload, element);
+    context.touched();
     return () => {
         if (map.get(owner) === element) {
             map.delete(owner);
             engine.adapter.register(part, payload, null);
+            context.touched();
         }
     };
 }
@@ -76,15 +78,20 @@ export function bindPart<P extends PartName>(
 ): Signal<PartAttributes> {
     const { register = true, injector } = options;
     const given = () => beforeInputs(undefined, payload);
-    const attributes = calendarValue(context, (): PartAttributes => {
-        const now = given();
-        if (now === undefined) return {};
-        const engine = context.engine();
-        const partOptions = context.partOptions();
-        return engine
-            ? engine.adapter.attributes(part, now, partOptions)
-            : partAttributes(context.model(), part, now, partOptions);
-    });
+    // the engine's record is the same object while the part's attributes are (Issue #24)
+    const attributes = calendarValue(
+        context,
+        (): PartAttributes => {
+            const now = given();
+            if (now === undefined) return {};
+            const engine = context.engine();
+            const partOptions = context.partOptions();
+            return engine
+                ? engine.adapter.attributes(part, now, partOptions)
+                : partAttributes(context.model(), part, now, partOptions);
+        },
+        { part },
+    );
     bindAttributes(element, attributes, injector);
     if (register) {
         // by its value: a new payload object of the same part keeps the registration

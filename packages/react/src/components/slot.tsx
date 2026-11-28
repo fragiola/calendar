@@ -1,4 +1,4 @@
-import type * as React from "react";
+import * as React from "react";
 import { SlotRowContext, useRequired } from "../context";
 import { splitRef } from "../hooks/internal";
 import { type SlotState, useSlot } from "../hooks/use-slot";
@@ -13,9 +13,10 @@ export interface SlotProps extends DivPrimitiveProps<SlotState> {
 
 /**
  * A day's cell of a slot row (`role="gridcell"`, `data-date`, `data-time`, `data-selected`, …):
- * one cell of the grid's roving focus; a press selects from it with `selection()`.
+ * one cell of the grid's roving focus; a press selects from it with `selection()`. Memoised: a
+ * slot row's call for a day whose events changed gives the same props, which skip it.
  */
-export function Slot(props: SlotProps) {
+export const Slot = React.memo(function Slot(props: SlotProps) {
     const { date, children, ...rest } = props;
     const { slot } = useRequired(SlotRowContext, "Slot", "Calendar.SlotRow");
     const { state, props: own } = useSlot({ date, time: slot.time });
@@ -29,4 +30,4 @@ export function Slot(props: SlotProps) {
                 typeof children === "function" ? children(state) : children,
         },
     });
-}
+});

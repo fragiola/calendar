@@ -20,7 +20,7 @@ import { Input } from "#/components/atoms/fields";
 import { DIALOG } from "#/components/ui/dialog";
 import { FIELD_PARTS } from "#/components/ui/field";
 import { CALENDARS, day, type Types, teamWeek } from "../_kit/data";
-import { text, timesOf, titleOf } from "../_kit/format";
+import { dateTimeFormat, text, timesOf, titleOf } from "../_kit/format";
 import { DayHeader } from "./day-header";
 import * as styles from "./styles";
 import { Toolbar } from "./toolbar";
@@ -199,7 +199,7 @@ export default class SelectToCreate {
         if (range.allDay) {
             return `All day, from ${range.start} to before ${range.end}`;
         }
-        const format = new Intl.DateTimeFormat("en-US", {
+        const format = dateTimeFormat("en-US", {
             weekday: "long",
             hour: "numeric",
             minute: "2-digit",

@@ -13,5 +13,6 @@ export function useNowPosition(): ComputedRef<NowPosition | null> {
     return useCalendarValue(
         context,
         () => context.engine.value?.get("now-position") ?? null,
+        { part: "now-indicator" },
     );
 }

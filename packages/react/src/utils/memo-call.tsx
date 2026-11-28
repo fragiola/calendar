@@ -29,3 +29,45 @@ export const MemoCall = React.memo(function MemoCall(props: MemoCallProps) {
     ) => React.ReactNode;
     return <>{call(...props.args)}</>;
 }, same);
+
+/**
+ * @internal `MemoCall`'s contract without a component per entity, for a collection called many
+ * times per row (a slot row's days): each entity's call runs again only when `render` or the
+ * entity changed, else its last element is given again (the same object, which React skips)
+ */
+export function useEntityCalls<E>(
+    render: (entity: E) => React.ReactNode,
+    entities: readonly E[],
+    keyOf: (entity: E, index: number) => string,
+): React.ReactNode[] {
+    const cache = React.useRef(
+        new Map<
+            string,
+            {
+                render: (entity: E) => React.ReactNode;
+                entity: E;
+                node: React.ReactNode;
+            }
+        >(),
+    );
+    const next = new Map<
+        string,
+        {
+            render: (entity: E) => React.ReactNode;
+            entity: E;
+            node: React.ReactNode;
+        }
+    >();
+    const nodes = entities.map((entity, index) => {
+        const key = keyOf(entity, index);
+        const previous = cache.current.get(key);
+        const call =
+            previous?.render === render && Object.is(previous.entity, entity)
+                ? previous
+                : { render, entity, node: render(entity) };
+        next.set(key, call);
+        return <React.Fragment key={key}>{call.node}</React.Fragment>;
+    });
+    cache.current = next;
+    return nodes;
+}

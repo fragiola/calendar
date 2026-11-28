@@ -122,6 +122,21 @@ export const scopes = "flex flex-col gap-2";
 
 export const scope = "justify-start";
 
+// The scope prompt answers the drop the person just made, so it shows in the first frame it is
+// in: a 150 ms keyframe (tw-animate-css's `animate-in`) that starts a quarter opaque and plays
+// from that frame, instead of the kit's 200 ms transition, which starts from transparent once
+// `data-starting-style` is gone, frames later. Its starting style is its resting one, so no
+// transition runs under the keyframe; its exit keeps the kit's.
+export const dialog = cn(
+    "animate-in duration-150 fade-in-25 zoom-in-95 motion-reduce:animate-none",
+    "data-starting-style:scale-100 data-starting-style:opacity-100",
+);
+
+export const dialogBackdrop = cn(
+    "animate-in duration-150 fade-in-25 motion-reduce:animate-none",
+    "data-starting-style:opacity-100",
+);
+
 export const preview =
     "palette-blue pointer-events-none z-10 rounded-(--cal-event-radius) bg-palette-base/25 ring-2 ring-palette-base ring-inset";
 

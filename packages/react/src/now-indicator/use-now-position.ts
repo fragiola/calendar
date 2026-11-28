@@ -10,5 +10,9 @@ import { useCalendarValue } from "../hooks/internal";
 export function useNowPosition(): NowPosition | null {
     const context = useCalendarContext("useNowPosition");
     const { engine } = context;
-    return useCalendarValue(context, () => engine?.get("now-position") ?? null);
+    return useCalendarValue(
+        context,
+        () => engine?.get("now-position") ?? null,
+        { part: "now-indicator" },
+    );
 }
